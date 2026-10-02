@@ -80,9 +80,12 @@ window.NCR = window.NCR || {};
   const byDue = (a, b) => (a.Due_Date || '9999') < (b.Due_Date || '9999') ? -1 : (a.Due_Date || '9999') > (b.Due_Date || '9999') ? 1 : 0;
   const byOldest = (a, b) => String(a.NCR_Date || '9999').localeCompare(String(b.NCR_Date || '9999'));
 
+  const emptyState = () => `<div class="card empty-state"><h2>No NCRs yet</h2><p>All data comes from your Excel export. Upload the file to get started — upload the same export again every week and only new or changed NCRs are applied.</p><a class="btn primary" href="#/import">Import Excel</a></div>`;
+
   // ---------- Today ----------
   const TF = { buyer: '' };
   function today() {
+    if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Today</h1></div>' + emptyState() };
     const all = open().filter((n) => !TF.buyer || buyerOf(n) === TF.buyer);
     const sec = { overdue: [], today: [], ready: [], new: [], review: [], soon: [] };
     all.forEach((n) => { const k = inf(n).section; if (k) sec[k].push(n); });
@@ -105,6 +108,7 @@ window.NCR = window.NCR || {};
 
   // ---------- Overview (dashboard) ----------
   function dashboard() {
+    if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Overview</h1></div>' + emptyState() };
     const o = open().map((n) => ({ n, i: inf(n) }));
     const month = L.todayISO().slice(0, 7), t = L.todayISO();
     const cnt = (fn) => o.filter(fn).length;
@@ -373,11 +377,11 @@ window.NCR = window.NCR || {};
     const ta = (k, l) => `<label>${l}<textarea name="${k}" rows="8">${esc((s[k] || []).join('\n'))}</textarea></label>`;
     return { html: `<div class="page-head"><h1>Settings</h1></div>
       <section class="card"><h2>Data source</h2>
-        <p class="hint">Mode: <b>${st.mode === 'sheets' ? 'Google Sheets (live)' : 'Demo – data stored only in this browser'}</b>. See README for the 5-minute Apps Script setup.</p>
+        <p class="hint">Mode: <b>${st.mode === 'sheets' ? 'Google Sheets (live)' : 'Browser only – data stays in this browser'}</b>. See README for the 5-minute Apps Script setup.</p>
         <form id="api" class="form"><label class="full">Apps Script Web App URL<input name="url" value="${esc(cfg.url || '')}" placeholder="https://script.google.com/macros/s/…/exec"></label>
           <label>API key (optional)<input name="key" value="${esc(cfg.key || '')}"></label>
           <div class="full actions"><button class="btn primary" type="submit">Save &amp; connect</button>
-          ${st.mode === 'demo' ? '<button class="btn" type="button" id="reset-demo">Reset demo data</button>' : ''}</div></form></section>
+          ${st.mode === 'demo' ? '<button class="btn danger" type="button" id="reset-demo">Clear all data in this browser</button>' : ''}</div></form></section>
       <form id="cfg" class="card"><h2>Dropdowns &amp; thresholds</h2><p class="hint">One option per line.</p>
         <div class="form cols3">${ta('dispositions', 'Disposition')}${ta('nextActions', 'Next Action')}${ta('waitingFor', 'Waiting For')}${ta('owners', 'Owners (suggestions)')}</div>
         <div class="form cols3"><label>Due Soon window (days)<input type="number" min="1" name="dueSoonDays" value="${s.dueSoonDays}"></label>
@@ -395,7 +399,7 @@ window.NCR = window.NCR || {};
         S.setApiConfig({ url: String(f.get('url')).trim(), key: String(f.get('key')).trim() });
         await S.init(); NCR.app.toast(st.error || 'Connected'); NCR.app.render();
       });
-      const rd = root.querySelector('#reset-demo'); if (rd) rd.addEventListener('click', async () => { if (confirm('Reset demo data?')) { await S.resetDemo(); NCR.app.toast('Demo data reset'); } });
+      const rd = root.querySelector('#reset-demo'); if (rd) rd.addEventListener('click', async () => { if (confirm('Delete all NCR data stored in this browser?')) { await S.resetDemo(); NCR.app.toast('Data cleared'); } });
       root.querySelector('#cfg').addEventListener('submit', (e) => {
         e.preventDefault(); const f = new FormData(e.target);
         const lines = (k) => String(f.get(k)).split('\n').map((x) => x.trim()).filter(Boolean);

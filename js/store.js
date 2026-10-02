@@ -22,6 +22,12 @@ window.NCR = window.NCR || {};
       let d = null;
       try { d = JSON.parse(localStorage.getItem(DATA_KEY)); } catch (e) { /* ignore */ }
       if (!d) { d = demoData(); localStorage.setItem(DATA_KEY, JSON.stringify(d)); }
+      // remove sample rows seeded by earlier versions
+      if (d.ncrs.some((n) => String(n.NCR_ID).startsWith('NCR-DEMO'))) {
+        d.ncrs = d.ncrs.filter((n) => !String(n.NCR_ID).startsWith('NCR-DEMO'));
+        d.history = d.history.filter((h) => !String(h.NCR_ID).startsWith('NCR-DEMO'));
+        localStorage.setItem(DATA_KEY, JSON.stringify(d));
+      }
       return d;
     },
     async save(p) {
@@ -240,30 +246,8 @@ window.NCR = window.NCR || {};
 
   function resetDemo() { LocalAdapter.reset(); return reload(); }
 
-  function demoData() {
-    const t = L.todayISO(), d = (n) => L.addDays(t, n);
-    const mk = (i, o) => Object.assign({ NCR_ID: 'NCR-DEMO' + i, NCR_No: 'NCR-2503' + i, Followup_Count: 0, Status: 'Open', Created_At: L.nowStamp(), Updated_At: L.nowStamp() }, o);
-    const rows = [
-      mk(1, { Buyer_Remark: 'Waiting scrap approval from PD', Buyer_Remark_Date: d(-9), Item_No: '8535', Batch_No: 'B2409-11', Supplier: 'Alpha Plastics', Buyer: 'Somchai', NCR_Date: d(-20), Defect: 'Burr on mounting face', Quantity: '1,200 pcs', Disposition: 'Scrap', Next_Action: 'Scrap', Owner: 'Buyer – Somchai', Waiting_For: 'Purchasing', Due_Date: d(-2), Followup_Count: 3, Last_Followup: d(-4), Status: 'Pending' }),
-      mk(2, { Buyer_Remark: 'Supplier will send replacement next week', Buyer_Remark_Date: d(-3), Item_No: '7120', Batch_No: 'L-0932', Supplier: 'Beta Metals', Buyer: 'Malee', NCR_Date: d(-9), Defect: 'Out of tolerance (Ø 12.4)', Quantity: '300 pcs', Disposition: 'Return to Supplier', Next_Action: 'Supplier Replacement', Owner: 'Buyer – Malee', Waiting_For: 'Supplier', Due_Date: d(0), Followup_Count: 1, Last_Followup: d(-3), Status: 'Pending' }),
-      mk(3, { Buyer_Remark: 'Rework in progress at supplier', Buyer_Remark_Date: d(-1), Item_No: '4410', Batch_No: 'X77', Supplier: 'Gamma Coatings', Buyer: 'Somchai', NCR_Date: d(-5), Defect: 'Paint peeling', Quantity: '80 pcs', Disposition: 'Rework', Next_Action: 'Rework', Owner: 'QA', Waiting_For: 'Production', Due_Date: d(2), Last_Followup: d(-1), Followup_Count: 1, Status: 'Open' }),
-      mk(4, { Item_No: '9001', Batch_No: 'K-12', Supplier: 'Delta Rubber', Buyer: 'Malee', NCR_Date: d(-14), Defect: 'Wrong colour', Quantity: '2,000 pcs', Disposition: 'Use As Is', Next_Action: 'Waiting Customer Decision', Owner: 'QA', Waiting_For: 'Customer', Due_Date: d(6), Followup_Count: 2, Last_Followup: d(-2), Status: 'Pending' }),
-      mk(5, { Item_No: '3302', Batch_No: 'Z-5', Supplier: 'Alpha Plastics', Buyer: 'Somchai', NCR_Date: d(-12), Defect: 'Short shot', Quantity: '450 pcs', Disposition: 'Sorting', Next_Action: 'Close NCR', Owner: 'QA', Waiting_For: 'QA', Due_Date: d(-1), Followup_Count: 2, Last_Followup: d(-1), Status: 'Ready to Close' }),
-      mk(6, { Item_No: '5150', Batch_No: 'M-808', Supplier: 'Beta Metals', Buyer: 'Malee', NCR_Date: d(-1), Defect: 'Rust spots', Quantity: '60 pcs', Status: 'Not Started' }),
-      mk(7, { Item_No: '6644', Batch_No: 'C-19', Supplier: 'Gamma Coatings', Buyer: 'Somchai', NCR_Date: d(-30), Defect: 'Dent', Quantity: '25 pcs', Disposition: 'Scrap', Next_Action: 'Scrap', Owner: 'Buyer – Somchai', Waiting_For: 'Purchasing', Due_Date: d(-10), Closed_Date: d(-8), Followup_Count: 2, Status: 'Closed' }),
-    ];
-    rows.forEach((n) => { n.Aging = L.daysBetween(n.NCR_Date, n.Status === 'Closed' ? n.Closed_Date : t); });
-    const hist = [];
-    const H = (i, date, no, action, waiting, remark) => hist.push({ History_ID: 'H-DEMO' + hist.length, NCR_ID: 'NCR-DEMO' + i, NCR_No: 'NCR-2503' + i, Date: date, Followup_No: no, Action: action, Waiting_For: waiting, Remark: remark || '', Created_By: 'QA', Created_At: date + 'T09:00:00' });
-    H(1, d(-14), 1, 'Waiting for Purchasing confirmation of disposition', 'Purchasing');
-    H(1, d(-9), 2, 'Buyer confirmed scrap disposition. Waiting for scrap completion.', 'Purchasing');
-    H(1, d(-4), 3, 'No update from buyer – asked again', 'Purchasing', 'Escalation recommended');
-    H(2, d(-3), 1, 'Asked supplier for replacement ETA', 'Supplier');
-    H(7, d(-12), 1, 'Waiting for scrap approval', 'Purchasing');
-    H(7, d(-9), 2, 'Scrap done, evidence received', 'Purchasing');
-    H(7, d(-8), '', 'QA verified and closed', 'QA');
-    return { ncrs: rows, history: hist, settings: L.DEFAULT_SETTINGS };
-  }
+  // Browser-only mode starts empty: all data comes from the uploaded Excel file.
+  function demoData() { return { ncrs: [], history: [], settings: {} }; }
 
   NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
     saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, removeNcr, saveMany, saveSettings, getApiConfig, setApiConfig, resetDemo };

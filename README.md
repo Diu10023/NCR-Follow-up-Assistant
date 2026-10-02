@@ -6,7 +6,7 @@ Static web app (plain HTML/CSS/JS, no build) + Google Sheets backend via a small
 
 ## Run
 Open `index.html` in a browser (or host the folder on any static host / GitHub Pages).
-With no backend configured it runs in **Demo mode** (sample data, stored in the browser only).
+With no backend configured the app starts empty and keeps data in the browser only; import your Excel file to begin. There is no sample data.
 
 ## Connect Google Sheets (auto load/save, no Sync button)
 1. Create a Google Sheet. **Extensions → Apps Script**, paste `apps-script/Code.gs`.

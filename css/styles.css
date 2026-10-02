@@ -91,3 +91,4 @@ label.inline,.inline{display:flex;flex-direction:row;align-items:center;gap:8px}
 #bulkbar[hidden]{display:none}#bulkbar .btn{border-color:#ffffff55}
 body:has(#bulkbar:not([hidden])) .wrap{padding-bottom:90px}
 .card.slim{padding:9px 16px;margin-bottom:8px;font-weight:600}.card.slim .muted{font-weight:400}
+.empty-state{text-align:center;padding:40px 20px}.empty-state p{max-width:520px;margin:0 auto 16px;color:var(--mut)}
