@@ -15,6 +15,9 @@ With no backend configured the app starts empty and keeps data in the browser on
 
 Sheets `NCR_Master`, `Followup_History` and `Settings` are created automatically with the specified columns.
 
+## Uploaded the wrong file?
+**Settings → Your data**: *Undo last import* (removes what it added, restores what it changed) or *Clear all NCR data* (type DELETE). The Import page also shows *Undo this import* right after an import. In Google Sheets mode, paste the latest `apps-script/Code.gs` and redeploy so undo and clear can reach the sheet.
+
 ## Weekly / monthly Excel import
 **Import Excel** page: upload the raw-data export (.xlsx/.xls/.csv). Columns are auto-detected (and remembered); check the mapping, review the preview, import.
 - New NCR No. → added as *Not Started*.

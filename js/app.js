@@ -71,6 +71,17 @@
     function fallback() { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) { toast('Copy failed – select the text manually', true); } ta.remove(); }
   }
 
+  // In-page confirmation (the browser's confirm() is not available inside the viewer). `typed` makes the user type a word first.
+  function confirmModal({ title, text, ok, typed, onOk }) {
+    openModal(`<form id="cm" class="form modal-form"><h2>${esc(title)}</h2><p class="full">${text}</p>
+      ${typed ? `<label class="full">Type <b>${esc(typed)}</b> to confirm<input id="cm-t" autocomplete="off"></label>` : ''}
+      <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn ok" id="cm-ok" type="submit"${typed ? ' disabled' : ''}>${esc(ok || 'Confirm')}</button></div></form>`, (m) => {
+      const t = m.querySelector('#cm-t'), b = m.querySelector('#cm-ok');
+      if (t) t.addEventListener('input', () => { b.disabled = t.value.trim() !== typed; });
+      m.querySelector('#cm').addEventListener('submit', (e) => { e.preventDefault(); if (typed && t.value.trim() !== typed) return; modal.close(); onOk(); });
+    });
+  }
+
   function ncrForm(id) {
     const n = id ? S.getNcr(id) : { NCR_Date: L.todayISO(), Status: 'Not Started' }, s = st.settings, edit = !!id;
     const inp = (name, label, o) => `<label>${label}${o && o.req ? ' *' : ''}<input name="${name}" value="${esc(n[name])}"${o && o.req ? ' required' : ''}${o && o.type ? ` type="${o.type}"` : ''}${o && o.list ? ` list="${o.list}"` : ''}></label>`;
@@ -102,8 +113,9 @@
         if (!edit) location.hash = '#/ncr/' + saved.NCR_ID;
       });
       const del = m.querySelector('#nf-del');
-      if (del) del.addEventListener('click', () => {
-        if (confirm(`Delete ${n.NCR_No} and its history? This cannot be undone.`)) { S.removeNcr(id); modal.close(); location.hash = '#/list'; }
+      if (del) del.addEventListener('click', () => { // two clicks: the first arms the button
+        if (!del.dataset.armed) { del.dataset.armed = '1'; del.textContent = 'Click again to delete'; setTimeout(() => { del.dataset.armed = ''; del.textContent = 'Delete'; }, 4000); return; }
+        S.removeNcr(id); modal.close(); location.hash = '#/list';
       });
     });
   }
@@ -305,6 +317,6 @@
   window.addEventListener('resize', fitRail); fitRail();
   if (window.ResizeObserver) new ResizeObserver(fitRail).observe($('.topbar'));
 
-  NCR.app = { render, toast };
+  NCR.app = { render, toast, confirmModal };
   S.init().then(() => { status(); render(); });
 })();

@@ -21,6 +21,7 @@ function doPost(e) {
     try {
       if (body.action === 'save') save_(body);
       else if (body.action === 'saveSettings') saveSettings_(body.settings);
+      else if (body.action === 'clear') clear_();
       else throw new Error('Unknown action');
     } finally { lock.releaseLock(); }
     return { ok: true };
@@ -89,7 +90,10 @@ function save_(b) {
     write_(sh, NCR_HEADERS, rows.filter(function (r) { return !del[r.NCR_ID]; }));
   }
   var hs = sheet_('Followup_History', HIST_HEADERS);
-  if (b.deleteIds && b.deleteIds.length) write_(hs, HIST_HEADERS, read_(hs, HIST_HEADERS).filter(function (r) { return !del[r.NCR_ID]; }));
+  var delH = {}; (b.deleteHistoryIds || []).forEach(function (id) { delH[id] = true; });
+  if ((b.deleteIds && b.deleteIds.length) || (b.deleteHistoryIds && b.deleteHistoryIds.length)) {
+    write_(hs, HIST_HEADERS, read_(hs, HIST_HEADERS).filter(function (r) { return !del[r.NCR_ID] && !delH[r.History_ID]; }));
+  }
   if (b.history && b.history.length) {
     var start = Math.max(hs.getLastRow(), 1) + 1;
     if (start + b.history.length - 1 > hs.getMaxRows()) hs.insertRowsAfter(hs.getMaxRows(), b.history.length);
@@ -105,4 +109,10 @@ function saveSettings_(s) {
   var keys = Object.keys(s || {});
   if (!keys.length) return;
   sh.getRange(2, 1, keys.length, 2).setNumberFormat('@').setValues(keys.map(function (k) { return [k, JSON.stringify(s[k])]; }));
+}
+
+// Wipe all NCRs and follow-up history (settings are kept). Used by "Clear all NCR data" in the app.
+function clear_() {
+  write_(sheet_('NCR_Master', NCR_HEADERS), NCR_HEADERS, []);
+  write_(sheet_('Followup_History', HIST_HEADERS), HIST_HEADERS, []);
 }

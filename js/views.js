@@ -479,7 +479,7 @@ window.NCR = window.NCR || {};
   function importPage() {
     const I = NCR.importer;
     let body = '';
-    if (imp.done) body += `<div class="alert ok">✅ Import complete: ${imp.done}</div>`;
+    if (imp.done) body += `<div class="alert ok">✅ Import complete: ${imp.done} <button class="btn sm" id="undo-now" type="button">Wrong file? Undo this import</button></div>`;
     if (imp.table) {
       const { records, bad } = I.buildRecords(imp.table, imp.mapping, st.settings.jiraKeywords);
       const p = I.plan(records, st.ncrs);
@@ -529,12 +529,15 @@ window.NCR = window.NCR || {};
       const sh = root.querySelector('#imp-sheet'); if (sh) sh.addEventListener('change', () => pickSheet(sh.value));
       root.querySelectorAll('[data-map]').forEach((s) => s.addEventListener('change', () => { imp.mapping[s.dataset.map] = s.value; NCR.app.render(); }));
       const miss = root.querySelector('#imp-missing'); if (miss) miss.addEventListener('change', () => { imp.opts.closeMissing = miss.checked; NCR.app.render(); });
+      const un = root.querySelector('#undo-now');
+      if (un) un.addEventListener('click', () => NCR.app.confirmModal({ title: 'Undo this import?', text: 'This removes the NCRs it added and restores the ones it changed.', ok: 'Undo import', onOk: () => { S.undoImport(); imp.done = null; NCR.app.toast('Import undone'); NCR.app.render(); } }));
       const cancel = root.querySelector('#imp-cancel'); if (cancel) cancel.addEventListener('click', () => { imp.table = null; imp.wb = null; NCR.app.render(); });
       const go = root.querySelector('#imp-go');
       if (go) go.addEventListener('click', () => {
         const { records } = I2.buildRecords(imp.table, imp.mapping, st.settings.jiraKeywords);
         const p = I2.plan(records, st.ncrs), r = I2.apply(p, imp.opts);
-        S.saveMany(r.ncrs, r.history);
+        const nClosed = p.added.filter((x) => x.CloseReason).length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0);
+        S.applyImport(r, { file: imp.name, added: p.added.length, updated: p.updated.length, closed: nClosed });
         const back = p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark' && c.to) && isFollowed(S.getNcr(u.old.NCR_ID))).length; // followed-up NCRs with a new buyer remark
         S.saveSettings({ importMapping: Object.assign({}, imp.mapping) });
         imp.done = `${back ? `${back} followed-up NCR${back === 1 ? ' has' : 's have'} a new buyer remark: see <a href="#/followed" data-wfilter='{}'>Followed up</a>. ` : ''}${p.added.length} added${p.added.length ? ' (' + Object.entries(p.added.reduce((m, r) => { const b = r.Buyer || '(No buyer)'; m[b] = (m[b] || 0) + 1; return m; }, {})).map(([b, c]) => b + ' ' + c).join(', ') + ')' : ''}, ${p.updated.length} updated, ${p.added.filter((r) => r.CloseReason).length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0)} closed (see <a href="#/closed" data-closed="">Closed</a>).`;
@@ -552,8 +555,14 @@ window.NCR = window.NCR || {};
         <p class="hint">Mode: <b>${st.mode === 'sheets' ? 'Google Sheets (live)' : 'Browser only – data stays in this browser'}</b>. See README for the 5-minute Apps Script setup.</p>
         <form id="api" class="form"><label class="full">Apps Script Web App URL<input name="url" value="${esc(cfg.url || '')}" placeholder="https://script.google.com/macros/s/…/exec"></label>
           <label>API key (optional)<input name="key" value="${esc(cfg.key || '')}"></label>
-          <div class="full actions"><button class="btn primary" type="submit">Save &amp; connect</button>
-          ${st.mode === 'demo' ? '<button class="btn danger" type="button" id="reset-demo">Clear all data in this browser</button>' : ''}</div></form></section>
+          <div class="full actions"><button class="btn primary" type="submit">Save &amp; connect</button></div></form></section>
+      <section class="card"><h2>Your data</h2>
+        ${(() => { const li = S.getLastImport(); return li ? `<p><b>Last import:</b> ${esc(li.file || 'file')} on ${L.fmtDate(li.at)} — ${li.added || 0} added, ${li.updated || 0} updated, ${li.closed || 0} closed.</p>
+          <p class="hint">Uploaded the wrong file? <b>Undo</b> removes the NCRs that import added and puts back the ones it changed. Follow-ups you recorded on those NCRs since then are lost too. Only the most recent import can be undone.</p>
+          <div class="actions"><button class="btn" id="undo-import">Undo last import</button></div>` : '<p class="hint">No import to undo yet. After an import you can undo it here.</p>'; })()}
+        <hr class="rule">
+        <p><b>Start over:</b> delete every NCR and its history from ${st.mode === 'sheets' ? 'the Google Sheet' : 'this browser'}. Settings (dropdowns, keywords) are kept.</p>
+        <div class="actions"><button class="btn danger" id="clear-all">Clear all NCR data…</button></div></section>
       <form id="cfg" class="card"><h2>Dropdowns &amp; thresholds</h2><p class="hint">One option per line.</p>
         <div class="form cols3">${ta('dispositions', 'Disposition')}${ta('nextActions', 'Next Action')}${ta('waitingFor', 'Waiting For')}${ta('owners', 'Owners (suggestions)')}</div>
         <div class="form cols3"><label>Hold / scrap keywords (Remarks)<textarea name="holdKeywords" rows="3">${esc((s.holdKeywords || []).join('\n'))}</textarea></label>
@@ -573,7 +582,9 @@ window.NCR = window.NCR || {};
         S.setApiConfig({ url: String(f.get('url')).trim(), key: String(f.get('key')).trim() });
         await S.init(); NCR.app.toast(st.error || 'Connected'); NCR.app.render();
       });
-      const rd = root.querySelector('#reset-demo'); if (rd) rd.addEventListener('click', async () => { if (confirm('Delete all NCR data stored in this browser?')) { await S.resetDemo(); NCR.app.toast('Data cleared'); } });
+      const ui = root.querySelector('#undo-import');
+      if (ui) ui.addEventListener('click', () => NCR.app.confirmModal({ title: 'Undo the last import?', text: 'This removes the NCRs it added and restores the ones it changed.', ok: 'Undo import', onOk: () => { S.undoImport(); NCR.app.toast('Import undone'); NCR.app.render(); } }));
+      root.querySelector('#clear-all').addEventListener('click', () => NCR.app.confirmModal({ title: 'Delete all NCR data?', text: `This deletes all ${st.ncrs.length} NCRs and their history from ${st.mode === 'sheets' ? 'the Google Sheet' : 'this browser'}. It cannot be undone.`, typed: 'DELETE', ok: 'Delete everything', onOk: () => { S.clearAll(); NCR.app.toast('All NCR data deleted'); NCR.app.render(); } }));
       root.querySelector('#cfg').addEventListener('submit', (e) => {
         e.preventDefault(); const f = new FormData(e.target);
         const lines = (k) => String(f.get(k)).split('\n').map((x) => x.trim()).filter(Boolean);

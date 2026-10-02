@@ -41,6 +41,7 @@ window.NCR = window.NCR || {};
       localStorage.setItem(DATA_KEY, JSON.stringify(d));
     },
     reset() { localStorage.removeItem(DATA_KEY); },
+    async clear() { this.reset(); },
   };
 
   function applyPayload(d, p) {
@@ -48,6 +49,7 @@ window.NCR = window.NCR || {};
     const idx = new Map(d.ncrs.map((n, i) => [n.NCR_ID, i]));
     (p.ncrs || []).forEach((n) => { if (idx.has(n.NCR_ID)) d.ncrs[idx.get(n.NCR_ID)] = n; else { idx.set(n.NCR_ID, d.ncrs.length); d.ncrs.push(n); } });
     d.history = d.history.concat(p.history || []);
+    if (p.deleteHistoryIds && p.deleteHistoryIds.length) { const dh = new Set(p.deleteHistoryIds); d.history = d.history.filter((h) => !dh.has(h.History_ID)); }
     if (del.size) { d.ncrs = d.ncrs.filter((n) => !del.has(n.NCR_ID)); d.history = d.history.filter((h) => !del.has(h.NCR_ID)); }
   }
 
@@ -65,6 +67,7 @@ window.NCR = window.NCR || {};
       name: 'sheets',
       async load() { return call('GET'); },
       async save(p) { await call('POST', Object.assign({ action: 'save' }, p)); },
+      async clear() { await call('POST', { action: 'clear' }); },
       async saveSettings(s) { await call('POST', { action: 'saveSettings', settings: s }); },
     };
   }
@@ -248,11 +251,38 @@ window.NCR = window.NCR || {};
     emit();
   }
 
-  function resetDemo() { LocalAdapter.reset(); return reload(); }
+  // ---- undo a wrong import / clear everything ----
+  const LAST_KEY = 'ncr.lastImport';
+  function getLastImport() { try { return JSON.parse(localStorage.getItem(LAST_KEY)); } catch (e) { return null; } }
+  function setLastImport(v) { try { v ? localStorage.setItem(LAST_KEY, JSON.stringify(v)) : localStorage.removeItem(LAST_KEY); } catch (e) { /* storage unavailable */ } }
+
+  // Save an import result and remember how to take it back.
+  function applyImport(result, meta) {
+    const prev = {}, addedIds = [];
+    result.ncrs.forEach((n) => { const o = getNcr(n.NCR_ID); if (o) prev[n.NCR_ID] = o; else addedIds.push(n.NCR_ID); });
+    setLastImport(Object.assign({ at: L.nowStamp(), prev, addedIds, historyIds: result.history.map((h) => h.History_ID) }, meta));
+    return saveMany(result.ncrs, result.history);
+  }
+  // Remove what the last import added and restore what it changed.
+  function undoImport() {
+    const rec = getLastImport(); if (!rec) return false;
+    const added = new Set(rec.addedIds), dropH = new Set(rec.historyIds), restored = Object.values(rec.prev);
+    state.ncrs = state.ncrs.filter((n) => !added.has(n.NCR_ID)).map((n) => rec.prev[n.NCR_ID] || n);
+    state.history = state.history.filter((h) => !added.has(h.NCR_ID) && !dropH.has(h.History_ID));
+    commit(restored, [], { deleteIds: rec.addedIds, deleteHistoryIds: rec.historyIds });
+    setLastImport(null); emit();
+    return true;
+  }
+  function clearAll() {
+    state.ncrs = []; state.history = []; setLastImport(null);
+    persist(() => adapter.clear());
+    emit();
+  }
+  function resetDemo() { return clearAll(); }
 
   // Browser-only mode starts empty: all data comes from the uploaded Excel file.
   function demoData() { return { ncrs: [], history: [], settings: {} }; }
 
   NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
-    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, removeNcr, saveMany, saveSettings, getApiConfig, setApiConfig, resetDemo };
+    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, removeNcr, saveMany, applyImport, undoImport, getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
 })(window.NCR);
