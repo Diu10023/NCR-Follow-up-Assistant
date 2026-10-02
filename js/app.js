@@ -115,7 +115,7 @@
     const one = list.length === 1, n0 = list[0];
     const groups = {}; list.forEach((n) => { (groups[V.buyerOf(n)] = groups[V.buyerOf(n)] || []).push(n); });
     const msgs = one ? [['', L.followupMessage(n0, s)]] : Object.keys(groups).sort().map((b) => [b, L.buyerMessage(b === V.NO_BUYER ? '' : b, groups[b].slice().sort((x, y) => String(x.NCR_Date).localeCompare(String(y.NCR_Date))))]);
-    const who = one ? (n0.Waiting_For || n0.Buyer || 'Purchasing') : buyerNames(list).join(', ');
+    const who = one ? (n0.Waiting_For || n0.Buyer || 'Purchasing') : '{buyer}'; // several NCRs: each history entry names its own buyer
     const nextDefault = plusDays(s.defaultCheckDays);
     const allWaiting = [...new Set(list.map((n) => n.Waiting_For))];
     openModal(`<form id="hf" class="form modal-form"><h2>${one ? `Follow-up #${(Number(n0.Followup_Count) || 0) + 1} – ${esc(n0.NCR_No)}` : `Follow-up – ${list.length} NCRs`}</h2>
@@ -131,6 +131,7 @@
         ${[3, 7, 14].map((d) => `<button type="button" class="btn sm" data-plus="${d}">+${d}d</button>`).join('')}</div></label>
       <label>Waiting For<select name="waiting">${V.options(V.withCurrent(s.waitingFor, allWaiting.length === 1 ? allWaiting[0] : ''), allWaiting.length === 1 ? allWaiting[0] : '', one ? '— unchanged —' : '— unchanged —')}</select></label>
       <label>Remark<input name="remark"></label>
+      ${one ? '' : '<p class="full muted small">{buyer} is replaced by each NCR\'s own buyer, so every NCR\'s history names only that buyer.</p>'}
       <label class="check full"><input type="checkbox" name="pending" checked> Set status to <b>Pending</b> (waiting for reply) when Not Started / Open</label>
       <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">I sent it, record${one ? '' : ' (' + list.length + ')'}</button></div></form>`, (m) => {
       m.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', () => copyText(m.querySelectorAll('.msg')[b.dataset.k].value)));

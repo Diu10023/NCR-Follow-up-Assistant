@@ -170,8 +170,10 @@ window.NCR = window.NCR || {};
   }
 
   // Record one follow-up on each NCR (single or bulk). p.nextDate becomes the next check (Due_Date).
+  // {buyer} in the action / person / remark text is replaced with each NCR's own buyer.
   function recordFollowups(ids, p) {
     const date = p.date || L.todayISO(), ncrs = [], hist = [];
+    const fill = (t, n) => String(t || '').split('{buyer}').join(n.Buyer || 'the buyer');
     ids.forEach((id) => {
       const o = getNcr(id); if (!o) return;
       const n = Object.assign({}, o);
@@ -182,7 +184,7 @@ window.NCR = window.NCR || {};
       stamp(n);
       state.ncrs[state.ncrs.findIndex((x) => x.NCR_ID === id)] = n;
       ncrs.push(n);
-      hist.push(histRow(n, { date, followupNo: n.Followup_Count, action: p.action, waiting: p.waiting || n.Waiting_For, remark: p.remark, by: p.by }));
+      hist.push(histRow(n, { date, followupNo: n.Followup_Count, action: fill(p.action, n), waiting: p.waiting || n.Waiting_For, remark: fill(p.remark, n), by: fill(p.by, n) }));
     });
     state.history.push(...hist);
     commit(ncrs, hist); emit();
