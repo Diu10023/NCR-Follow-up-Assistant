@@ -128,33 +128,41 @@
     const list = ids.map(S.getNcr).filter(Boolean), s = st.settings;
     if (!list.length) return;
     const one = list.length === 1, n0 = list[0];
-    const groups = {}; list.forEach((n) => { (groups[V.buyerOf(n)] = groups[V.buyerOf(n)] || []).push(n); });
-    const msgs = one ? [['', L.followupMessage(n0, s)]] : Object.keys(groups).sort().map((b) => [b, L.buyerMessage(b === V.NO_BUYER ? '' : b, groups[b].slice().sort((x, y) => String(x.NCR_Date).localeCompare(String(y.NCR_Date))))]);
-    // Several NCRs: if they share one buyer use that name; if not, each NCR's history gets its own buyer's name automatically.
-    const buyersSel = buyerNames(list), multi = !one && buyersSel.length > 1;
-    const who = one ? (n0.Waiting_For || n0.Buyer || 'Purchasing') : buyersSel[0];
+    // one block per buyer: its own message, person, note and remark
+    const by = {}; list.forEach((n) => { (by[V.buyerOf(n)] = by[V.buyerOf(n)] || []).push(n); });
+    const groups = Object.keys(by).sort().map((name) => {
+      const ncrs = by[name].slice().sort((x, y) => String(x.NCR_Date).localeCompare(String(y.NCR_Date))), named = name !== V.NO_BUYER;
+      const who = one ? (n0.Waiting_For || n0.Buyer || 'Purchasing') : named ? name : '';
+      return { name, named, ncrs, ids: ncrs.map((n) => n.NCR_ID), who,
+        msg: one ? L.followupMessage(n0, s) : L.buyerMessage(named ? name : '', ncrs),
+        action: who ? 'Asked ' + who + ' for status update' : 'Asked for status update' };
+    });
+    const many = groups.length > 1;
     const nextDefault = plusDays(s.defaultCheckDays);
     const allWaiting = [...new Set(list.map((n) => n.Waiting_For))];
-    openModal(`<form id="hf" class="form modal-form"><h2>${one ? `Follow-up #${(Number(n0.Followup_Count) || 0) + 1} – ${esc(n0.NCR_No)}` : `Follow-up – ${list.length} NCRs`}</h2>
-      <ol class="steps full"><li><b>Copy</b> the message below and send it to the buyer (Teams or email).</li><li><b>Choose</b> when you will check again.</li><li><b>Press Record</b>. The NCR moves to Followed up and stays there until it is closed. On the check date it is flagged so you chase again.</li></ol>
-      ${msgs.map(([b, m], k) => `<div class="full"><label>${one ? 'Message (editable)' : 'Message for ' + esc(b) + ' (' + groups[b].length + ' NCRs)'}<textarea class="msg" rows="${one ? 9 : Math.min(14, 6 + groups[b].length)}">${esc(m)}</textarea></label>
-        <button type="button" class="btn sm copy" data-k="${k}">📋 Copy message</button></div>`).join('')}
-      <div class="full muted small">Paste into Teams / email, then record the follow-up below.</div><hr class="full">
+    openModal(`<form id="hf" class="form modal-form"><h2>${one ? `Follow-up #${(Number(n0.Followup_Count) || 0) + 1} – ${esc(n0.NCR_No)}` : `Follow-up – ${list.length} NCRs${many ? ' · ' + groups.length + ' buyers' : ''}`}</h2>
+      <ol class="steps full"><li><b>Copy</b> each buyer's message and send it (Teams or email).</li><li><b>Choose</b> when you will check again.</li><li><b>Press Record</b>. The NCRs move to Followed up and stay there until they are closed. On the check date they are flagged so you chase again.</li></ol>
+      ${groups.map((g, k) => `<section class="grp full">
+        ${many || !one ? `<h3>${esc(g.name)} <span class="count">${g.ncrs.length} NCR${g.ncrs.length === 1 ? '' : 's'}</span></h3>` : ''}
+        <label>${one ? 'Message (editable)' : 'Message for ' + esc(g.name)}<textarea class="msg" rows="${one ? 9 : Math.min(12, 6 + g.ncrs.length)}">${esc(g.msg)}</textarea></label>
+        <button type="button" class="btn sm copy" data-k="${k}">📋 Copy message</button>
+        <div class="form inner">
+          <label>Person / department<input name="by_${k}" value="${esc(g.who)}"></label>
+          <label>Action / note *<input name="action_${k}" required value="${esc(g.action)}"></label>
+          <label class="full">Remark<input name="remark_${k}"></label>
+        </div></section>`).join('')}
+      <hr class="full">
       <label>Date<input type="date" name="date" value="${L.todayISO()}" required></label>
-      <label>Person / department${multi ? '<input value="Each NCR\'s own buyer" disabled>' : `<input name="by" value="${esc(who)}">`}</label>
-      <label class="full">Action / note *<input name="action" required value="${esc(multi ? 'Asked for status update' : 'Asked ' + who + ' for status update')}"></label>
+      <label>Waiting For<select name="waiting">${V.options(V.withCurrent(s.waitingFor, allWaiting.length === 1 ? allWaiting[0] : ''), allWaiting.length === 1 ? allWaiting[0] : '', '— unchanged —')}</select></label>
       <label class="full">Next check date * <span class="muted">– flagged in Followed up when this date arrives</span>
         <div class="inline"><input type="date" name="nextDate" id="nd" value="${nextDefault}" min="${plusDays(1)}" required>
         ${[3, 7, 14].map((d) => `<button type="button" class="btn sm" data-plus="${d}">+${d}d</button>`).join('')}</div></label>
-      <label>Waiting For<select name="waiting">${V.options(V.withCurrent(s.waitingFor, allWaiting.length === 1 ? allWaiting[0] : ''), allWaiting.length === 1 ? allWaiting[0] : '', one ? '— unchanged —' : '— unchanged —')}</select></label>
-      <label>Remark<input name="remark"></label>
-      ${multi ? '<p class="full muted small">Each NCR\'s history is saved with its own buyer\'s name, for example “Asked for status update – Pikko Choosuk”.</p>' : ''}
       <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">I sent it, record${one ? '' : ' (' + list.length + ')'}</button></div></form>`, (m) => {
       m.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', () => copyText(m.querySelectorAll('.msg')[b.dataset.k].value)));
       m.querySelectorAll('[data-plus]').forEach((b) => b.addEventListener('click', () => { m.querySelector('#nd').value = plusDays(Number(b.dataset.plus)); }));
       m.querySelector('#hf').addEventListener('submit', (e) => {
         e.preventDefault(); const f = new FormData(e.target);
-        S.recordFollowups(ids, { date: f.get('date'), by: multi ? '{buyer}' : f.get('by'), action: multi ? f.get('action') + ' – {buyer}' : f.get('action'), waiting: f.get('waiting'), remark: f.get('remark'), nextDate: f.get('nextDate') });
+        groups.forEach((g, k) => S.recordFollowups(g.ids, { date: f.get('date'), by: f.get('by_' + k), action: f.get('action_' + k), waiting: f.get('waiting'), remark: f.get('remark_' + k), nextDate: f.get('nextDate') }));
         V.SEL.clear(); modal.close(); toast(`Recorded. ${one ? 'It is' : list.length + ' NCRs are'} now in Followed up, flagged again on ${L.fmtDate(f.get('nextDate'))}`);
       });
     });
