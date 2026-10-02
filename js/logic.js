@@ -2,8 +2,8 @@
 window.NCR = window.NCR || {};
 (function (NCR) {
   const STATUSES = ['Not Started', 'Open', 'Pending', 'Ready to Close', 'Closed'];
-  // Statuses QA can pick by hand. Ready to Close is gone: closing comes only from the uploaded file.
-  const PICKABLE = STATUSES.filter((x) => x !== 'Ready to Close');
+  // Statuses QA can pick by hand. Ready to Close and Closed are not offered: closing comes only from the uploaded file.
+  const PICKABLE = STATUSES.filter((x) => x !== 'Ready to Close' && x !== 'Closed');
 
   const DEFAULT_SETTINGS = {
     dispositions: ['Scrap', 'Rework', 'Return to Supplier', 'Sorting', 'Cleaning', 'Use As Is', 'Replacement', 'Other'],

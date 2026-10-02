@@ -267,7 +267,7 @@ window.NCR = window.NCR || {};
     }
     return `${pills}${buyerLine(LF.buyer)}${tabs}
       <div class="row-between wait-line"><span class="muted">${hidden ? `${hidden} already followed up — <a href="#/followed" data-wfilter='${esc(JSON.stringify({ buyer: LF.buyer }))}'>see Followed up</a>` : ''}</span>
-        <span class="inline">${LF.buyer ? `<button class="btn primary" data-action="chase" data-buyer="${esc(cur)}"${currentIds().length ? '' : ' disabled'}>Message ${esc(cur)} (${currentIds().length})</button>` : ''}</span></div>
+        <span class="inline"><button class="btn" data-action="export" data-src="todo">Export to Excel</button>${LF.buyer ? `<button class="btn primary" data-action="chase" data-buyer="${esc(cur)}"${currentIds().length ? '' : ' disabled'}>Message ${esc(cur)} (${currentIds().length})</button>` : ''}</span></div>
       ${body}`;
   }
 
@@ -312,9 +312,17 @@ window.NCR = window.NCR || {};
   const WF_OPEN = new Set(); // rows whose timeline is expanded
   function setWaitFilter(f) { Object.assign(WF, { q: '', buyer: '', tab: 'none' }, f); }
   // what, if anything, needs QA's attention on a followed-up NCR
+  // Followed up several times and the buyer's remark has not changed since the first follow-up
+  function noReplyAfter(n) {
+    const count = Number(n.Followup_Count) || 0;
+    if (count < (st.settings.escalationThreshold || 3)) return 0;
+    const first = S.historyFor(n.NCR_ID).filter((h) => h.Followup_No).map((h) => String(h.Date)).sort()[0];
+    if (!first) return 0;
+    return !n.Buyer_Remark_Date || String(n.Buyer_Remark_Date).slice(0, 10) < first ? count : 0;
+  }
   function attention(n) {
-    const i = inf(n);
-    if (i.ready) return { rank: 0, label: 'Ready to close', cls: 'b-ready' };
+    const i = inf(n), nr = noReplyAfter(n);
+    if (nr) return { rank: 0, label: `No reply after ${nr} follow-ups`, cls: 'b-overdue', noReply: true };
     if (i.needsReview) return { rank: 2, label: 'Buyer updated', cls: 'b-review' };
     if (i.dueDiff !== null && i.dueDiff <= 0) return { rank: 3, label: 'Check due', cls: 'b-soon' };
     return null;
@@ -335,7 +343,7 @@ window.NCR = window.NCR || {};
     const cnt = { none: found.filter((n) => inf(n).remarkGroup === 'none').length, has: found.filter((n) => inf(n).remarkGroup !== 'none').length, all: found.length };
     const list = WF.tab === 'none' ? found.filter((n) => inf(n).remarkGroup === 'none') : WF.tab === 'has' ? found.filter((n) => inf(n).remarkGroup !== 'none') : found;
     sectionIds.followed = list.map((n) => n.NCR_ID);
-    const attn = list.filter(attention).length;
+    const attn = list.filter(attention).length, unanswered = list.filter((n) => noReplyAfter(n)).length;
     const rows = list.map((n) => {
       const i = inf(n), at = attention(n), open_ = WF_OPEN.has(n.NCR_ID);
       const changes = S.historyFor(n.NCR_ID).filter((x) => /^Buyer update|^Buyer cleared/.test(x.Action)).length;
@@ -350,7 +358,8 @@ window.NCR = window.NCR || {};
         ${open_ ? `<tr class="sub-row"><td colspan="8"><ul class="mini-tl">${timelineRows(n)}</ul><a href="#/ncr/${esc(n.NCR_ID)}">Full timeline →</a></td></tr>` : ''}`;
     }).join('');
     return `${pillsHtml(per, all.length, WF.buyer, 'data-wbuyer')}${buyerLine(WF.buyer)}${tabsHtml(cnt, WF.tab, 'data-wtab')}
-      <p class="muted wait-line">${list.length ? `<b>${attn}</b> of these need your attention (buyer updated or check date reached). The rest are waiting.` : ''}</p>
+      <div class="row-between wait-line"><span class="muted">${list.length ? `<b>${attn}</b> of these need your attention${unanswered ? ` (<b>${unanswered}</b> with no reply after ${st.settings.escalationThreshold || 3}+ follow-ups)` : ''}: no reply, buyer updated, or check date reached. The rest are waiting.` : ''}</span>
+        <button class="btn" data-action="export" data-src="followed"${list.length ? '' : ' disabled'}>Export to Excel</button></div>
       <section class="block">${list.length ? `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead}<th>NCR</th><th>Buyer / Defect</th><th>Latest remark</th><th>Last follow-up</th><th>Next check</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
         : `<div class="empty">${all.length ? 'No NCRs in this tab.' : 'Nothing here yet. Press Follow-up on an NCR in To follow up: it moves here and stays until it is closed.'}</div>`}</section>`;
   }
@@ -365,6 +374,15 @@ window.NCR = window.NCR || {};
       root.querySelector('#w-q').addEventListener('input', (e) => { WF.q = e.target.value; refresh(); });
       main.addEventListener('click', (e) => { const b = e.target.closest('[data-wbuyer]'), t = e.target.closest('[data-wtab]'); if (b) { WF.buyer = b.dataset.wbuyer; refresh(); } else if (t) { WF.tab = t.dataset.wtab; refresh(); } });
     } };
+  }
+
+  // Plain rows for the Excel export (one object per NCR)
+  function exportRows(ids) {
+    return ids.map(S.getNcr).filter(Boolean).sort(oldest).map((n) => {
+      const i = inf(n);
+      return { 'NCR No.': n.NCR_No, 'Item No.': n.Item_No, 'Batch No.': n.Batch_No, Buyer: n.Buyer || '', Defect: n.Defect, Created: n.NCR_Date ? L.fmtDate(n.NCR_Date) : '',
+        'Days open': i.aging === null ? '' : i.aging, 'Buyer remark': n.Buyer_Remark || '', 'Follow-ups': i.count, 'Last follow-up': n.Last_Followup ? L.fmtDate(n.Last_Followup) : '', 'Next check': n.Due_Date ? L.fmtDate(n.Due_Date) : '' };
+    });
   }
 
   // ---------- Hold for scrap / Jira closed (kept out of the follow-up flow) ----------
@@ -424,8 +442,6 @@ window.NCR = window.NCR || {};
         <div class="btns">
           <button class="btn primary" data-action="followup" data-id="${esc(id)}">📨 Follow-up</button>
           ${i.needsReview ? `<button class="btn" data-action="reviewed" data-id="${esc(id)}">✓ Reviewed</button>` : ''}
-          ${i.closed ? '<button class="btn" data-action="reopen" data-id="' + esc(id) + '">Reopen</button>' : `
-            <button class="btn ok" data-action="close" data-id="${esc(id)}">Verify &amp; Close NCR</button>`}
           <button class="btn" data-action="edit" data-id="${esc(id)}">Edit NCR</button>
         </div></div>
       ${i.reasons.length ? `<div class="alert info"><b>Needs your action:</b> ${i.reasons.map(esc).join(' · ')}</div>` : (!i.closed ? `<div class="alert ok">⏳ Waiting${n.Due_Date ? ` — next check <b>${L.fmtDate(n.Due_Date)}</b>${i.dueDiff > 0 ? ` (in ${i.dueDiff}d)` : ''}` : ''}. It will return to Today automatically.</div>` : '')}
@@ -444,7 +460,7 @@ window.NCR = window.NCR || {};
         <section class="card"><h2>Follow-up Control</h2>
           <form id="ctl" class="form">
             <label>Disposition<select name="Disposition">${options(withCurrent(s.dispositions, n.Disposition), n.Disposition, '— select —')}</select></label>
-            <label>Current Status<select name="Status">${options(withCurrent(L.PICKABLE, n.Status), n.Status)}</select></label>
+            <label>Current Status<select name="Status"${i.closed ? ' disabled title="Closed from the uploaded file"' : ''}>${options(withCurrent(L.PICKABLE, n.Status), n.Status)}</select></label>
             <label>Next Action<select name="Next_Action">${options(withCurrent(s.nextActions, n.Next_Action), n.Next_Action, '— select —')}</select></label>
             <label>Owner<input name="Owner" list="owners" value="${esc(n.Owner)}"></label>
             <label>Waiting For<select name="Waiting_For">${options(withCurrent(s.waitingFor, n.Waiting_For), n.Waiting_For, '— select —')}</select></label>
@@ -464,7 +480,7 @@ window.NCR = window.NCR || {};
       root.querySelector('#ctl').addEventListener('submit', (e) => {
         e.preventDefault();
         const f = new FormData(e.target), upd = Object.assign({}, n);
-        ['Disposition', 'Status', 'Next_Action', 'Owner', 'Waiting_For', 'Due_Date', 'Remark'].forEach((k) => { upd[k] = f.get(k) || ''; });
+        ['Disposition', 'Status', 'Next_Action', 'Owner', 'Waiting_For', 'Due_Date', 'Remark'].forEach((k) => { if (f.has(k)) upd[k] = f.get(k) || ''; });
         S.saveNcr(upd, { recordChanges: !!f.get('rec'), by: 'QA' });
         NCR.app.toast('Saved');
       });
@@ -589,5 +605,5 @@ window.NCR = window.NCR || {};
     } };
   }
 
-  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
+  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
 })(window.NCR);

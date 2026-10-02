@@ -96,7 +96,7 @@
         ${inp('Owner', 'Owner', { list: 'owners' })}
         <label>Waiting For<select name="Waiting_For">${V.options(V.withCurrent(s.waitingFor, n.Waiting_For), n.Waiting_For, '—')}</select></label>
         ${inp('Due_Date', 'Due Date', { type: 'date' })}
-        ${edit ? `<label>Status<select name="Status">${V.options(V.withCurrent(L.PICKABLE, n.Status), n.Status)}</select></label>` : ''}
+        ${edit ? `<label>Status<select name="Status"${n.Status === 'Closed' ? ' disabled' : ''}>${V.options(V.withCurrent(L.PICKABLE, n.Status), n.Status)}</select></label>` : ''}
         <label class="full">Remark<textarea name="Remark" rows="2">${esc(n.Remark)}</textarea></label></div></details>
       <datalist id="buyers">${S.buyers().map((b) => `<option value="${esc(b)}">`).join('')}</datalist>
       <datalist id="owners">${S.owners().map((b) => `<option value="${esc(b)}">`).join('')}</datalist>
@@ -213,7 +213,7 @@
   function updateBulkBar() {
     const bar = $('#bulkbar'), n = V.SEL.size;
     bar.hidden = !n;
-    if (n) bar.innerHTML = `<b>${n} selected</b><button class="btn primary" data-action="bulk-followup">📨 Follow-up</button><button class="btn" data-action="bulk-close">Verify &amp; close</button><button class="btn" data-action="bulk-set">Set next check / owner / status</button><button class="btn" data-action="bulk-clear">Clear</button>`;
+    if (n) bar.innerHTML = `<b>${n} selected</b><button class="btn primary" data-action="bulk-followup">📨 Follow-up</button><button class="btn" data-action="bulk-set">Set next check / owner / status</button><button class="btn" data-action="bulk-clear">Clear</button>`;
   }
   document.addEventListener('change', (e) => {
     const cb = e.target;
@@ -224,19 +224,28 @@
     }
   });
 
-  function closeModal(ids) {
-    const list = ids.map(S.getNcr).filter(Boolean);
-    openModal(`<form id="cf" class="form modal-form"><h2>Verify &amp; close ${list.length === 1 ? esc(list[0].NCR_No) : list.length + ' NCRs'}</h2>
-      <p class="full">Confirm QA has verified the required action and evidence. ${list.length === 1 ? 'The NCR' : 'These NCRs'} will move to the Closed page.</p>
-      <label class="full">Verification note<input name="note" value="QA verified and closed"></label>
-      <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn ok" type="submit">Close ${list.length === 1 ? 'NCR' : list.length + ' NCRs'}</button></div></form>`, (m) => {
-      m.querySelector('#cf').addEventListener('submit', (e) => {
-        e.preventDefault();
-        S.bulkSet(ids, { Status: 'Closed' }, new FormData(e.target).get('note') || 'QA verified and closed');
-        V.SEL.clear(); modal.close(); toast(list.length === 1 ? 'NCR closed' : list.length + ' NCRs closed');
-        if (list.length === 1 && route().page === 'ncr') location.hash = '#/closed';
-      });
+  // Excel export: one sheet per buyer. In the viewer the file goes through the downloads capability; elsewhere the browser saves it.
+  async function exportXlsx(ids, label) {
+    if (!ids.length) { toast('Nothing to export', true); return; }
+    if (typeof XLSX === 'undefined') { toast('Excel library not loaded (check internet connection)', true); return; }
+    const rows = V.exportRows(ids), by = {};
+    rows.forEach((r) => { (by[r.Buyer || V.NO_BUYER] = by[r.Buyer || V.NO_BUYER] || []).push(r); });
+    const wb = XLSX.utils.book_new(), used = new Set();
+    Object.keys(by).sort().forEach((name) => {
+      let sn = name.replace(/[\\/?*\[\]:]/g, ' ').trim().slice(0, 28) || 'Sheet', k = 2, base = sn;
+      while (used.has(sn.toLowerCase())) sn = base.slice(0, 26) + ' ' + k++;
+      used.add(sn.toLowerCase());
+      const ws = XLSX.utils.json_to_sheet(by[name]);
+      ws['!cols'] = [12, 12, 14, 18, 28, 13, 10, 60, 10, 14, 13].map((w) => ({ wch: w }));
+      XLSX.utils.book_append_sheet(wb, ws, sn);
     });
+    const who = Object.keys(by).length === 1 ? '_' + Object.keys(by)[0].replace(/[^\w\-]+/g, '_') : '';
+    const filename = `NCR_${label}${who}_${L.todayISO()}.xlsx`;
+    try {
+      const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+      if (dl) { await dl.save({ filename, data: XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) }); toast('Excel file ready'); }
+      else { XLSX.writeFile(wb, filename); toast('Excel file downloaded'); }
+    } catch (e) { if (!e || e.code !== 'declined') toast('Could not save the file' + (e && e.message ? ': ' + e.message : ''), true); }
   }
 
   const actions = {
@@ -260,14 +269,8 @@
       const ids = V.currentIds();
       if (ids.length) followupModal(ids);
     },
-    close: (el) => closeModal([el.dataset.id]),
-    'bulk-close': () => closeModal([...V.SEL]),
+    export: (el) => exportXlsx(el.dataset.src === 'todo' ? V.currentIds() : V.sectionIds.followed || [], el.dataset.src === 'todo' ? 'to-follow-up' : 'followed-up'),
     togglebuyer: (el) => { const b = el.dataset.buyer; V.HOME_OPEN.has(b) ? V.HOME_OPEN.delete(b) : V.HOME_OPEN.add(b); window.__keepScroll = window.scrollY; render(); },
-    reopen: (el) => {
-      const n = S.getNcr(el.dataset.id);
-      S.saveNcr(Object.assign({}, n, { Status: 'Open' }));
-      S.addHistory(n.NCR_ID, { action: 'NCR reopened', by: 'QA' }); toast('Reopened');
-    },
   };
 
   document.addEventListener('click', (e) => {

@@ -32,7 +32,9 @@ Sheets `NCR_Master`, `Followup_History` and `Settings` are created automatically
 2. **Chase**: tick rows (or *Select all*, or *Message [buyer]*) → **Follow-up** → copy the message → pick the next check date → record. The NCR moves to **Followed up** (badge = how many) and **stays there until it is closed**.
 3. **Every week**: import the new export. Nothing is lost: buyer remark changes are added to each NCR's timeline, new NCRs land in To follow up, NCRs the file marks as closed are closed automatically.
 4. **In Followed up**, NCRs that need you rise to the top: *Buyer updated*, *Check due*. Press ▸ on a row to see its latest timeline; **Follow up again** records another round.
-5. **Closing happens from the file, not by hand**: at import an NCR is closed when its *Closed* column says yes (any letter case) or its Remarks contain a close keyword such as *Jira* (any letter case, editable in Settings). Closed NCRs go to the Closed page. (Manual *Verify & close* still exists on the NCR page.)
+5. **Closing happens from the file, not by hand**: at import an NCR is closed when its *Closed* column says yes (any letter case) or its Remarks contain a close keyword such as *Jira* (any letter case, editable in Settings). Closed NCRs go to the Closed page. There is no manual close or reopen button.
+6. **Not forgotten**: a Followed up NCR with 3+ follow-ups and no buyer reply since the first one gets a red **No reply after N follow-ups** badge and sorts to the top.
+7. **Export to Excel** (To follow up and Followed up pages): one sheet per buyer, ready to attach to an email. Pick a buyer pill to export just that buyer.
 
 ## Hold for scrap and Jira
 Remarks containing **hold** or **scrap** (any letter case) are kept out of To follow up and Followed up and listed on **Hold & Jira → Hold for scrap**. Remarks containing **jira** (any letter case, “JIRA: unable to approve - Closed”) are closed at import and listed on **Hold & Jira → Jira closed** (not on the Closed page). Keywords are editable in Settings; Jira wins if a remark has both.
