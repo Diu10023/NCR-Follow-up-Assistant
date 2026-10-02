@@ -68,7 +68,6 @@ window.NCR = window.NCR || {};
     { k: 'none', label: 'No update', color: 'var(--c-none)', ink: 'var(--i-none)' },
     { k: 'progress', label: 'In progress', color: 'var(--c-progress)', ink: 'var(--i-progress)' },
     { k: 'hold', label: 'Hold / scrap', color: 'var(--c-hold)', ink: 'var(--i-hold)' },
-    { k: 'jira', label: 'Closed in Jira', color: 'var(--c-jira)', ink: 'var(--i-jira)' },
   ];
   const niceStep = (max) => { const raw = Math.max(1, max) / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
   // bar with only its right (data) end rounded; the baseline end stays square
@@ -122,7 +121,7 @@ window.NCR = window.NCR || {};
   function home() {
     if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Home</h1></div>' + emptyState() };
     const by = {};
-    const row = (name) => (by[name] = by[name] || { name, total: 0, todo: 0, followed: 0, closed: 0, none: 0, progress: 0, hold: 0, jira: 0, noneIds: [] });
+    const row = (name) => (by[name] = by[name] || { name, total: 0, todo: 0, followed: 0, closed: 0, none: 0, progress: 0, hold: 0, noneIds: [] });
     st.ncrs.forEach((n) => {
       const r = row(buyerOf(n)), i = inf(n);
       r.total++;
@@ -137,10 +136,10 @@ window.NCR = window.NCR || {};
     const link = (buyer, group, n, cls) => (n ? `<a href="#/list" data-filter='${esc(JSON.stringify({ buyer: bf(buyer), buyerUpdate: group, tab: group === 'none' ? 'none' : group ? 'has' : 'all' }))}' class="${cls || ''}">${n}</a>` : '<span class="muted">0</span>');
     const body = rows.map((r) => `<tr><td><button class="link tog" data-action="togglebuyer" data-buyer="${esc(r.name)}">${HOME_OPEN.has(r.name) ? '▾' : '▸'}</button> <b>${esc(r.name)}</b></td>
         <td>${r.total}</td><td>${link(r.name, '', r.todo)}</td>
-        <td>${link(r.name, 'none', r.none, 'bad strong')}</td><td>${link(r.name, 'progress', r.progress)}</td><td>${link(r.name, 'hold', r.hold)}</td><td>${link(r.name, 'jira', r.jira)}</td>
+        <td>${link(r.name, 'none', r.none, 'bad strong')}</td><td>${link(r.name, 'progress', r.progress)}</td><td>${link(r.name, 'hold', r.hold)}</td>
         <td>${r.followed ? `<a href="#/followed" data-wfilter='${esc(JSON.stringify({ buyer: bf(r.name) }))}'>${r.followed}</a>` : '<span class="muted">0</span>'}</td>
         <td>${r.closed ? `<a href="#/closed" data-closed="${esc(r.name)}">${r.closed}</a>` : '<span class="muted">0</span>'}</td></tr>
-      ${HOME_OPEN.has(r.name) ? `<tr class="sub-row"><td colspan="9"><div class="sub">No remark, still to follow up (${r.none}):</div><div class="nolist">${r.noneIds.length ? r.noneIds.slice().sort(byOldest).slice(0, 60).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(' ') + (r.noneIds.length > 60 ? ' …' : '') : '<span class="muted">none</span>'}</div></td></tr>` : ''}`).join('');
+      ${HOME_OPEN.has(r.name) ? `<tr class="sub-row"><td colspan="8"><div class="sub">No remark, still to follow up (${r.none}):</div><div class="nolist">${r.noneIds.length ? r.noneIds.slice().sort(byOldest).slice(0, 60).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(' ') + (r.noneIds.length > 60 ? ' …' : '') : '<span class="muted">none</span>'}</div></td></tr>` : ''}`).join('');
     const big = (v, l, href, attr) => `<a class="big" href="${href}" ${attr || ''}><b>${v}</b><span>${l}</span></a>`;
     return { html: `<div class="page-head"><h1>Home</h1><span class="muted">${L.fmtDate(L.todayISO())}</span></div>
       <div class="bigs">${big(tot.total, 'Total', '#/home')}${big(tot.todo, 'To follow up', '#/list', `data-filter='${esc(JSON.stringify({ tab: 'none' }))}'`)}${big(tot.followed, 'Followed up', '#/followed', `data-wfilter='{}'`)}${big(tot.closed, 'Closed', '#/closed', 'data-closed=""')}</div>
@@ -148,10 +147,10 @@ window.NCR = window.NCR || {};
         <section class="block"><h2>To follow up, by buyer</h2><p class="hint">Each bar is one buyer's NCRs still to follow up, split by what their Remarks say. Exact numbers are in the table below.</p>${buyerChart(rows)}</section>
         <section class="block"><h2>How long they have been open</h2><p class="hint">All open NCRs grouped by days since the NCR date.</p>${agingChart(open())}</section>
       </div>
-      <section class="block"><h2>By buyer</h2><p class="hint">To follow up = No remark + In progress + Hold / scrap + Closed in Jira. <b>Followed up</b> are waiting for their next check date. Click a number to see those NCRs; ▸ lists the NCRs with no remark.</p>
-        <div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th>Total</th><th>To follow up</th><th>No remark</th><th>In progress</th><th>Hold / scrap</th><th>Closed in Jira</th><th>Followed up</th><th>Closed</th></tr></thead>
-        <tbody>${body}<tr class="total"><td><b>Total</b></td><td>${tot.total}</td><td>${tot.todo}</td><td>${tot.none}</td><td>${tot.progress}</td><td>${tot.hold}</td><td>${tot.jira}</td><td>${tot.followed}</td><td>${tot.closed}</td></tr></tbody></table></div>
-        <p class="hint">Hold / scrap = Remarks contain “${esc(st.settings.holdKeywords.join('”, “'))}”. Closed in Jira = Remarks contain “${esc(st.settings.jiraKeywords.join('”, “'))}”. Change the keywords in Settings.</p></section>` };
+      <section class="block"><h2>By buyer</h2><p class="hint">To follow up = No remark + In progress + Hold / scrap. <b>Followed up</b> are waiting for their next check date. Click a number to see those NCRs; ▸ lists the NCRs with no remark.</p>
+        <div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th>Total</th><th>To follow up</th><th>No remark</th><th>In progress</th><th>Hold / scrap</th><th>Followed up</th><th>Closed</th></tr></thead>
+        <tbody>${body}<tr class="total"><td><b>Total</b></td><td>${tot.total}</td><td>${tot.todo}</td><td>${tot.none}</td><td>${tot.progress}</td><td>${tot.hold}</td><td>${tot.followed}</td><td>${tot.closed}</td></tr></tbody></table></div>
+        <p class="hint">Hold / scrap = Remarks contain “${esc(st.settings.holdKeywords.join('”, “'))}”. NCRs are closed automatically at import when Closed = Yes, or when Remarks contain “${esc(st.settings.jiraKeywords.join('”, “'))}”. Change the keywords in Settings.</p></section>` };
   }
 
   // ---------- Closed archive ----------
@@ -244,10 +243,9 @@ window.NCR = window.NCR || {};
     } else if (LF.tab === 'has') {
       const g = (fn) => v.has.filter(fn).sort(oldest);
       const parts = [
-        ['rv', 'Buyer updated — read, then ✓ Reviewed', 'Remarks changed since you last reviewed.', g((n) => inf(n).needsReview && inf(n).remarkGroup !== 'jira')],
+        ['rv', 'Buyer updated — read, then ✓ Reviewed', 'Remarks changed since you last reviewed.', g((n) => inf(n).needsReview)],
         ['pr', 'In progress', 'Remarks written, not finished. Follow up for the next step.', g((n) => inf(n).remarkGroup === 'progress' && !inf(n).needsReview)],
         ['hd', 'Hold / scrap', 'Waiting for scrap. Cannot close yet.', g((n) => inf(n).remarkGroup === 'hold' && !inf(n).needsReview)],
-        ['jr', 'Closed in Jira — verify and close', 'Remarks say Jira is closed. Tick the rows and press Verify &amp; close.', g((n) => inf(n).remarkGroup === 'jira')],
       ].filter((x) => x[3].length);
       body = parts.map(([k, t, h, l]) => `<section class="block"><h2>${t} <span class="count">${l.length}</span></h2><p class="hint">${h}</p>${workTable(l, '', k, 25, true)}</section>`).join('')
         || '<div class="empty">No NCRs with a remark.</div>';
@@ -277,7 +275,7 @@ window.NCR = window.NCR || {};
           ${sel('f-waiting', 'Waiting For', `<option value="">All</option><option value="__none"${LF.waiting === '__none' ? ' selected' : ''}>Not set</option>${options(s.waitingFor, LF.waiting)}`)}
           ${sel('f-disposition', 'Disposition', options(s.dispositions, LF.disposition, 'All'))}
           ${sel('f-due', 'Next check / Due', o([['', 'Any'], ['overdue', 'Overdue'], ['today', 'Today'], ['soon', 'Due soon'], ['week', 'Next 7 days'], ['none', 'Not set']], LF.due))}
-          ${sel('f-bu', 'Remark type', o([['', 'Any'], ['progress', 'In progress'], ['hold', 'Hold / scrap'], ['jira', 'Closed in Jira'], ['stale', 'Stale']], LF.buyerUpdate))}
+          ${sel('f-bu', 'Remark type', o([['', 'Any'], ['progress', 'In progress'], ['hold', 'Hold / scrap'], ['stale', 'Stale']], LF.buyerUpdate))}
           ${sel('f-sort', 'Sort “All to follow up” by', o([['due', 'Next check'], ['aging', 'Aging'], ['date', 'NCR date']], LF.sort))}
           <button class="btn" id="f-dir" title="Toggle direction">${LF.dir === 'asc' ? '↑ Asc' : '↓ Desc'}</button></div></details>
       </div>
@@ -305,7 +303,6 @@ window.NCR = window.NCR || {};
   function attention(n) {
     const i = inf(n);
     if (i.ready) return { rank: 0, label: 'Ready to close', cls: 'b-ready' };
-    if (i.remarkGroup === 'jira' && i.reasons.some((r) => /Jira/.test(r))) return { rank: 1, label: 'Closed in Jira: verify', cls: 'b-ready' };
     if (i.needsReview) return { rank: 2, label: 'Buyer updated', cls: 'b-review' };
     if (i.dueDiff !== null && i.dueDiff <= 0) return { rank: 3, label: 'Check due', cls: 'b-soon' };
     return null;
@@ -422,17 +419,20 @@ window.NCR = window.NCR || {};
   }
 
   // ---------- import ----------
-  const imp = { wb: null, name: '', sheet: '', table: null, mapping: {}, opts: { markMissingReady: true, markClosedReady: true }, done: null };
+  const imp = { wb: null, name: '', sheet: '', table: null, mapping: {}, opts: { closeMissing: false }, done: null };
   function importPage() {
     const I = NCR.importer;
     let body = '';
     if (imp.done) body += `<div class="alert ok">✅ Import complete: ${imp.done}</div>`;
     if (imp.table) {
-      const { records, bad } = I.buildRecords(imp.table, imp.mapping);
+      const { records, bad } = I.buildRecords(imp.table, imp.mapping, st.settings.jiraKeywords);
       const p = I.plan(records, st.ncrs);
       const missingReq = I.FIELDS.filter((f) => f.required && !imp.mapping[f.key]);
       const mapRows = I.FIELDS.map((f) => `<label>${f.label}${f.required ? ' *' : ''}<select data-map="${f.key}">${options(imp.table.headers, imp.mapping[f.key], '— not in file —')}</select></label>`).join('');
       const sample = (arr, fn) => arr.slice(0, 8).map(fn).join('');
+      const newClosed = p.added.filter((r) => r.CloseReason), toClose = newClosed.length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0);
+      const byReason = (arr) => arr.reduce((m, x) => { m[x] = (m[x] || 0) + 1; return m; }, {});
+      const reasons = byReason(newClosed.map((r) => r.CloseReason).concat(p.closeNow.map((c) => c.reason)));
       body += `<section class="card"><h2>2. Check column mapping</h2><p class="hint">File: <b>${esc(imp.name)}</b>${imp.wb.SheetNames.length > 1 ? ` · Sheet: <select id="imp-sheet">${options(imp.wb.SheetNames, imp.sheet)}</select>` : ''} · header row ${imp.table.headerRow} · ${imp.table.rows.length} data rows</p>
         <div class="form cols3">${mapRows}</div>
         ${missingReq.length ? `<div class="alert bad">Map the required column(s): ${missingReq.map((f) => f.label).join(', ')}</div>` : ''}</section>
@@ -440,15 +440,14 @@ window.NCR = window.NCR || {};
           <div class="cards small"><div class="card stat"><div class="num">${p.added.length}</div><div class="lbl">New NCRs</div></div>
           <div class="card stat"><div class="num">${p.updated.length}</div><div class="lbl">Updated</div></div>
           <div class="card stat"><div class="num">${p.unchanged.length}</div><div class="lbl">Unchanged</div></div>
-          <div class="card stat ${p.closedInFile.length ? 'c-ready' : ''}"><div class="num">${p.closedInFile.length}</div><div class="lbl">Closed in file (still open here)</div></div></div>
+          <div class="card stat ${toClose ? 'c-ready' : ''}"><div class="num">${toClose}</div><div class="lbl">Will be closed</div></div></div>
           <p class="hint">New NCRs start as <b>Not Started</b> with the Buyer as Owner. Existing follow-up data (Next Action, Owner, Due Date, Status, history…) is never overwritten. Only raw fields (item, batch, supplier, buyer, date, defect, quantity) are refreshed.</p>
           ${bad.length ? `<details class="alert warn"><summary>${bad.length} row(s) with issues</summary>${bad.slice(0, 20).map((b) => `<div>Row ${b.row}: ${esc(b.reason)}</div>`).join('')}</details>` : ''}
           ${p.added.length ? `<h3>New</h3><div class="table-wrap"><table class="grid compact"><thead><tr><th>NCR</th><th>Item</th><th>Batch</th><th>Date</th><th>Buyer</th><th>Defect</th></tr></thead><tbody>${sample(p.added, (r) => `<tr><td>${esc(r.NCR_No)}</td><td>${esc(r.Item_No)}</td><td>${esc(r.Batch_No)}</td><td>${L.fmtDate(r.NCR_Date)}</td><td>${esc(r.Buyer)}</td><td>${esc(r.Defect)}</td></tr>`)}</tbody></table></div>${p.added.length > 8 ? `<div class="muted small">…and ${p.added.length - 8} more</div>` : ''}` : ''}
           ${p.updated.length ? `<h3>Updated</h3>${sample(p.updated, (u) => `<div class="small"><b>${esc(u.rec.NCR_No)}</b>: ${u.changes.map((c) => `${esc(c.field.replace('_', ' '))} "${esc(c.from)}" → "${esc(c.to)}"`).join('; ')}</div>`)}${p.updated.length > 8 ? `<div class="muted small">…and ${p.updated.length - 8} more</div>` : ''}` : ''}
-          ${p.added.filter((r) => r.Closed).length ? `<p class="hint">${p.added.filter((r) => r.Closed).length} of the new NCRs are already <b>Closed = Yes</b> in the file. They go straight to the Closed page (closed date = today, since the file has no close date).</p>` : ''}
-          ${p.closedInFile.length ? `<label class="check block"><input type="checkbox" id="imp-closed"${imp.opts.markClosedReady ? ' checked' : ''}> Mark the ${p.closedInFile.length} NCR(s) closed in the file as <b>Ready to Close</b> (QA still verifies and closes): ${esc(p.closedInFile.slice(0, 6).map((n) => n.NCR_No).join(', '))}${p.closedInFile.length > 6 ? '…' : ''}</label>` : ''}
-          ${p.missing.length ? `${p.missing.length > 0.5 * st.ncrs.filter((n) => n.Status !== 'Closed').length ? '<div class="alert warn">⚠️ More than half of the open NCRs are missing from this file — is it a partial / filtered export? Untick below if so.</div>' : ''}<label class="check block"><input type="checkbox" id="imp-missing"${imp.opts.markMissingReady ? ' checked' : ''}> ${p.missing.length} open NCR(s) are no longer in the export (closed in the ERP?). Mark them <b>Ready to Close</b> — QA still verifies and closes: ${esc(p.missing.slice(0, 6).map((n) => n.NCR_No).join(', '))}${p.missing.length > 6 ? '…' : ''}</label>` : ''}
-          <div class="actions"><button class="btn primary" id="imp-go"${missingReq.length || (!p.added.length && !p.updated.length && !(imp.opts.markMissingReady && p.missing.length) && !(imp.opts.markClosedReady && p.closedInFile.length)) ? ' disabled' : ''}>Import into NCR Master</button>
+          ${Object.keys(reasons).length ? `<div class="alert ok"><b>Closed by this file</b> (they move to the Closed page, nothing to close by hand): ${Object.entries(reasons).map(([k, v]) => `${v} × ${esc(k)}`).join(' · ')}. The closed date is today, because the file has no close date.</div>` : ''}
+          ${p.missing.length ? `${p.missing.length > 0.5 * st.ncrs.filter((n) => n.Status !== 'Closed').length ? '<div class="alert warn">⚠️ More than half of the open NCRs are missing from this file — is it a partial / filtered export? Leave the box below unticked if so.</div>' : ''}<label class="check block"><input type="checkbox" id="imp-missing"${imp.opts.closeMissing ? ' checked' : ''}> ${p.missing.length} open NCR(s) are not in this file. Close them too (only if the export lists every NCR): ${esc(p.missing.slice(0, 6).map((n) => n.NCR_No).join(', '))}${p.missing.length > 6 ? '…' : ''}</label>` : ''}
+          <div class="actions"><button class="btn primary" id="imp-go"${missingReq.length || (!p.added.length && !p.updated.length && !p.closeNow.length && !(imp.opts.closeMissing && p.missing.length)) ? ' disabled' : ''}>Import into NCR Master</button>
           <button class="btn" id="imp-cancel">Cancel</button></div></section>`;
     }
     return { html: `<div class="page-head"><h1>Import from Excel</h1></div>
@@ -473,17 +472,16 @@ window.NCR = window.NCR || {};
       drop.addEventListener('drop', (e) => e.dataTransfer.files[0] && load(e.dataTransfer.files[0]));
       const sh = root.querySelector('#imp-sheet'); if (sh) sh.addEventListener('change', () => pickSheet(sh.value));
       root.querySelectorAll('[data-map]').forEach((s) => s.addEventListener('change', () => { imp.mapping[s.dataset.map] = s.value; NCR.app.render(); }));
-      const miss = root.querySelector('#imp-missing'); if (miss) miss.addEventListener('change', () => { imp.opts.markMissingReady = miss.checked; NCR.app.render(); });
-      const cl = root.querySelector('#imp-closed'); if (cl) cl.addEventListener('change', () => { imp.opts.markClosedReady = cl.checked; NCR.app.render(); });
+      const miss = root.querySelector('#imp-missing'); if (miss) miss.addEventListener('change', () => { imp.opts.closeMissing = miss.checked; NCR.app.render(); });
       const cancel = root.querySelector('#imp-cancel'); if (cancel) cancel.addEventListener('click', () => { imp.table = null; imp.wb = null; NCR.app.render(); });
       const go = root.querySelector('#imp-go');
       if (go) go.addEventListener('click', () => {
-        const { records } = I2.buildRecords(imp.table, imp.mapping);
+        const { records } = I2.buildRecords(imp.table, imp.mapping, st.settings.jiraKeywords);
         const p = I2.plan(records, st.ncrs), r = I2.apply(p, imp.opts);
         S.saveMany(r.ncrs, r.history);
         const back = p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark' && c.to) && isFollowed(S.getNcr(u.old.NCR_ID))).length; // followed-up NCRs with a new buyer remark
         S.saveSettings({ importMapping: Object.assign({}, imp.mapping) });
-        imp.done = `${back ? `${back} followed-up NCR${back === 1 ? ' has' : 's have'} a new buyer remark: see <a href="#/followed" data-wfilter='{}'>Followed up</a>. ` : ''}${p.added.length} added${p.added.length ? ' (' + Object.entries(p.added.reduce((m, r) => { const b = r.Buyer || '(No buyer)'; m[b] = (m[b] || 0) + 1; return m; }, {})).map(([b, c]) => b + ' ' + c).join(', ') + ')' : ''}, ${p.updated.length} updated${imp.opts.markClosedReady && p.closedInFile.length ? ', ' + p.closedInFile.length + ' closed-in-file marked Ready to Close' : ''}${imp.opts.markMissingReady && p.missing.length ? ', ' + p.missing.length + ' missing marked Ready to Close' : ''}.`;
+        imp.done = `${back ? `${back} followed-up NCR${back === 1 ? ' has' : 's have'} a new buyer remark: see <a href="#/followed" data-wfilter='{}'>Followed up</a>. ` : ''}${p.added.length} added${p.added.length ? ' (' + Object.entries(p.added.reduce((m, r) => { const b = r.Buyer || '(No buyer)'; m[b] = (m[b] || 0) + 1; return m; }, {})).map(([b, c]) => b + ' ' + c).join(', ') + ')' : ''}, ${p.updated.length} updated, ${p.added.filter((r) => r.CloseReason).length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0)} closed (see <a href="#/closed" data-closed="">Closed</a>).`;
         imp.table = null; imp.wb = null; NCR.app.render();
       });
     } };
@@ -503,7 +501,7 @@ window.NCR = window.NCR || {};
       <form id="cfg" class="card"><h2>Dropdowns &amp; thresholds</h2><p class="hint">One option per line.</p>
         <div class="form cols3">${ta('dispositions', 'Disposition')}${ta('nextActions', 'Next Action')}${ta('waitingFor', 'Waiting For')}${ta('owners', 'Owners (suggestions)')}</div>
         <div class="form cols3"><label>Hold / scrap keywords (Remarks)<textarea name="holdKeywords" rows="3">${esc((s.holdKeywords || []).join('\n'))}</textarea></label>
-          <label>Closed-in-Jira keywords (Remarks)<textarea name="jiraKeywords" rows="3">${esc((s.jiraKeywords || []).join('\n'))}</textarea></label></div>
+          <label>Close at import when Remarks contain<textarea name="jiraKeywords" rows="3">${esc((s.jiraKeywords || []).join('\n'))}</textarea></label></div>
         <div class="form cols3"><label>Due Soon window (days)<input type="number" min="1" name="dueSoonDays" value="${s.dueSoonDays}"></label>
           <label>Escalate at follow-up count ≥<input type="number" min="1" name="escalationThreshold" value="${s.escalationThreshold}"></label>
           <label>Default next check after follow-up (days)<input type="number" min="1" name="defaultCheckDays" value="${s.defaultCheckDays}"></label>

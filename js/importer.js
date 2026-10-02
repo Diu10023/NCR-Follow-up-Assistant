@@ -85,7 +85,9 @@ window.NCR = window.NCR || {};
   // Excel may re-save line breaks (\r\n vs \n); that alone is not a buyer update
   const normText = (v) => String(v == null ? '' : v).replace(/\r\n?/g, '\n').trim();
 
-  function buildRecords(table, mapping) {
+  // closeKeywords: a remark containing any of them (any letter case) closes the NCR on import, like Closed = Yes
+  function buildRecords(table, mapping, closeKeywords) {
+    const kw = (closeKeywords || []).map((k) => String(k).trim().toLowerCase()).filter(Boolean);
     const col = {}; FIELDS.forEach((f) => { col[f.key] = mapping[f.key] ? table.headers.indexOf(mapping[f.key]) : -1; });
     const out = [], bad = [];
     table.rows.forEach((r, i) => {
@@ -95,7 +97,8 @@ window.NCR = window.NCR || {};
       const rec = { NCR_No: no };
       ['Item_No', 'Batch_No', 'Supplier', 'Buyer', 'Defect', 'Quantity', 'Disposition'].forEach((k) => { rec[k] = String(get(k)).trim(); });
       rec.Buyer_Remark = normText(get('Buyer_Remark'));
-      rec.Closed = isClosedValue(get('Closed'));
+      const yes = isClosedValue(get('Closed')), jira = kw.some((k) => rec.Buyer_Remark.toLowerCase().includes(k));
+      rec.CloseReason = yes ? 'Closed = Yes in Excel' : jira ? 'Remarks mention Jira' : '';
       rec.RemarkMapped = col.Buyer_Remark >= 0;
       rec.NCR_Date = parseDate(get('NCR_Date'));
       if (get('NCR_Date') !== '' && !rec.NCR_Date) bad.push({ row: table.headerRow + 1 + i, reason: 'Unreadable date "' + get('NCR_Date') + '" (NCR ' + no + ')' });
@@ -109,13 +112,13 @@ window.NCR = window.NCR || {};
   // Compare against existing NCRs (key = NCR No., case-insensitive). Follow-up fields are never touched.
   function plan(records, existing) {
     const byNo = new Map(existing.map((n) => [String(n.NCR_No).trim().toLowerCase(), n]));
-    const seen = new Set(), added = [], updated = [], unchanged = [], skippedClosed = [], closedInFile = [];
+    const seen = new Set(), added = [], updated = [], unchanged = [], closeNow = [];
     records.forEach((r) => {
       const key = r.NCR_No.toLowerCase();
       if (seen.has(key)) return; seen.add(key);
       const old = byNo.get(key);
       if (!old) { added.push(r); return; }
-      if (r.Closed && old.Status !== 'Closed') closedInFile.push(old);
+      if (r.CloseReason && old.Status !== 'Closed') closeNow.push({ old, reason: r.CloseReason }); // closed by the file, no manual step
       const changes = [];
       UPDATABLE.forEach((f) => { if (r[f] && String(r[f]) !== String(old[f] || '')) changes.push({ field: f, from: old[f] || '', to: r[f] }); });
       // Remarks mirror the file: a change (including the buyer clearing it) is recorded, never silently lost.
@@ -124,7 +127,7 @@ window.NCR = window.NCR || {};
       if (changes.length) updated.push({ rec: r, old, changes }); else unchanged.push(old);
     });
     const missing = existing.filter((n) => n.Status !== 'Closed' && !seen.has(String(n.NCR_No).trim().toLowerCase()));
-    return { added, updated, unchanged, missing, skippedClosed, closedInFile };
+    return { added, updated, unchanged, missing, closeNow };
   }
 
   // Returns {ncrs, history} ready for store.saveMany.
@@ -135,10 +138,10 @@ window.NCR = window.NCR || {};
     p.added.forEach((r) => {
       const n = {}; NCR.store.NCR_FIELDS.forEach((f) => { n[f] = ''; });
       Object.assign(n, r, { Owner: r.Buyer, NCR_ID: L.uid('NCR'), Status: 'Not Started', Followup_Count: 0, Created_At: now, Updated_At: now });
-      if (r.Closed) { n.Status = 'Closed'; n.Closed_Date = today; n.Next_Action = ''; }
+      if (r.CloseReason) { n.Status = 'Closed'; n.Closed_Date = today; n.Next_Action = ''; }
       n.Aging = L.daysBetween(n.NCR_Date, n.Closed_Date || today);
-      delete n.RemarkMapped; delete n.Closed; ncrs.push(n); H(n, r.Closed ? 'Imported as Closed (Closed = Yes in Excel)' : 'NCR imported from Excel');
-      if (n.Buyer_Remark && !r.Closed) H(n, 'Buyer Remarks at import: ' + n.Buyer_Remark, '', 'Buyer (Excel)');
+      delete n.RemarkMapped; delete n.CloseReason; ncrs.push(n); H(n, r.CloseReason ? 'Imported as Closed (' + r.CloseReason + ')' : 'NCR imported from Excel');
+      if (n.Buyer_Remark && !r.CloseReason) H(n, 'Buyer Remarks at import: ' + n.Buyer_Remark, '', 'Buyer (Excel)');
     });
     p.updated.forEach(({ rec, old, changes }) => {
       const n = Object.assign({}, old);
@@ -153,15 +156,17 @@ window.NCR = window.NCR || {};
       if (others.length) H(n, 'Updated from Excel: ' + others.map((c) => c.field.replace('_', ' ')).join(', '));
       ncrs.push(n);
     });
-    const ready = (list, why) => list.forEach((o) => {
+    // Closing happens only from the uploaded file: Closed = Yes, or a remark with a close keyword (e.g. Jira).
+    const close = (o, why) => {
       const cur = ncrs.find((x) => x.NCR_ID === o.NCR_ID), n = Object.assign({}, cur || o);
-      if (n.Status === 'Ready to Close' || n.Status === 'Closed') return;
-      n.Status = 'Ready to Close'; n.Next_Action = n.Next_Action || 'Close NCR'; n.Updated_At = now;
+      if (n.Status === 'Closed') return;
+      n.Status = 'Closed'; n.Closed_Date = today; n.Updated_At = now;
+      n.Aging = L.daysBetween(n.NCR_Date, today);
       if (cur) ncrs[ncrs.indexOf(cur)] = n; else ncrs.push(n);
-      H(n, why);
-    });
-    if (opts && opts.markClosedReady) ready(p.closedInFile, 'Marked Closed in latest Excel file → Ready to Close (QA to verify)');
-    if (opts && opts.markMissingReady) ready(p.missing, 'No longer in latest Excel file → Ready to Close (QA to verify)');
+      H(n, 'Closed from Excel: ' + why);
+    };
+    p.closeNow.forEach(({ old, reason }) => close(old, reason));
+    if (opts && opts.closeMissing) p.missing.forEach((o) => close(o, 'not in the latest Excel file'));
     return { ncrs, history };
   }
 

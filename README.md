@@ -20,16 +20,16 @@ Sheets `NCR_Master`, `Followup_History` and `Settings` are created automatically
 - New NCR No. → added as *Not Started*.
 - Existing NCR No. → only raw fields (item, batch, supplier, buyer, date, defect, quantity) are refreshed; Next Action, Owner, Due Date, Status and history are never overwritten.
 - Expected columns: Created date, NCR Number, Item number, Batch number, Closed, Sub nonconformance category id (→ Defect), Remarks, Buyer. Quantity and Supplier are optional.
-- NCRs already **Closed** (Yes) in the file are imported straight into the Closed page; NCRs still open here but Closed in the file are marked *Ready to Close* (QA verifies and closes).
+- NCRs with **Closed = yes** (any letter case), or Remarks containing **jira** (any letter case), are closed automatically at import, new or existing. They go to the Closed page with today as the closed date.
 - **Remarks = buyer's progress.** It is stored as *Buyer Remark* (separate from QA's own Remark) and refreshed on every import; each change — including the buyer clearing Remarks (old text kept in the history entry) — is logged in history as a "Buyer update". A buyer update unchanged for N days (Settings, default 7) is flagged **⏳ stale**. Open NCRs whose Remarks are empty are the first priority tab on **Open NCRs** ("No remark") so QA knows to chase the buyer first.
-- Optional: mark open NCRs missing from the file as *Ready to Close* (QA still verifies and closes).
+- Optional: also close open NCRs that are missing from the file (off by default; only for exports that list every NCR).
 
 ## The weekly loop
 1. **First import**: the full history. Every open NCR starts in **To follow up** (badge = how many).
 2. **Chase**: tick rows (or *Select all*, or *Message [buyer]*) → **Follow-up** → copy the message → pick the next check date → record. The NCR moves to **Followed up** (badge = how many) and **stays there until it is closed**.
-3. **Every week**: import the new export. Nothing is lost: buyer remark changes are added to each NCR's timeline, new NCRs land in To follow up, NCRs closed in the export become *Ready to close*.
-4. **In Followed up**, NCRs that need you rise to the top: *Buyer updated*, *Closed in Jira: verify*, *Ready to close*, *Check due*. Press ▸ on a row to see its latest timeline; **Follow up again** records another round.
-5. When done: **Verify & close** (QA always closes explicitly). Closed NCRs go to the Closed page.
+3. **Every week**: import the new export. Nothing is lost: buyer remark changes are added to each NCR's timeline, new NCRs land in To follow up, NCRs the file marks as closed are closed automatically.
+4. **In Followed up**, NCRs that need you rise to the top: *Buyer updated*, *Check due*. Press ▸ on a row to see its latest timeline; **Follow up again** records another round.
+5. **Closing happens from the file, not by hand**: at import an NCR is closed when its *Closed* column says yes (any letter case) or its Remarks contain a close keyword such as *Jira* (any letter case, editable in Settings). Closed NCRs go to the Closed page. (Manual *Verify & close* still exists on the NCR page.)
 
 ## Pages
 Home (by buyer) · To follow up (no remark first) · Followed up (waiting for the next check date) · Closed archive (search/filter/sort) · NCR Detail (follow-up control, history timeline, quick Follow-up message) · Add/Edit NCR · Import Excel · Settings (dropdowns, due-soon window, escalation threshold, aging bands).

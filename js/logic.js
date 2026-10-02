@@ -15,7 +15,7 @@ window.NCR = window.NCR || {};
     buyerStaleDays: 7,
     defaultCheckDays: 7,
     holdKeywords: ['hold', 'scrap'], // Remarks containing these = waiting for scrap, cannot close yet
-    jiraKeywords: ['jira'], // Remarks containing these = already closed in Jira, QA to verify & close
+    jiraKeywords: ['jira'], // a Remarks value containing any of these (any letter case) closes the NCR when the file is imported
     agingBands: [
       { max: 7, label: 'Normal', cls: 'age-normal' },
       { max: 14, label: 'Follow-up', cls: 'age-followup' },
@@ -75,38 +75,34 @@ window.NCR = window.NCR || {};
     const needsReview = !closed && !ready && !notStarted && !!n.Buyer_Remark && !!n.Buyer_Remark_Date && String(n.Buyer_Remark_Date) > String(n.Last_Review || '');
     const rem = String(n.Buyer_Remark || '').toLowerCase();
     const hasKw = (list) => (list || []).some((k) => k && rem.includes(String(k).toLowerCase()));
-    const remarkGroup = closed ? '' : !rem.trim() ? 'none' : hasKw(s.jiraKeywords) ? 'jira' : hasKw(s.holdKeywords) ? 'hold' : 'progress';
+    const remarkGroup = closed ? '' : !rem.trim() ? 'none' : hasKw(s.holdKeywords) ? 'hold' : 'progress';
     // followed up / reviewed since the buyer's last remark, and the next check date is still ahead: nothing to do yet
     const scheduled = !closed && dueDiff !== null && dueDiff > 0 && (!n.Buyer_Remark_Date || String(n.Last_Review || '') >= String(n.Buyer_Remark_Date));
-    const jiraNow = remarkGroup === 'jira' && !scheduled;
     const triage = notStarted && !(scheduled && (Number(n.Followup_Count) || 0) > 0); // a followed-up NCR is no longer "new"
     const isNew = !closed && aging !== null && aging <= 7;
     const reasons = [];
     if (!closed) {
-      if (jiraNow) reasons.push('Closed in Jira – verify & close');
       if (overdue) reasons.push(`Overdue ${-dueDiff}d`); else if (dueToday) reasons.push('Due today');
       if (ready) reasons.push('Ready to close – verify');
-      if (triage && remarkGroup !== 'jira') reasons.push('New – triage');
+      if (triage) reasons.push('New – triage');
       if (needsReview) reasons.push('Buyer updated – review');
     }
     const actionRequired = reasons.length > 0;
     let state = 'ontrack';
     if (closed) state = 'closed';
-    else if (jiraNow) state = 'jira';
     else if (overdue) state = 'overdue';
     else if (ready) state = 'ready';
     else if (triage) state = 'new';
     else if (needsReview) state = 'review';
     else if (dueToday || dueSoon) state = 'soon';
     // primary section on the Today page (each NCR appears once)
-    const section = closed ? null : jiraNow ? 'jira' : overdue ? 'overdue' : dueToday ? 'today' : ready ? 'ready' : triage ? 'new' : needsReview ? 'review' : dueSoon ? 'soon' : null;
+    const section = closed ? null : overdue ? 'overdue' : dueToday ? 'today' : ready ? 'ready' : triage ? 'new' : needsReview ? 'review' : dueSoon ? 'soon' : null;
     const band = agingBand(aging, s);
     return { remarkGroup, notStarted, needsReview, isNew, reasons, section, closed, aging, dueDiff, ready, overdue, dueToday, dueSoon, missingNext, noUpdate, stale, staleDays, count, escalate, state, band, actionRequired };
   }
 
   const STATE_META = {
     overdue: { icon: '🔴', label: 'Overdue', cls: 'b-overdue' },
-    jira: { icon: '🔵', label: 'Closed in Jira', cls: 'b-ready' },
     new: { icon: '🆕', label: 'New – triage', cls: 'b-new' },
     review: { icon: '💬', label: 'Buyer updated', cls: 'b-review' },
     soon: { icon: '🟡', label: 'Due Soon', cls: 'b-soon' },
