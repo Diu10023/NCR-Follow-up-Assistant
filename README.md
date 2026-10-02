@@ -20,7 +20,7 @@ Sheets `NCR_Master`, `Followup_History` and `Settings` are created automatically
 - New NCR No. → added as *Not Started*.
 - Existing NCR No. → only raw fields (item, batch, supplier, buyer, date, defect, quantity) are refreshed; Next Action, Owner, Due Date, Status and history are never overwritten.
 - Expected columns: Created date, NCR Number, Item number, Batch number, Closed, Sub nonconformance category id (→ Defect), Remarks, Buyer. Quantity and Supplier are optional.
-- NCRs already **Closed** in the file are not imported as new; NCRs still open here but Closed in the file are marked *Ready to Close* (QA verifies and closes).
+- NCRs already **Closed** (Yes) in the file are imported straight into the Closed page; NCRs still open here but Closed in the file are marked *Ready to Close* (QA verifies and closes).
 - **Remarks = buyer's progress.** It is stored as *Buyer Remark* (separate from QA's own Remark) and refreshed on every import; each change — including the buyer clearing Remarks (old text kept in the history entry) — is logged in history as a "Buyer update". A buyer update unchanged for N days (Settings, default 7) is flagged **⏳ stale**. Open NCRs whose Remarks are empty are flagged **📭 No buyer update** (Dashboard alert, Today section, list filter, Action Required) so QA knows to chase the buyer.
 - Optional: mark open NCRs missing from the file as *Ready to Close* (QA still verifies and closes).
 

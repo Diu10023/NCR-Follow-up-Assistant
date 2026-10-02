@@ -110,7 +110,7 @@ window.NCR = window.NCR || {};
       const key = r.NCR_No.toLowerCase();
       if (seen.has(key)) return; seen.add(key);
       const old = byNo.get(key);
-      if (!old) { (r.Closed ? skippedClosed : added).push(r); return; }
+      if (!old) { added.push(r); return; }
       if (r.Closed && old.Status !== 'Closed') closedInFile.push(old);
       const changes = [];
       UPDATABLE.forEach((f) => { if (r[f] && String(r[f]) !== String(old[f] || '')) changes.push({ field: f, from: old[f] || '', to: r[f] }); });
@@ -131,9 +131,10 @@ window.NCR = window.NCR || {};
     p.added.forEach((r) => {
       const n = {}; NCR.store.NCR_FIELDS.forEach((f) => { n[f] = ''; });
       Object.assign(n, r, { Owner: r.Buyer, NCR_ID: L.uid('NCR'), Status: 'Not Started', Followup_Count: 0, Created_At: now, Updated_At: now });
-      n.Aging = L.daysBetween(n.NCR_Date, today);
-      delete n.RemarkMapped; delete n.Closed; ncrs.push(n); H(n, 'NCR imported from Excel');
-      if (n.Buyer_Remark) H(n, 'Buyer Remarks at import: ' + n.Buyer_Remark, '', 'Buyer (Excel)');
+      if (r.Closed) { n.Status = 'Closed'; n.Closed_Date = today; n.Next_Action = ''; }
+      n.Aging = L.daysBetween(n.NCR_Date, n.Closed_Date || today);
+      delete n.RemarkMapped; delete n.Closed; ncrs.push(n); H(n, r.Closed ? 'Imported as Closed (Closed = Yes in Excel)' : 'NCR imported from Excel');
+      if (n.Buyer_Remark && !r.Closed) H(n, 'Buyer Remarks at import: ' + n.Buyer_Remark, '', 'Buyer (Excel)');
     });
     p.updated.forEach(({ rec, old, changes }) => {
       const n = Object.assign({}, old);
