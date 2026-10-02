@@ -218,3 +218,7 @@ dialog{border:0;border-radius:var(--r-card);padding:0;width:min(720px,94vw);back
 .theme-btn .moon{display:none}
 :root[data-theme="dark"] .theme-btn .sun{display:none}:root[data-theme="dark"] .theme-btn .moon{display:block}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .theme-btn .sun{display:none}:root:not([data-theme="light"]) .theme-btn .moon{display:block}}
+
+.backbar{margin:-12px 0 16px}
+.steps{margin:0 0 4px;padding:12px 18px 12px 38px;border-radius:var(--r-base);box-shadow:var(--ins-s);font-size:14.5px;color:var(--fg)}
+.steps li{margin:2px 0}.steps b{color:var(--acc)}

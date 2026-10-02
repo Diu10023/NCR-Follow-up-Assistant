@@ -16,11 +16,11 @@
     const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, settings: V.settings };
     current = (views[page] || V.home)();
     current.closed = page === 'ncr' && (S.getNcr(arg) || {}).Status === 'Closed';
-    main.innerHTML = current.html;
+    main.innerHTML = (page === 'home' || page === 'overview' || page === 'dashboard' ? '' : '<div class="backbar"><button class="btn sm" data-action="back">← Back</button></div>') + current.html;
     if (current.bind) current.bind(main);
     document.querySelectorAll('nav a, .rail a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'ncr' ? (current.closed ? 'closed' : 'list') : page === 'overview' || page === 'dashboard' ? 'home' : page)));
     updateBulkBar();
-    window.scrollTo(0, window.__keepScroll || 0); window.__keepScroll = 0;
+    window.scrollTo({ top: window.__keepScroll || 0, behavior: 'instant' }); window.__keepScroll = 0;
   }
 
   function status() {
@@ -38,7 +38,13 @@
     const editing = a && main.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
     if (st.loaded && !modal.open && !editing) { window.__keepScroll = window.scrollY; render(); }
   });
-  window.addEventListener('hashchange', () => { V.SEL.clear(); window.scrollTo(0, 0); render(); });
+  // remember where each page was scrolled, so Back returns to the same spot in a long list
+  const scrollMem = {}; let scrollKey = location.hash;
+  window.addEventListener('scroll', () => { scrollMem[scrollKey] = window.scrollY; }, { passive: true });
+  window.addEventListener('hashchange', () => {
+    const key = location.hash; scrollKey = '';
+    V.SEL.clear(); render(); window.scrollTo({ top: scrollMem[key] || 0, behavior: 'instant' }); scrollKey = key;
+  });
 
   // ---------- toast ----------
   let tt;
@@ -113,6 +119,7 @@
     const nextDefault = plusDays(s.defaultCheckDays);
     const allWaiting = [...new Set(list.map((n) => n.Waiting_For))];
     openModal(`<form id="hf" class="form modal-form"><h2>${one ? `Follow-up #${(Number(n0.Followup_Count) || 0) + 1} – ${esc(n0.NCR_No)}` : `Follow-up – ${list.length} NCRs`}</h2>
+      <ol class="steps full"><li><b>Copy</b> the message below and send it to the buyer (Teams or email).</li><li><b>Choose</b> when you will check again.</li><li><b>Press Record</b>. The NCR is hidden until that date and the follow-up is saved in its history.</li></ol>
       ${msgs.map(([b, m], k) => `<div class="full"><label>${one ? 'Message (editable)' : 'Message for ' + esc(b) + ' (' + groups[b].length + ' NCRs)'}<textarea class="msg" rows="${one ? 9 : Math.min(14, 6 + groups[b].length)}">${esc(m)}</textarea></label>
         <button type="button" class="btn sm copy" data-k="${k}">📋 Copy message</button></div>`).join('')}
       <div class="full muted small">Paste into Teams / email, then record the follow-up below.</div><hr class="full">
@@ -125,7 +132,7 @@
       <label>Waiting For<select name="waiting">${V.options(V.withCurrent(s.waitingFor, allWaiting.length === 1 ? allWaiting[0] : ''), allWaiting.length === 1 ? allWaiting[0] : '', one ? '— unchanged —' : '— unchanged —')}</select></label>
       <label>Remark<input name="remark"></label>
       <label class="check full"><input type="checkbox" name="pending" checked> Set status to <b>Pending</b> (waiting for reply) when Not Started / Open</label>
-      <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">Record follow-up${one ? '' : ' for ' + list.length}</button></div></form>`, (m) => {
+      <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">I sent it, record${one ? '' : ' (' + list.length + ')'}</button></div></form>`, (m) => {
       m.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', () => copyText(m.querySelectorAll('.msg')[b.dataset.k].value)));
       m.querySelectorAll('[data-plus]').forEach((b) => b.addEventListener('click', () => { m.querySelector('#nd').value = plusDays(Number(b.dataset.plus)); }));
       m.querySelector('#hf').addEventListener('submit', (e) => {
@@ -208,6 +215,11 @@
   }
 
   const actions = {
+    back: () => {
+      if (history.length > 1) { history.back(); return; }
+      const { page } = route();
+      location.hash = page === 'ncr' ? (current.closed ? '#/closed' : '#/list') : '#/home';
+    },
     add: () => ncrForm(),
     edit: (el) => ncrForm(el.dataset.id),
     followup: (el) => followupModal([el.dataset.id]),

@@ -312,7 +312,7 @@ window.NCR = window.NCR || {};
       ${h.Remark ? `<div class="sub">${esc(h.Remark)}</div>` : ''}</div></li>`).join('');
     const info = (l, v) => `<div class="kv"><span>${l}</span><b>${esc(v) || '–'}</b></div>`;
     return { html: `
-      <div class="page-head"><div><a href="${i.closed ? '#/closed' : '#/list'}" class="muted">← ${i.closed ? 'Closed' : 'Open NCRs'}</a><h1>${esc(n.NCR_No)} ${stateBadge(i)}</h1></div>
+      <div class="page-head"><div><h1>${esc(n.NCR_No)} ${stateBadge(i)}</h1></div>
         <div class="btns">
           <button class="btn primary" data-action="followup" data-id="${esc(id)}">📨 Follow-up</button>
           ${i.needsReview ? `<button class="btn" data-action="reviewed" data-id="${esc(id)}">✓ Reviewed</button>` : ''}
