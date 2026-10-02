@@ -21,14 +21,14 @@ Sheets `NCR_Master`, `Followup_History` and `Settings` are created automatically
 - Existing NCR No. → only raw fields (item, batch, supplier, buyer, date, defect, quantity) are refreshed; Next Action, Owner, Due Date, Status and history are never overwritten.
 - Expected columns: Created date, NCR Number, Item number, Batch number, Closed, Sub nonconformance category id (→ Defect), Remarks, Buyer. Quantity and Supplier are optional.
 - NCRs already **Closed** (Yes) in the file are imported straight into the Closed page; NCRs still open here but Closed in the file are marked *Ready to Close* (QA verifies and closes).
-- **Remarks = buyer's progress.** It is stored as *Buyer Remark* (separate from QA's own Remark) and refreshed on every import; each change — including the buyer clearing Remarks (old text kept in the history entry) — is logged in history as a "Buyer update". A buyer update unchanged for N days (Settings, default 7) is flagged **⏳ stale**. Open NCRs whose Remarks are empty are flagged **📭 No buyer update** (Dashboard alert, Today section, list filter, Action Required) so QA knows to chase the buyer.
+- **Remarks = buyer's progress.** It is stored as *Buyer Remark* (separate from QA's own Remark) and refreshed on every import; each change — including the buyer clearing Remarks (old text kept in the history entry) — is logged in history as a "Buyer update". A buyer update unchanged for N days (Settings, default 7) is flagged **⏳ stale**. Open NCRs whose Remarks are empty are the first priority tab on **Open NCRs** ("No remark") so QA knows to chase the buyer first.
 - Optional: mark open NCRs missing from the file as *Ready to Close* (QA still verifies and closes).
 
 ## Daily / weekly routine
 1. **Import Excel** weekly. New NCRs appear as *New – triage* (Owner = Buyer); NCRs gone from the export are marked *Ready to Close*; changed buyer Remarks appear as *Buyer updated – review*.
-2. **Today** is the only worklist. Sections: Overdue → Due Today → Buyer updated → New (oldest first) → Ready to Close → Coming up.
+2. **Open NCRs** is the only worklist. Tab 1 *No remark* (chase first, oldest first); tab 2 *Has remark* split into Buyer updated, In progress, Hold / scrap and Closed in Jira (verify and close); tab 3 *All open*. Filter by buyer with the pills.
 3. Chase: tick rows (or *Select all*, or **Chase** per buyer on Overview) → **Follow-up** → copy the generated message (one per buyer) → pick the **next check date** → record.
-4. Followed up but can't close yet? The NCR leaves Today until its next check date, then returns automatically — nothing is forgotten, and the Overview "Not forgotten?" panel shows follow-up coverage.
+4. Followed up but can't close yet? The NCR is hidden from Open NCRs until its next check date (tick *Include NCRs waiting* to see it), then returns automatically — nothing is forgotten, and Home shows the totals by buyer.
 5. When the work is done: **Mark Ready to Close**, verify, **Verify & Close** (QA always closes explicitly).
 
 ## Pages
