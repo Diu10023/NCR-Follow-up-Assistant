@@ -65,10 +65,10 @@ window.NCR = window.NCR || {};
   // ---------- charts (inline SVG, no library) ----------
   // Palette from the design colours, validated as one ordered set: dark, blue, grey, light blue.
   const SEG = [
-    { k: 'none', label: 'No update', color: '#333333', ink: '#fff' },
-    { k: 'progress', label: 'In progress', color: '#007AC8', ink: '#fff' },
-    { k: 'hold', label: 'Hold / scrap', color: '#666666', ink: '#fff' },
-    { k: 'jira', label: 'Closed in Jira', color: '#A0C8EC', ink: '#000' },
+    { k: 'none', label: 'No update', color: 'var(--c-none)', ink: 'var(--i-none)' },
+    { k: 'progress', label: 'In progress', color: 'var(--c-progress)', ink: 'var(--i-progress)' },
+    { k: 'hold', label: 'Hold / scrap', color: 'var(--c-hold)', ink: 'var(--i-hold)' },
+    { k: 'jira', label: 'Closed in Jira', color: 'var(--c-jira)', ink: 'var(--i-jira)' },
   ];
   const niceStep = (max) => { const raw = Math.max(1, max) / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
   // bar with only its right (data) end rounded; the baseline end stays square
@@ -82,19 +82,19 @@ window.NCR = window.NCR || {};
     const max = Math.max(...list.map((r) => r.open)), step = niceStep(max), top_ = Math.ceil(max / step) * step;
     const plotW = W - labelW - right, sc = (v) => (v / top_) * plotW, H = top + list.length * rowH + axisH;
     let g = '', bars = '';
-    for (let t = 0; t <= top_; t += step) g += `<line x1="${labelW + sc(t)}" x2="${labelW + sc(t)}" y1="${top}" y2="${H - axisH}" stroke="#dcdcdc" stroke-width="1"/><text x="${labelW + sc(t)}" y="${H - 8}" text-anchor="middle" font-size="12" fill="#444">${t}</text>`;
+    for (let t = 0; t <= top_; t += step) g += `<line x1="${labelW + sc(t)}" x2="${labelW + sc(t)}" y1="${top}" y2="${H - axisH}" class="grid-l"/><text class="ax" x="${labelW + sc(t)}" y="${H - 8}" text-anchor="middle" font-size="12">${t}</text>`;
     list.forEach((r, i) => {
       const y = top + i * rowH + (rowH - 22) / 2;
       const name = r.name.length > 18 ? r.name.slice(0, 17) + '…' : r.name;
-      bars += `<text x="${labelW - 10}" y="${y + 15}" text-anchor="end" font-size="14" font-weight="700" fill="#000">${esc(name)}</text>`;
+      bars += `<text x="${labelW - 10}" y="${y + 15}" text-anchor="end" font-size="14" font-weight="700">${esc(name)}</text>`;
       let x = labelW; const parts = SEG.filter((sg) => r[sg.k] > 0);
       parts.forEach((sg, j) => {
         const w = sc(r[sg.k]), last = j === parts.length - 1, dw = Math.max(1, w - (last ? 0 : 2)); // 2px surface gap between segments
-        bars += `<path class="seg" d="${barPath(x, y, dw, 22, last ? 4 : 0)}" fill="${sg.color}" ${tipAttrs(r.name, sg.label, r[sg.k] + ' of ' + r.open + ' open', sg.color)}/>`;
-        if (w >= 26) bars += `<text x="${x + w / 2 - (last ? 0 : 1)}" y="${y + 16}" text-anchor="middle" font-size="12.5" font-weight="700" fill="${sg.ink}" pointer-events="none">${r[sg.k]}</text>`;
+        bars += `<path class="seg" d="${barPath(x, y, dw, 22, last ? 4 : 0)}" style="fill:${sg.color}" ${tipAttrs(r.name, sg.label, r[sg.k] + ' of ' + r.open + ' open', sg.color)}/>`;
+        if (w >= 26) bars += `<text x="${x + w / 2 - (last ? 0 : 1)}" y="${y + 16}" text-anchor="middle" font-size="12.5" font-weight="700" style="fill:${sg.ink}" pointer-events="none">${r[sg.k]}</text>`;
         x += w;
       });
-      bars += `<text x="${x + 8}" y="${y + 16}" font-size="14" font-weight="800" fill="#000">${r.open}</text>`;
+      bars += `<text x="${x + 8}" y="${y + 16}" font-size="14" font-weight="800">${r.open}</text>`;
     });
     const legend = SEG.map((sg) => `<span class="lg"><i style="background:${sg.color}"></i>${sg.label}</span>`).join('');
     return `<div class="legend-row">${legend}</div><svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Open NCRs per buyer, split by buyer update status. Values are in the table below.">${g}${bars}</svg>`;
@@ -106,13 +106,13 @@ window.NCR = window.NCR || {};
     const W = 420, H = 270, left = 34, bottom = 36, top = 22, plotH = H - bottom - top, band = (W - left - 10) / vals.length, bw = 24;
     const max = Math.max(1, ...vals.map((x) => x.v)), step = niceStep(max), top_ = Math.ceil(max / step) * step, sc = (v) => (v / top_) * plotH;
     let g = '', bars = '';
-    for (let t = 0; t <= top_; t += step) g += `<line x1="${left}" x2="${W - 10}" y1="${top + plotH - sc(t)}" y2="${top + plotH - sc(t)}" stroke="#dcdcdc" stroke-width="1"/><text x="${left - 6}" y="${top + plotH - sc(t) + 4}" text-anchor="end" font-size="12" fill="#444">${t}</text>`;
+    for (let t = 0; t <= top_; t += step) g += `<line x1="${left}" x2="${W - 10}" y1="${top + plotH - sc(t)}" y2="${top + plotH - sc(t)}" class="grid-l"/><text class="ax" x="${left - 6}" y="${top + plotH - sc(t) + 4}" text-anchor="end" font-size="12">${t}</text>`;
     vals.forEach((d, i) => {
       const cx = left + band * i + band / 2, h = sc(d.v), x = cx - bw / 2, y = top + plotH - h;
-      bars += `<g ${tipAttrs(d.l + ' old', 'Open NCRs', d.v, '#007AC8')} class="seg"><rect x="${cx - band / 2 + 4}" y="${top}" width="${band - 8}" height="${plotH}" fill="transparent"/>`
-        + (d.v ? `<path d="M${x},${top + plotH}v${-(h - 4)}a4,4 0 0 1 4,-4h${bw - 8}a4,4 0 0 1 4,4v${h - 4}z" fill="#007AC8"/>` : '')
-        + `<text x="${cx}" y="${y - 6}" text-anchor="middle" font-size="14" font-weight="800" fill="#000">${d.v}</text></g>`
-        + `<text x="${cx}" y="${H - 12}" text-anchor="middle" font-size="12.5" fill="#000">${d.l}</text>`;
+      bars += `<g ${tipAttrs(d.l + ' old', 'Open NCRs', d.v, 'var(--acc)')} class="seg"><rect x="${cx - band / 2 + 4}" y="${top}" width="${band - 8}" height="${plotH}" fill="transparent"/>`
+        + (d.v ? `<path d="M${x},${top + plotH}v${-(h - 4)}a4,4 0 0 1 4,-4h${bw - 8}a4,4 0 0 1 4,4v${h - 4}z" style="fill:var(--acc)"/>` : '')
+        + `<text x="${cx}" y="${y - 6}" text-anchor="middle" font-size="14" font-weight="800">${d.v}</text></g>`
+        + `<text x="${cx}" y="${H - 12}" text-anchor="middle" font-size="12.5">${d.l}</text>`;
     });
     return `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Open NCRs by age: ${vals.map((x) => x.l + ' ' + x.v).join(', ')}">${g}${bars}</svg>`;
   }

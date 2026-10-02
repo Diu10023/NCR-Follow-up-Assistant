@@ -269,6 +269,15 @@
   document.addEventListener('focusin', (e) => { const el = e.target.closest && e.target.closest('[data-tv]'); if (el) { const r = el.getBoundingClientRect(); showTip(el, r.left + r.width / 2, r.top); } });
   document.addEventListener('focusout', () => { tip.hidden = true; });
 
+  // light / dark: follows the system until the user picks one; the choice is remembered
+  const root = document.documentElement;
+  try { const t = localStorage.getItem('ncr.theme'); if (t === 'light' || t === 'dark') root.dataset.theme = t; } catch (e) { /* storage unavailable */ }
+  $('#theme-btn').addEventListener('click', () => {
+    const dark = root.dataset.theme ? root.dataset.theme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+    try { localStorage.setItem('ncr.theme', root.dataset.theme); } catch (e) { /* ignore */ }
+  });
+
   // keep the right-hand tab rail directly under the sticky header, whatever its height
   const fitRail = () => document.documentElement.style.setProperty('--hdr', $('.topbar').offsetHeight + 'px');
   window.addEventListener('resize', fitRail); fitRail();
