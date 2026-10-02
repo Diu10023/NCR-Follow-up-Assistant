@@ -27,9 +27,7 @@ window.NCR = window.NCR || {};
     if (!i.closed && i.dueDiff !== null) rel = i.dueDiff < 0 ? `<div class="sub bad">${-i.dueDiff}d overdue</div>` : i.dueDiff === 0 ? '<div class="sub warn">Today</div>' : `<div class="sub">in ${i.dueDiff}d</div>`;
     return `${L.fmtDate(n.Due_Date)}${rel}`;
   }
-  function agingText(i) { return i.aging === null ? '–' : `${i.aging}d${i.band ? ` <span class="chip ${i.band.cls}">${i.band.label}</span>` : ''}`; }
   const nextText = (n, i) => (n.Next_Action ? esc(n.Next_Action) : i.closed || i.ready ? '–' : '<span class="muted">not set</span>');
-  const countText = (n, i) => `${i.count}${i.escalate ? ' <span class="chip age-escalation" title="Escalation Recommended">⚠️ Escalate</span>' : ''}`;
   function remarkText(n, i) {
     if (!n.Buyer_Remark) return i.closed ? '–' : '<span class="chip age-escalation">📭 No buyer update</span>';
     return `<div class="rtext" title="${esc(n.Buyer_Remark)}">${esc(n.Buyer_Remark)}</div>${n.Buyer_Remark_Date ? `<div class="sub">${L.fmtDate(n.Buyer_Remark_Date)}</div>` : ''}${i.stale ? `<div><span class="chip age-attention" title="Remarks unchanged for ${i.staleDays} days">⏳ No change ${i.staleDays}d</span></div>` : ''}`;
@@ -548,7 +546,7 @@ window.NCR = window.NCR || {};
 
   // ---------- settings ----------
   function settings() {
-    const s = st.settings, cfg = S.getApiConfig(), bands = s.agingBands;
+    const s = st.settings, cfg = S.getApiConfig();
     const ta = (k, l) => `<label>${l}<textarea name="${k}" rows="8">${esc((s[k] || []).join('\n'))}</textarea></label>`;
     return { html: `<div class="page-head"><h1>Settings</h1></div>
       <section class="card"><h2>Data source</h2>
@@ -563,18 +561,14 @@ window.NCR = window.NCR || {};
         <hr class="rule">
         <p><b>Start over:</b> delete every NCR and its history from ${st.mode === 'sheets' ? 'the Google Sheet' : 'this browser'}. Settings (dropdowns, keywords) are kept.</p>
         <div class="actions"><button class="btn danger" id="clear-all">Clear all NCR data…</button></div></section>
-      <form id="cfg" class="card"><h2>Dropdowns &amp; thresholds</h2><p class="hint">One option per line.</p>
-        <div class="form cols3">${ta('dispositions', 'Disposition')}${ta('nextActions', 'Next Action')}${ta('waitingFor', 'Waiting For')}${ta('owners', 'Owners (suggestions)')}</div>
-        <div class="form cols3"><label>Hold / scrap keywords (Remarks)<textarea name="holdKeywords" rows="3">${esc((s.holdKeywords || []).join('\n'))}</textarea></label>
+      <form id="cfg" class="card"><h2>Keywords &amp; follow-up timing</h2>
+        <p class="hint">Keywords are matched in the buyer's Remarks, any letter case. One per line.</p>
+        <div class="form cols3"><label>Hold for scrap: Remarks contain<textarea name="holdKeywords" rows="3">${esc((s.holdKeywords || []).join('\n'))}</textarea></label>
           <label>Close at import when Remarks contain<textarea name="jiraKeywords" rows="3">${esc((s.jiraKeywords || []).join('\n'))}</textarea></label></div>
-        <div class="form cols3"><label>Due Soon window (days)<input type="number" min="1" name="dueSoonDays" value="${s.dueSoonDays}"></label>
-          <label>Escalate at follow-up count ≥<input type="number" min="1" name="escalationThreshold" value="${s.escalationThreshold}"></label>
-          <label>Default next check after follow-up (days)<input type="number" min="1" name="defaultCheckDays" value="${s.defaultCheckDays}"></label>
-          <label>Buyer update stale after (days)<input type="number" min="1" name="buyerStaleDays" value="${s.buyerStaleDays}"></label></div>
-        <h3>Aging bands (days)</h3><div class="form cols3">
-          <label>Normal up to<input type="number" min="1" name="b0" value="${bands[0].max}"></label>
-          <label>Follow-up up to<input type="number" min="1" name="b1" value="${bands[1].max}"></label>
-          <label>Attention up to (above = Escalation)<input type="number" min="1" name="b2" value="${bands[2].max}"></label></div>
+        <div class="form cols3"><label>Default next check after a follow-up (days)<input type="number" min="1" name="defaultCheckDays" value="${s.defaultCheckDays}"></label>
+          <label>Flag a buyer remark that has not changed for (days)<input type="number" min="1" name="buyerStaleDays" value="${s.buyerStaleDays}"></label></div>
+        <h2>Dropdown lists</h2><p class="hint">Used when you edit an NCR. One option per line.</p>
+        <div class="form cols3">${ta('dispositions', 'Disposition')}${ta('nextActions', 'Next Action')}${ta('waitingFor', 'Waiting For')}${ta('owners', 'Owners (suggestions)')}</div>
         <div class="actions"><button class="btn primary" type="submit">Save settings</button></div></form>`,
     bind(root) {
       root.querySelector('#api').addEventListener('submit', async (e) => {
@@ -589,11 +583,8 @@ window.NCR = window.NCR || {};
         e.preventDefault(); const f = new FormData(e.target);
         const lines = (k) => String(f.get(k)).split('\n').map((x) => x.trim()).filter(Boolean);
         const num = (k, d) => Math.max(1, parseInt(f.get(k), 10) || d);
-        const b0 = num('b0', 7), b1 = Math.max(b0 + 1, num('b1', 14)), b2 = Math.max(b1 + 1, num('b2', 30));
-        const B = L.DEFAULT_SETTINGS.agingBands;
         S.saveSettings({ holdKeywords: lines('holdKeywords'), jiraKeywords: lines('jiraKeywords'), dispositions: lines('dispositions'), nextActions: lines('nextActions'), waitingFor: lines('waitingFor'), owners: lines('owners'),
-          dueSoonDays: num('dueSoonDays', 2), escalationThreshold: num('escalationThreshold', 3), buyerStaleDays: num('buyerStaleDays', 7), defaultCheckDays: num('defaultCheckDays', 7),
-          agingBands: [Object.assign({}, B[0], { max: b0 }), Object.assign({}, B[1], { max: b1 }), Object.assign({}, B[2], { max: b2 }), B[3]] });
+          buyerStaleDays: num('buyerStaleDays', 7), defaultCheckDays: num('defaultCheckDays', 7) });
         NCR.app.toast('Settings saved');
       });
     } };
