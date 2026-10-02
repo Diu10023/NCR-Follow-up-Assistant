@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NCR Follow-up Control</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">NCR Follow-up Control <span id="mode" class="chip demo" hidden title="Data is stored only in this browser. Connect Google Sheets in Settings.">Demo mode</span></div>
+    <nav>
+      <a href="#/dashboard">Dashboard</a>
+      <a href="#/today">Today <span id="today-badge" class="nbadge"></span></a>
+      <a href="#/list">NCR List</a>
+      <a href="#/import">Import Excel</a>
+      <a href="#/settings">Settings</a>
+    </nav>
+    <button class="btn primary" id="add-btn">+ Add NCR</button>
+  </header>
+  <div id="sync" class="sync"></div>
+  <main id="main" class="wrap"><div class="empty">Loading…</div></main>
+  <dialog id="modal"></dialog>
+  <div id="toast"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="js/logic.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/importer.js"></script>
+  <script src="js/views.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
