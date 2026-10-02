@@ -255,3 +255,47 @@ dialog{box-shadow:10px 10px 0 var(--acc)}
 #bulkbar{background:var(--volt);box-shadow:8px 8px 0 #000}#bulkbar .btn.primary{background:#000;color:#fff}
 #toast{background:var(--volt);box-shadow:6px 6px 0 #000}
 #list-body,#closed-body{box-shadow:8px 8px 0 #000}
+
+/* ---- Readability: one clean sans (Plus Jakarta Sans + Noto Sans Thai) everywhere except big headlines; larger sizes ---- */
+:root{--body:"Plus Jakarta Sans","Noto Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Plus Jakarta Sans","Noto Sans Thai",system-ui,sans-serif}
+body{font-size:16px;line-height:1.5}
+.grid td{font-size:15.5px;padding:12px 10px}
+.grid th{font-size:13px;letter-spacing:.04em;padding:11px 10px}
+.sub{font-size:13.5px}.hint{font-size:14px}.small{font-size:13px}
+label{font-size:13px;letter-spacing:.03em}
+.kv{font-size:12.5px;letter-spacing:.03em}.kv b{font-size:15.5px}
+input,select,textarea{font-size:15px;padding:8px 10px}
+input::placeholder{font-size:14px;text-transform:none}
+.btn{font-size:14px;letter-spacing:.02em;padding:7px 16px}
+.btn.sm{font-size:13px;padding:3px 10px}
+.pill{font-size:14px;letter-spacing:.02em;padding:5px 14px}
+nav a{font-size:14px;letter-spacing:.04em}
+.brand{font-size:26px}
+.badge{font-size:12px;letter-spacing:.02em;padding:2px 8px}
+.chip{font-size:12px}
+.chip.demo{font-size:12px;letter-spacing:.04em}
+.why{font-size:13.5px;text-transform:none;letter-spacing:0;font-weight:800}
+.count{font-size:14px}
+.page-head>span.muted{font-size:14px}
+.page-head .muted{font-size:15px}
+.more,#list-body>.small,#closed-body>.small{font-size:13px;letter-spacing:.02em}
+.sync{font-size:13px}
+.rail a{font-size:14px;letter-spacing:.1em}
+details>summary{font-size:13px;letter-spacing:.03em}
+.legend{font-size:14px}
+.big span{font-size:14px;letter-spacing:.04em}
+.big b{font-size:64px}
+h2{font-size:30px}
+#bulkbar,#toast{font-size:14px}
+.empty{font-size:15px}
+.alert{font-size:15px}
+.timeline .t-date{font-size:13px}
+nav a,.btn,.pill,label,.kv,.badge,.chip,.drop,#bulkbar,#toast,.more,.rail a,details>summary,#list-body>.small,.big span,.page-head>span.muted{text-transform:none}
+nav a{padding:5px 9px;letter-spacing:0;font-size:15px}
+nav{gap:4px}
+.topbar{gap:18px 22px}
+.brand{font-size:24px}
+.btn{letter-spacing:0}.pill{letter-spacing:0}
+.rail{top:var(--hdr,75px)}
+.rail a{letter-spacing:.06em;font-size:15px}
+.grid th{font-size:12.5px}
