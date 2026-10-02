@@ -88,3 +88,26 @@ dialog{border:none;border-radius:14px;padding:0;width:min(720px,94vw);box-shadow
 .strong{font-weight:650}tr.total td{border-top:2px solid var(--ink);font-weight:600}
 tr.sub-row td{background:var(--soft)}.nolist{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px}
 .tog{width:14px}.grid td a.bad{color:var(--red)}
+
+/* ---- Theme: dashboard look inspired by Tabler (soft grey page, white cards, blue accent, soft badges) ---- */
+:root{--bg:#f4f6fa;--pri:#206bc4;--line:#e6e8ee;--soft:#f6f8fb}
+nav a.active{color:var(--pri);border-bottom-color:var(--pri)}
+.nbadge:not(:empty){background:var(--pri)}
+h1{font-size:22px}
+.block,.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px 20px;box-shadow:0 1px 2px #1018280a}
+.card.stat{padding:12px 14px}
+.empty-state{box-shadow:none}
+.block .table-wrap,.card .table-wrap{margin:0 -20px}
+.block .grid th,.card .grid th{padding-left:20px}.block .grid td:first-child,.card .grid td:first-child,.block .grid th:first-child,.card .grid th:first-child{padding-left:20px}
+.grid th{background:#fafbfd;text-transform:uppercase;letter-spacing:.04em;font-size:11px;font-weight:600}
+.pill{background:#fff}.pill.on{background:var(--pri);border-color:var(--pri)}.pill.on b{color:#d6e6fa}
+.btn.primary{background:var(--pri);border-color:var(--pri)}.btn.primary:hover{background:#1a5aa8}
+.badge{padding:1px 10px;border-radius:999px}
+.b-overdue{background:#fdecea}.b-soon{background:#fff4dd}.b-ok{background:#e4f5ec}.b-ready,.b-review{background:#e6effc}.b-closed{background:#eceef2}.b-new{background:#f1ecfb}
+.bigs{gap:16px}.big{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 26px;min-width:160px;box-shadow:0 1px 2px #1018280a}.big b{font-size:34px}
+.big:hover{border-color:var(--pri)}
+tr.total td{border-top:2px solid var(--line);background:#fafbfd}
+tr.sub-row td{background:#f6f8fb}
+.alert{background:#fff;border:1px solid var(--line);border-left-width:3px}
+.topbar{box-shadow:0 1px 2px #1018280a}
+#bulkbar{background:var(--pri)}#bulkbar .btn.primary{color:var(--pri)}

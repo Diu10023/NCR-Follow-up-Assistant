@@ -82,7 +82,7 @@ window.NCR = window.NCR || {};
       if (remarkGroup === 'jira') reasons.push('Closed in Jira – verify & close');
       if (overdue) reasons.push(`Overdue ${-dueDiff}d`); else if (dueToday) reasons.push('Due today');
       if (ready) reasons.push('Ready to close – verify');
-      if (notStarted) reasons.push('New – triage');
+      if (notStarted && remarkGroup !== 'jira') reasons.push('New – triage');
       if (needsReview) reasons.push('Buyer updated – review');
     }
     const actionRequired = reasons.length > 0;
