@@ -116,28 +116,26 @@ window.NCR = window.NCR || {};
   function closedList() {
     const q = CF.q.trim().toLowerCase();
     return st.ncrs.filter((n) => n.Status === 'Closed' && (!q || `${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))
-      && (!CF.buyer || buyerOf(n) === CF.buyer) && (!CF.month || String(n.Closed_Date).slice(0, 7) === CF.month))
-      .sort((a, b) => String(b.Closed_Date).localeCompare(String(a.Closed_Date)));
+      && (!CF.buyer || buyerOf(n) === CF.buyer))
+      .sort((a, b) => String(b.NCR_Date).localeCompare(String(a.NCR_Date)));
   }
   function closedBody() {
     const list = closedList();
     if (!list.length) return '<div class="empty">No closed NCRs.</div>';
     const rows = list.map((n) => { const i = inf(n); return `<tr data-href="#/ncr/${esc(n.NCR_ID)}"><td class="nowrap"><b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)}</div></td><td>${esc(buyerOf(n))}</td><td>${esc(n.Defect)}</td>
-      <td class="nowrap">${L.fmtDate(n.NCR_Date)}</td><td class="nowrap">${L.fmtDate(n.Closed_Date)}</td><td>${i.aging === null ? '–' : i.aging + 'd'}</td><td class="nowrap">${i.count}</td></tr>`; }).join('');
-    return `<div class="muted small">${list.length} closed</div><div class="table-wrap"><table class="grid"><thead><tr><th>NCR</th><th>Buyer</th><th>Defect</th><th>Created</th><th>Closed</th><th>Days open</th><th>Follow-ups</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      <td class="nowrap">${L.fmtDate(n.NCR_Date)}</td><td class="nowrap">${i.count}</td></tr>`; }).join('');
+    return `<div class="muted small">${list.length} closed</div><div class="table-wrap"><table class="grid"><thead><tr><th>NCR</th><th>Buyer</th><th>Defect</th><th>Created</th><th>Follow-ups</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   function closedPage() {
     const done = st.ncrs.filter((n) => n.Status === 'Closed');
-    const months = [...new Set(done.map((n) => String(n.Closed_Date).slice(0, 7)).filter(Boolean))].sort().reverse();
     const buyers = [...new Set(done.map(buyerOf))].sort();
-    return { html: `<div class="page-head"><h1>Closed</h1><span class="muted">${done.length} total · ${done.filter((n) => String(n.Closed_Date).slice(0, 7) === L.todayISO().slice(0, 7)).length} this month</span></div>
+    return { html: `<div class="page-head"><h1>Closed</h1><span class="muted">${done.length} closed</span></div>
       <div class="filters"><label class="grow">Search<input id="c-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(CF.q)}"></label>
-        <label>Buyer<select id="c-buyer">${options(buyers, CF.buyer, 'All')}</select></label>
-        <label>Closed in<select id="c-month">${options(months, CF.month, 'Any month')}</select></label></div>
+        <label>Buyer<select id="c-buyer">${options(buyers, CF.buyer, 'All')}</select></label></div>
       <div id="closed-body">${closedBody()}</div>`,
     bind(root) {
       const r = () => { root.querySelector('#closed-body').innerHTML = closedBody(); };
-      [['c-q', 'q'], ['c-buyer', 'buyer'], ['c-month', 'month']].forEach(([id, k]) => root.querySelector('#' + id).addEventListener('input', (e) => { CF[k] = e.target.value; r(); }));
+      [['c-q', 'q'], ['c-buyer', 'buyer']].forEach(([id, k]) => root.querySelector('#' + id).addEventListener('input', (e) => { CF[k] = e.target.value; r(); }));
     } };
   }
 
