@@ -18,7 +18,7 @@
     current.closed = page === 'ncr' && (S.getNcr(arg) || {}).Status === 'Closed';
     main.innerHTML = (page === 'home' || page === 'overview' || page === 'dashboard' ? '' : '<div class="backbar"><button class="btn sm" data-action="back">← Back</button></div>') + current.html;
     if (current.bind) current.bind(main);
-    document.querySelectorAll('nav a, .rail a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'today' ? 'list' : page === 'ncr' ? (current.closed ? 'closed' : 'list') : page === 'overview' || page === 'dashboard' ? 'home' : page)));
+    document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'today' ? 'list' : page === 'ncr' ? (current.closed ? 'closed' : 'list') : page === 'overview' || page === 'dashboard' ? 'home' : page)));
     updateBulkBar();
     window.scrollTo({ top: window.__keepScroll || 0, behavior: 'instant' }); window.__keepScroll = 0;
   }
@@ -290,7 +290,6 @@
     const row = e.target.closest('tr[data-href]');
     if (row && !e.target.closest('a,button,input,select')) location.hash = row.dataset.href;
   });
-  $('#add-btn').addEventListener('click', () => ncrForm());
 
   // Auto-load: refresh when the tab regains focus and every minute (Sheets mode only).
   function autoRefresh() { if (st.mode === 'sheets' && !st.saving && !modal.open) S.reload(); }
@@ -320,10 +319,6 @@
     try { localStorage.setItem('ncr.theme', root.dataset.theme); } catch (e) { /* ignore */ }
   });
 
-  // keep the right-hand tab rail directly under the sticky header, whatever its height
-  const fitRail = () => document.documentElement.style.setProperty('--hdr', $('.topbar').offsetHeight + 'px');
-  window.addEventListener('resize', fitRail); fitRail();
-  if (window.ResizeObserver) new ResizeObserver(fitRail).observe($('.topbar'));
 
   NCR.app = { render, toast, confirmModal };
   S.init().then(() => { status(); render(); });
