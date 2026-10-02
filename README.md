@@ -26,13 +26,13 @@ Sheets `NCR_Master`, `Followup_History` and `Settings` are created automatically
 
 ## Daily / weekly routine
 1. **Import Excel** weekly. New NCRs appear as *New – triage* (Owner = Buyer); NCRs gone from the export are marked *Ready to Close*; changed buyer Remarks appear as *Buyer updated – review*.
-2. **Open NCRs** is the only worklist. Tab 1 *No remark* (chase first, oldest first); tab 2 *Has remark* split into Buyer updated, In progress, Hold / scrap and Closed in Jira (verify and close); tab 3 *All open*. Filter by buyer with the pills.
+2. **To follow up** is the worklist. Tab 1 *No remark* (chase first, oldest first); tab 2 *Has remark* split into Buyer updated, In progress, Hold / scrap and Closed in Jira (verify and close); tab 3 *All open*. Filter by buyer with the pills.
 3. Chase: tick rows (or *Select all*, or **Chase** per buyer on Overview) → **Follow-up** → copy the generated message (one per buyer) → pick the **next check date** → record.
-4. Followed up but can't close yet? The NCR is hidden from Open NCRs until its next check date (tick *Include NCRs waiting* to see it), then returns automatically — nothing is forgotten, and Home shows the totals by buyer.
+4. Followed up but can't close yet? The NCR moves to the **Followed up** page until its next check date, then returns to To follow up on its own (or press *Bring back*), then returns automatically — nothing is forgotten, and Home shows the totals by buyer.
 5. When the work is done: **Mark Ready to Close**, verify, **Verify & Close** (QA always closes explicitly).
 
 ## Pages
-Home (by buyer) · Open NCRs (no remark first) · Closed archive (search/filter/sort) · NCR Detail (follow-up control, history timeline, quick Follow-up message) · Add/Edit NCR · Import Excel · Settings (dropdowns, due-soon window, escalation threshold, aging bands).
+Home (by buyer) · To follow up (no remark first) · Followed up (waiting for the next check date) · Closed archive (search/filter/sort) · NCR Detail (follow-up control, history timeline, quick Follow-up message) · Add/Edit NCR · Import Excel · Settings (dropdowns, due-soon window, escalation threshold, aging bands).
 
 ## Notes
 - Excel parsing uses SheetJS from cdnjs, so the Import page needs internet access.

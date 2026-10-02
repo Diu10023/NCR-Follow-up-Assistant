@@ -13,18 +13,18 @@
   function render() {
     if (!st.loaded) { main.innerHTML = `<div class="empty">${st.error ? esc(st.error) : 'Loading…'}</div>`; return; }
     const { page, arg } = route();
-    const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, settings: V.settings };
+    const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, followed: V.followedPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, settings: V.settings };
     current = (views[page] || V.home)();
     current.closed = page === 'ncr' && (S.getNcr(arg) || {}).Status === 'Closed';
     main.innerHTML = (page === 'home' || page === 'overview' || page === 'dashboard' ? '' : '<div class="backbar"><button class="btn sm" data-action="back">← Back</button></div>') + current.html;
     if (current.bind) current.bind(main);
-    document.querySelectorAll('nav a, .rail a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'ncr' ? (current.closed ? 'closed' : 'list') : page === 'overview' || page === 'dashboard' ? 'home' : page)));
+    document.querySelectorAll('nav a, .rail a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'today' ? 'list' : page === 'ncr' ? (current.closed ? 'closed' : 'list') : page === 'overview' || page === 'dashboard' ? 'home' : page)));
     updateBulkBar();
     window.scrollTo({ top: window.__keepScroll || 0, behavior: 'instant' }); window.__keepScroll = 0;
   }
 
   function status() {
-    const open = st.ncrs.filter((n) => n.Status !== 'Closed' && V.inf(n).remarkGroup === 'none').length; // priority 1: no remark
+    const open = st.ncrs.filter((n) => n.Status !== 'Closed' && V.inf(n).actionRequired && V.inf(n).remarkGroup === 'none').length; // priority 1: no remark, not yet followed up
     $('#today-badge').textContent = open || '';
     const el = $('#sync');
     el.className = 'sync' + (st.error ? ' err' : '');
@@ -138,7 +138,7 @@
       m.querySelector('#hf').addEventListener('submit', (e) => {
         e.preventDefault(); const f = new FormData(e.target);
         S.recordFollowups(ids, { date: f.get('date'), by: f.get('by'), action: f.get('action'), waiting: f.get('waiting'), remark: f.get('remark'), nextDate: f.get('nextDate'), setPending: !!f.get('pending') });
-        V.SEL.clear(); modal.close(); toast(`Follow-up recorded${one ? '' : ' for ' + list.length + ' NCRs'} – next check ${L.fmtDate(f.get('nextDate'))}`);
+        V.SEL.clear(); modal.close(); toast(`Recorded. ${one ? 'It is' : list.length + ' NCRs are'} now in Followed up until ${L.fmtDate(f.get('nextDate'))}`);
       });
     });
   }
@@ -229,6 +229,7 @@
     'bulk-clear': () => { V.SEL.clear(); render(); },
     showall: (el) => { V.showAll[el.dataset.key] = !V.showAll[el.dataset.key]; window.__keepScroll = window.scrollY; render(); },
     selsection: (el) => { (V.sectionIds[el.dataset.key] || []).forEach((id) => V.SEL.add(id)); window.__keepScroll = window.scrollY; render(); },
+    comeback: (el) => { S.bulkSet([el.dataset.id], { Due_Date: L.todayISO() }, 'Brought back to To follow up'); toast('Moved back to To follow up'); },
     reviewed: (el) => { S.markReviewed([el.dataset.id], plusDays(st.settings.defaultCheckDays)); toast(`Reviewed – next check in ${st.settings.defaultCheckDays} days`); },
     chase: (el) => {
       const ids = V.currentIds();
@@ -257,6 +258,8 @@
     if (cl) { V.CF.q = ''; V.CF.buyer = cl.dataset.closed; }
     const f = e.target.closest('[data-filter]');
     if (f) V.setFilter(JSON.parse(f.dataset.filter));
+    const w = e.target.closest('[data-wfilter]');
+    if (w) V.setWaitFilter(JSON.parse(w.dataset.wfilter));
     const row = e.target.closest('tr[data-href]');
     if (row && !e.target.closest('a,button,input,select')) location.hash = row.dataset.href;
   });

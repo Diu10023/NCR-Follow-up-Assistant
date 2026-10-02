@@ -185,12 +185,12 @@ dialog{border:0;border-radius:var(--r-card);padding:0;width:min(720px,94vw);back
 .modal-form{padding:26px 28px}
 
 /* ---------- home: numbers + charts ---------- */
-.bigs{display:flex;gap:32px;flex-wrap:wrap;margin:6px 0 44px}
-.big{display:flex;flex-direction:column;min-width:190px;padding:20px 32px;color:var(--fg);text-decoration:none;border-radius:var(--r-card);background:var(--bg);box-shadow:var(--ext);transition:all var(--ease)}
+.bigs{display:flex;gap:28px;flex-wrap:wrap;margin:6px 0 44px}
+.big{display:flex;flex-direction:column;min-width:170px;padding:20px 28px;color:var(--fg);text-decoration:none;border-radius:var(--r-card);background:var(--bg);box-shadow:var(--ext);transition:all var(--ease)}
 .big b{font-size:60px;font-weight:800;line-height:1.05;color:var(--acc)}.big span{font-weight:600;color:var(--mut)}
 .big:hover{transform:translateY(-2px);box-shadow:var(--ext-h);text-decoration:none}
 .big:nth-child(1){background:var(--acc)}.big:nth-child(1) b,.big:nth-child(1) span{color:var(--on-acc)}
-.big:nth-child(3){box-shadow:var(--ins-d)}.big:nth-child(3):hover{transform:none;box-shadow:var(--ins-d)}.big:nth-child(3) b{color:var(--fg)}
+.big:last-child{box-shadow:var(--ins-d)}.big:last-child:hover{transform:none;box-shadow:var(--ins-d)}.big:last-child b{color:var(--fg)}
 .charts{display:grid;grid-template-columns:3fr 2fr;gap:48px}
 @media(max-width:1000px){.charts{grid-template-columns:1fr;gap:0}}
 .chart{display:block;max-width:100%;height:auto;margin-top:8px;overflow:visible}
