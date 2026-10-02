@@ -74,7 +74,7 @@
   // In-page confirmation (the browser's confirm() is not available inside the viewer). `typed` makes the user type a word first.
   function confirmModal({ title, text, ok, typed, onOk }) {
     openModal(`<form id="cm" class="form modal-form"><h2>${esc(title)}</h2><p class="full">${text}</p>
-      ${typed ? `<label class="full">Type <b>${esc(typed)}</b> to confirm<input id="cm-t" autocomplete="off"></label>` : ''}
+      ${typed ? `<label class="full"><span>Type <b>${esc(typed)}</b> (capital letters) to confirm</span><input id="cm-t" autocomplete="off" placeholder="${esc(typed)}"></label>` : ''}
       <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn ok" id="cm-ok" type="submit"${typed ? ' disabled' : ''}>${esc(ok || 'Confirm')}</button></div></form>`, (m) => {
       const t = m.querySelector('#cm-t'), b = m.querySelector('#cm-ok');
       if (t) t.addEventListener('input', () => { b.disabled = t.value.trim() !== typed; });
