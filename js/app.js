@@ -272,6 +272,7 @@
   // keep the right-hand tab rail directly under the sticky header, whatever its height
   const fitRail = () => document.documentElement.style.setProperty('--hdr', $('.topbar').offsetHeight + 'px');
   window.addEventListener('resize', fitRail); fitRail();
+  if (window.ResizeObserver) new ResizeObserver(fitRail).observe($('.topbar'));
 
   NCR.app = { render, toast };
   S.init().then(() => { status(); render(); });
