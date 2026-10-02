@@ -32,7 +32,7 @@ Sheets `NCR_Master`, `Followup_History` and `Settings` are created automatically
 5. When the work is done: **Mark Ready to Close**, verify, **Verify & Close** (QA always closes explicitly).
 
 ## Pages
-Dashboard · Today · NCR List (search/filter/sort) · NCR Detail (follow-up control, history timeline, quick Follow-up message) · Add/Edit NCR · Import Excel · Settings (dropdowns, due-soon window, escalation threshold, aging bands).
+Today · Open NCRs · Closed archive (search/filter/sort) · NCR Detail (follow-up control, history timeline, quick Follow-up message) · Add/Edit NCR · Import Excel · Settings (dropdowns, due-soon window, escalation threshold, aging bands).
 
 ## Notes
 - Excel parsing uses SheetJS from cdnjs, so the Import page needs internet access.

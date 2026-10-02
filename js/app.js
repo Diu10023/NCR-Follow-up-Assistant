@@ -13,11 +13,12 @@
   function render() {
     if (!st.loaded) { main.innerHTML = `<div class="empty">${st.error ? esc(st.error) : 'Loading…'}</div>`; return; }
     const { page, arg } = route();
-    const views = { dashboard: V.dashboard, overview: V.dashboard, today: V.today, list: V.list, ncr: () => V.detail(arg), import: V.importPage, settings: V.settings };
-    current = (views[page] || V.dashboard)();
+    const views = { overview: V.today, dashboard: V.today, closed: V.closedPage, today: V.today, list: V.list, ncr: () => V.detail(arg), import: V.importPage, settings: V.settings };
+    current = (views[page] || V.today)();
+    current.closed = page === 'ncr' && (S.getNcr(arg) || {}).Status === 'Closed';
     main.innerHTML = current.html;
     if (current.bind) current.bind(main);
-    document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'ncr' ? 'list' : page === 'dashboard' ? 'overview' : page)));
+    document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'ncr' ? (current.closed ? 'closed' : 'list') : page === 'overview' || page === 'dashboard' ? 'today' : page)));
     updateBulkBar();
     window.scrollTo(0, window.__keepScroll || 0); window.__keepScroll = 0;
   }
