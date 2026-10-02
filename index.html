@@ -4,11 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NCR Follow-up Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=DM+Sans:wght@400;500;700&display=swap">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+  <div class="confetti" aria-hidden="true">
+    <svg class="a-drift" style="left:2%;top:18%" width="54" height="50" viewBox="0 0 54 50"><path d="M27 4 L51 46 H3 Z" fill="#ff5b57" stroke="#17140d" stroke-width="4" stroke-linejoin="round"/></svg>
+    <svg class="a-bob" style="right:3%;top:12%" width="64" height="64" viewBox="0 0 64 64"><path d="M6 58 A52 52 0 0 1 58 6 L58 58 Z" fill="#12b3a4" stroke="#17140d" stroke-width="4" stroke-linejoin="round"/></svg>
+    <svg class="a-spin" style="left:1%;top:52%" width="62" height="62" viewBox="0 0 62 62"><circle cx="31" cy="31" r="26" fill="#ffc531" stroke="#17140d" stroke-width="4"/><circle cx="31" cy="31" r="14" fill="none" stroke="#17140d" stroke-width="5" stroke-dasharray="2 9" stroke-linecap="round"/></svg>
+    <svg class="a-spin" style="right:2%;top:46%" width="46" height="46" viewBox="0 0 46 46"><path d="M23 4 V42 M4 23 H42" stroke="#17140d" stroke-width="14" stroke-linecap="round"/><path d="M23 4 V42 M4 23 H42" stroke="#6b5be6" stroke-width="7" stroke-linecap="round"/></svg>
+    <svg class="a-sway" style="left:3%;top:80%" width="92" height="30" viewBox="0 0 92 30"><path d="M4 22 Q15 2 26 15 T48 15 T70 15 T88 8" fill="none" stroke="#17140d" stroke-width="6" stroke-linecap="round"/></svg>
+    <svg class="a-drift" style="right:2%;top:76%" width="66" height="36" viewBox="0 0 66 36"><path d="M4 34 A29 29 0 0 1 62 34 Z" fill="#ffc531" stroke="#17140d" stroke-width="4" stroke-linejoin="round"/></svg>
+    <svg class="a-bob" style="left:50%;top:94%" width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="8" fill="#12b3a4" stroke="#17140d" stroke-width="3"/></svg>
+    <svg class="a-bob" style="right:7%;top:92%" width="78" height="34" viewBox="0 0 78 34"><path d="M4 28 L22 6 L38 28 L56 6 L74 28" fill="none" stroke="#3aa0ff" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    <svg class="a-spin" style="left:6%;top:34%" width="46" height="46" viewBox="0 0 46 46"><defs><clipPath id="cc"><circle cx="23" cy="23" r="19"/></clipPath></defs><circle cx="23" cy="23" r="19" fill="#ff5b57"/><g clip-path="url(#cc)" stroke="#17140d" stroke-width="3"><path d="M-4 12 L50 -6 M-4 24 L50 6 M-4 36 L50 18 M-4 48 L50 30"/></g><circle cx="23" cy="23" r="19" fill="none" stroke="#17140d" stroke-width="4"/></svg>
+  </div>
   <header class="topbar">
-    <div class="brand">NCR Follow-up Control <span id="mode" class="chip demo" hidden title="Data is stored only in this browser. Connect Google Sheets in Settings to share and keep it permanently.">Browser-only data</span></div>
+    <div class="brand"><span class="logo"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M2 14 Q6 3 10 11 T20 8" fill="none" stroke="#17140d" stroke-width="3.5" stroke-linecap="round"/></svg></span>NCR Follow-up Control <span id="mode" class="chip demo" hidden title="Data is stored only in this browser. Connect Google Sheets in Settings to share and keep it permanently.">Browser-only data</span></div>
     <nav>
       <a href="#/home">Summary</a>
       <a href="#/today">Today <span id="today-badge" class="nbadge"></span></a>
