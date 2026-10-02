@@ -79,13 +79,14 @@ window.NCR = window.NCR || {};
     // followed up / reviewed since the buyer's last remark, and the next check date is still ahead: nothing to do yet
     const scheduled = !closed && dueDiff !== null && dueDiff > 0 && (!n.Buyer_Remark_Date || String(n.Last_Review || '') >= String(n.Buyer_Remark_Date));
     const jiraNow = remarkGroup === 'jira' && !scheduled;
+    const triage = notStarted && !(scheduled && (Number(n.Followup_Count) || 0) > 0); // a followed-up NCR is no longer "new"
     const isNew = !closed && aging !== null && aging <= 7;
     const reasons = [];
     if (!closed) {
       if (jiraNow) reasons.push('Closed in Jira – verify & close');
       if (overdue) reasons.push(`Overdue ${-dueDiff}d`); else if (dueToday) reasons.push('Due today');
       if (ready) reasons.push('Ready to close – verify');
-      if (notStarted && remarkGroup !== 'jira') reasons.push('New – triage');
+      if (triage && remarkGroup !== 'jira') reasons.push('New – triage');
       if (needsReview) reasons.push('Buyer updated – review');
     }
     const actionRequired = reasons.length > 0;
@@ -94,11 +95,11 @@ window.NCR = window.NCR || {};
     else if (jiraNow) state = 'jira';
     else if (overdue) state = 'overdue';
     else if (ready) state = 'ready';
-    else if (notStarted) state = 'new';
+    else if (triage) state = 'new';
     else if (needsReview) state = 'review';
     else if (dueToday || dueSoon) state = 'soon';
     // primary section on the Today page (each NCR appears once)
-    const section = closed ? null : jiraNow ? 'jira' : overdue ? 'overdue' : dueToday ? 'today' : ready ? 'ready' : notStarted ? 'new' : needsReview ? 'review' : dueSoon ? 'soon' : null;
+    const section = closed ? null : jiraNow ? 'jira' : overdue ? 'overdue' : dueToday ? 'today' : ready ? 'ready' : triage ? 'new' : needsReview ? 'review' : dueSoon ? 'soon' : null;
     const band = agingBand(aging, s);
     return { remarkGroup, notStarted, needsReview, isNew, reasons, section, closed, aging, dueDiff, ready, overdue, dueToday, dueSoon, missingNext, noUpdate, stale, staleDays, count, escalate, state, band, actionRequired };
   }

@@ -180,7 +180,7 @@ window.NCR = window.NCR || {};
       n.Followup_Count = (Number(n.Followup_Count) || 0) + 1; n.Last_Followup = date; n.Last_Review = L.nowStamp();
       if (p.waiting) n.Waiting_For = p.waiting;
       if (p.nextDate) n.Due_Date = p.nextDate;
-      if (p.setPending && (n.Status === 'Not Started' || n.Status === 'Open')) n.Status = 'Pending';
+      if (n.Status === 'Not Started' || n.Status === 'Open') n.Status = 'Pending'; // waiting for the buyer's reply
       stamp(n);
       state.ncrs[state.ncrs.findIndex((x) => x.NCR_ID === id)] = n;
       ncrs.push(n);

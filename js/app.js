@@ -127,18 +127,17 @@
       <label>Person / department<input name="by" value="${esc(who)}"></label>
       <label class="full">Action / note *<input name="action" required value="${esc('Asked ' + who + ' for status update')}"></label>
       <label class="full">Next check date * <span class="muted">– the NCR is hidden from Open NCRs until this date</span>
-        <div class="inline"><input type="date" name="nextDate" id="nd" value="${nextDefault}" required>
+        <div class="inline"><input type="date" name="nextDate" id="nd" value="${nextDefault}" min="${plusDays(1)}" required>
         ${[3, 7, 14].map((d) => `<button type="button" class="btn sm" data-plus="${d}">+${d}d</button>`).join('')}</div></label>
       <label>Waiting For<select name="waiting">${V.options(V.withCurrent(s.waitingFor, allWaiting.length === 1 ? allWaiting[0] : ''), allWaiting.length === 1 ? allWaiting[0] : '', one ? '— unchanged —' : '— unchanged —')}</select></label>
       <label>Remark<input name="remark"></label>
       ${one ? '' : '<p class="full muted small">{buyer} is replaced by each NCR\'s own buyer, so every NCR\'s history names only that buyer.</p>'}
-      <label class="check full"><input type="checkbox" name="pending" checked> Set status to <b>Pending</b> (waiting for reply) when Not Started / Open</label>
       <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">I sent it, record${one ? '' : ' (' + list.length + ')'}</button></div></form>`, (m) => {
       m.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', () => copyText(m.querySelectorAll('.msg')[b.dataset.k].value)));
       m.querySelectorAll('[data-plus]').forEach((b) => b.addEventListener('click', () => { m.querySelector('#nd').value = plusDays(Number(b.dataset.plus)); }));
       m.querySelector('#hf').addEventListener('submit', (e) => {
         e.preventDefault(); const f = new FormData(e.target);
-        S.recordFollowups(ids, { date: f.get('date'), by: f.get('by'), action: f.get('action'), waiting: f.get('waiting'), remark: f.get('remark'), nextDate: f.get('nextDate'), setPending: !!f.get('pending') });
+        S.recordFollowups(ids, { date: f.get('date'), by: f.get('by'), action: f.get('action'), waiting: f.get('waiting'), remark: f.get('remark'), nextDate: f.get('nextDate') });
         V.SEL.clear(); modal.close(); toast(`Recorded. ${one ? 'It is' : list.length + ' NCRs are'} now in Followed up until ${L.fmtDate(f.get('nextDate'))}`);
       });
     });
@@ -169,7 +168,7 @@
     const s = st.settings;
     openModal(`<form id="bf" class="form modal-form"><h2>Update ${ids.length} NCR${ids.length > 1 ? 's' : ''}</h2>
       <p class="full muted small">Leave a field empty to keep it unchanged.</p>
-      <label class="full">Next check date<div class="inline"><input type="date" name="Due_Date" id="nd">${[3, 7, 14].map((d) => `<button type="button" class="btn sm" data-plus="${d}">+${d}d</button>`).join('')}</div></label>
+      <label class="full">Next check date<div class="inline"><input type="date" name="Due_Date" id="nd" min="${plusDays(1)}">${[3, 7, 14].map((d) => `<button type="button" class="btn sm" data-plus="${d}">+${d}d</button>`).join('')}</div></label>
       <label>Owner<input name="Owner" list="owners"></label>
       <label>Waiting For<select name="Waiting_For">${V.options(s.waitingFor, '', '— unchanged —')}</select></label>
       <label>Status<select name="Status">${V.options(['Open', 'Pending', 'Ready to Close'], '', '— unchanged —')}</select></label>
