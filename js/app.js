@@ -96,7 +96,7 @@
         ${inp('Owner', 'Owner', { list: 'owners' })}
         <label>Waiting For<select name="Waiting_For">${V.options(V.withCurrent(s.waitingFor, n.Waiting_For), n.Waiting_For, '—')}</select></label>
         ${inp('Due_Date', 'Due Date', { type: 'date' })}
-        ${edit ? `<label>Status<select name="Status">${V.options(L.STATUSES, n.Status)}</select></label>` : ''}
+        ${edit ? `<label>Status<select name="Status">${V.options(V.withCurrent(L.PICKABLE, n.Status), n.Status)}</select></label>` : ''}
         <label class="full">Remark<textarea name="Remark" rows="2">${esc(n.Remark)}</textarea></label></div></details>
       <datalist id="buyers">${S.buyers().map((b) => `<option value="${esc(b)}">`).join('')}</datalist>
       <datalist id="owners">${S.owners().map((b) => `<option value="${esc(b)}">`).join('')}</datalist>
@@ -188,7 +188,7 @@
       <label class="full">Next check date<div class="inline"><input type="date" name="Due_Date" id="nd" min="${plusDays(1)}">${[3, 7, 14].map((d) => `<button type="button" class="btn sm" data-plus="${d}">+${d}d</button>`).join('')}</div></label>
       <label>Owner<input name="Owner" list="owners"></label>
       <label>Waiting For<select name="Waiting_For">${V.options(s.waitingFor, '', '— unchanged —')}</select></label>
-      <label>Status<select name="Status">${V.options(['Open', 'Pending', 'Ready to Close'], '', '— unchanged —')}</select></label>
+      <label>Status<select name="Status">${V.options(['Open', 'Pending'], '', '— unchanged —')}</select></label>
       <datalist id="owners">${S.owners().map((b) => `<option value="${esc(b)}">`).join('')}</datalist>
       <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">Apply</button></div></form>`, (m) => {
       m.querySelectorAll('[data-plus]').forEach((b) => b.addEventListener('click', () => { m.querySelector('#nd').value = plusDays(Number(b.dataset.plus)); }));
@@ -255,11 +255,6 @@
     close: (el) => closeModal([el.dataset.id]),
     'bulk-close': () => closeModal([...V.SEL]),
     togglebuyer: (el) => { const b = el.dataset.buyer; V.HOME_OPEN.has(b) ? V.HOME_OPEN.delete(b) : V.HOME_OPEN.add(b); window.__keepScroll = window.scrollY; render(); },
-    ready: (el) => {
-      const n = S.getNcr(el.dataset.id);
-      S.saveNcr(Object.assign({}, n, { Status: 'Ready to Close', Next_Action: n.Next_Action || 'Close NCR' }));
-      S.addHistory(n.NCR_ID, { action: 'Required action completed – Ready to Close (QA to verify)', by: 'QA' }); toast('Marked Ready to Close');
-    },
     reopen: (el) => {
       const n = S.getNcr(el.dataset.id);
       S.saveNcr(Object.assign({}, n, { Status: 'Open' }));

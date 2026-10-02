@@ -282,7 +282,7 @@ window.NCR = window.NCR || {};
         <label class="grow">Search<input id="f-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(LF.q)}"></label>
         <button class="btn" id="f-clear">Clear</button>
         <details class="full-row"><summary>More filters &amp; sorting</summary><div class="filters inner">
-          ${sel('f-status', 'Status', options(L.STATUSES.filter((x) => x !== 'Closed'), LF.status, 'Any'))}
+          ${sel('f-status', 'Status', options(L.PICKABLE.filter((x) => x !== 'Closed'), LF.status, 'Any'))}
           ${sel('f-owner', 'Owner', options(S.owners(), LF.owner, 'All'))}
           ${sel('f-waiting', 'Waiting For', `<option value="">All</option><option value="__none"${LF.waiting === '__none' ? ' selected' : ''}>Not set</option>${options(s.waitingFor, LF.waiting)}`)}
           ${sel('f-disposition', 'Disposition', options(s.dispositions, LF.disposition, 'All'))}
@@ -425,7 +425,6 @@ window.NCR = window.NCR || {};
           <button class="btn primary" data-action="followup" data-id="${esc(id)}">📨 Follow-up</button>
           ${i.needsReview ? `<button class="btn" data-action="reviewed" data-id="${esc(id)}">✓ Reviewed</button>` : ''}
           ${i.closed ? '<button class="btn" data-action="reopen" data-id="' + esc(id) + '">Reopen</button>' : `
-            ${n.Status !== 'Ready to Close' ? `<button class="btn" data-action="ready" data-id="${esc(id)}">Mark Ready to Close</button>` : ''}
             <button class="btn ok" data-action="close" data-id="${esc(id)}">Verify &amp; Close NCR</button>`}
           <button class="btn" data-action="edit" data-id="${esc(id)}">Edit NCR</button>
         </div></div>
@@ -445,7 +444,7 @@ window.NCR = window.NCR || {};
         <section class="card"><h2>Follow-up Control</h2>
           <form id="ctl" class="form">
             <label>Disposition<select name="Disposition">${options(withCurrent(s.dispositions, n.Disposition), n.Disposition, '— select —')}</select></label>
-            <label>Current Status<select name="Status">${options(L.STATUSES, n.Status)}</select></label>
+            <label>Current Status<select name="Status">${options(withCurrent(L.PICKABLE, n.Status), n.Status)}</select></label>
             <label>Next Action<select name="Next_Action">${options(withCurrent(s.nextActions, n.Next_Action), n.Next_Action, '— select —')}</select></label>
             <label>Owner<input name="Owner" list="owners" value="${esc(n.Owner)}"></label>
             <label>Waiting For<select name="Waiting_For">${options(withCurrent(s.waitingFor, n.Waiting_For), n.Waiting_For, '— select —')}</select></label>
