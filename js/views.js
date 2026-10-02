@@ -325,7 +325,7 @@ window.NCR = window.NCR || {};
     return `<div class="pills">${pills}</div>
       <p class="muted wait-line">${list.length ? `<b>${soon}</b> coming back within 3 days` : ''}</p>
       <section class="block">${list.length ? `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead}<th>NCR</th><th>Buyer / Defect</th><th>Buyer remark</th><th>Last follow-up</th><th>Comes back</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
-        : `<div class="empty">${all.length ? 'No NCRs match.' : 'Nothing is waiting. Press Follow-up on an NCR in To follow up and it will appear here until its next check date.'}</div>`}</section>`;
+        : `<div class="empty">${all.length ? 'No NCRs match.' : 'Nothing is waiting. NCRs appear here after you press Follow-up, and return to To follow up on their check date or when the buyer updates the remark (the Buyer updated group, under tab 2).'}</div>`}</section>`;
   }
   function followedPage() {
     if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Followed up</h1></div>' + emptyState() };
@@ -462,9 +462,11 @@ window.NCR = window.NCR || {};
       if (go) go.addEventListener('click', () => {
         const { records } = I2.buildRecords(imp.table, imp.mapping);
         const p = I2.plan(records, st.ncrs), r = I2.apply(p, imp.opts);
+        const waitingBefore = open().filter(isWaiting).map((n) => n.NCR_ID);
         S.saveMany(r.ncrs, r.history);
+        const back = waitingBefore.filter((id) => { const n = S.getNcr(id); return n && n.Status !== 'Closed' && !isWaiting(n); }).length; // followed-up NCRs the buyer has since updated
         S.saveSettings({ importMapping: Object.assign({}, imp.mapping) });
-        imp.done = `${p.added.length} added${p.added.length ? ' (' + Object.entries(p.added.reduce((m, r) => { const b = r.Buyer || '(No buyer)'; m[b] = (m[b] || 0) + 1; return m; }, {})).map(([b, c]) => b + ' ' + c).join(', ') + ')' : ''}, ${p.updated.length} updated${imp.opts.markClosedReady && p.closedInFile.length ? ', ' + p.closedInFile.length + ' closed-in-file marked Ready to Close' : ''}${imp.opts.markMissingReady && p.missing.length ? ', ' + p.missing.length + ' missing marked Ready to Close' : ''}.`;
+        imp.done = `${back ? `${back} followed-up NCR${back === 1 ? '' : 's'} came back to <a href="#/list" data-filter='{"tab":"has"}'>To follow up</a> because the buyer updated the remark. ` : ''}${p.added.length} added${p.added.length ? ' (' + Object.entries(p.added.reduce((m, r) => { const b = r.Buyer || '(No buyer)'; m[b] = (m[b] || 0) + 1; return m; }, {})).map(([b, c]) => b + ' ' + c).join(', ') + ')' : ''}, ${p.updated.length} updated${imp.opts.markClosedReady && p.closedInFile.length ? ', ' + p.closedInFile.length + ' closed-in-file marked Ready to Close' : ''}${imp.opts.markMissingReady && p.missing.length ? ', ' + p.missing.length + ' missing marked Ready to Close' : ''}.`;
         imp.table = null; imp.wb = null; NCR.app.render();
       });
     } };

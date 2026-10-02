@@ -82,6 +82,9 @@ window.NCR = window.NCR || {};
     return true; // yes / true / closed / a date
   }
 
+  // Excel may re-save line breaks (\r\n vs \n); that alone is not a buyer update
+  const normText = (v) => String(v == null ? '' : v).replace(/\r\n?/g, '\n').trim();
+
   function buildRecords(table, mapping) {
     const col = {}; FIELDS.forEach((f) => { col[f.key] = mapping[f.key] ? table.headers.indexOf(mapping[f.key]) : -1; });
     const out = [], bad = [];
@@ -90,7 +93,8 @@ window.NCR = window.NCR || {};
       const no = String(get('NCR_No')).trim();
       if (!no) { if (r.some((c) => String(c).trim())) bad.push({ row: table.headerRow + 1 + i, reason: 'No NCR No.' }); return; }
       const rec = { NCR_No: no };
-      ['Item_No', 'Batch_No', 'Supplier', 'Buyer', 'Defect', 'Quantity', 'Disposition', 'Buyer_Remark'].forEach((k) => { rec[k] = String(get(k)).trim(); });
+      ['Item_No', 'Batch_No', 'Supplier', 'Buyer', 'Defect', 'Quantity', 'Disposition'].forEach((k) => { rec[k] = String(get(k)).trim(); });
+      rec.Buyer_Remark = normText(get('Buyer_Remark'));
       rec.Closed = isClosedValue(get('Closed'));
       rec.RemarkMapped = col.Buyer_Remark >= 0;
       rec.NCR_Date = parseDate(get('NCR_Date'));
@@ -115,7 +119,7 @@ window.NCR = window.NCR || {};
       const changes = [];
       UPDATABLE.forEach((f) => { if (r[f] && String(r[f]) !== String(old[f] || '')) changes.push({ field: f, from: old[f] || '', to: r[f] }); });
       // Remarks mirror the file: a change (including the buyer clearing it) is recorded, never silently lost.
-      if (r.RemarkMapped && (r.Buyer_Remark || '') !== String(old.Buyer_Remark || '').trim()) changes.push({ field: 'Buyer_Remark', from: old.Buyer_Remark || '', to: r.Buyer_Remark || '' });
+      if (r.RemarkMapped && (r.Buyer_Remark || '') !== normText(old.Buyer_Remark)) changes.push({ field: 'Buyer_Remark', from: old.Buyer_Remark || '', to: r.Buyer_Remark || '' });
       ['Disposition'].forEach((f) => { if (r[f] && !old[f]) changes.push({ field: f, from: '', to: r[f] }); });
       if (changes.length) updated.push({ rec: r, old, changes }); else unchanged.push(old);
     });
