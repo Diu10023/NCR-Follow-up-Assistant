@@ -262,6 +262,8 @@
     if (f) V.setFilter(JSON.parse(f.dataset.filter));
     const w = e.target.closest('[data-wfilter]');
     if (w) V.setWaitFilter(JSON.parse(w.dataset.wfilter));
+    const link = (f || w) && e.target.closest('a');
+    if (link && link.getAttribute('href') === location.hash) render(); // already on that page: no hashchange will fire
     const row = e.target.closest('tr[data-href]');
     if (row && !e.target.closest('a,button,input,select')) location.hash = row.dataset.href;
   });

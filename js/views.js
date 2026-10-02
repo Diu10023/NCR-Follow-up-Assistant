@@ -188,13 +188,13 @@ window.NCR = window.NCR || {};
   function setFilter(f) { Object.keys(LF).forEach((k) => delete LF[k]); Object.assign(LF, LF0, f); }
 
   // every open NCR matching the non-tab filters; `tab` decides which part of it to show
-  function baseList() {
+  function baseList(ignoreBuyer) {
     const q = LF.q.trim().toLowerCase();
     return st.ncrs.filter((n) => {
       const i = inf(n);
       if (i.closed) return false; // closed NCRs live on the Closed page
       if (q && !(`${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))) return false;
-      if (LF.buyer && (LF.buyer === '__none' ? n.Buyer : n.Buyer !== LF.buyer)) return false;
+      if (!ignoreBuyer && LF.buyer && (LF.buyer === '__none' ? n.Buyer : n.Buyer !== LF.buyer)) return false;
       if (LF.show === 'action' && !i.actionRequired) return false;
       if (LF.show === 'ready' && !i.ready) return false;
       if (LF.status && n.Status !== LF.status) return false;
@@ -228,15 +228,27 @@ window.NCR = window.NCR || {};
   // ids behind the "Message buyer" button = what the current tab is showing
   function currentIds() { const v = visibleList(); return (LF.tab === 'none' ? v.none : LF.tab === 'has' ? v.has : v.shown).map((n) => n.NCR_ID); }
 
+  // Shared by To follow up and Followed up: buyer pills, the three tabs, and a per-buyer count line.
+  const TAB_DEFS = [['none', '1 · No remark'], ['has', '2 · Has remark'], ['all', '3 · All']];
+  const tabsHtml = (cnt, cur, attr) => `<div class="tabs">${TAB_DEFS.map(([k, l]) => `<button class="tab${cur === k ? ' on' : ''}" ${attr}="${k}">${l} <b>${cnt[k]}</b></button>`).join('')}</div>`;
+  const pillsHtml = (per, total, cur, attr) => {
+    const names = Object.keys(per).sort((x, y) => per[y] - per[x] || x.localeCompare(y));
+    return `<div class="pills">${[`<button class="pill${cur ? '' : ' on'}" ${attr}="">All buyers <b>${total}</b></button>`].concat(names.map((b) => { const v = b === NO_BUYER ? '__none' : b; return `<button class="pill${cur === v ? ' on' : ''}" ${attr}="${esc(v)}">${esc(b)} <b>${per[b]}</b></button>`; })).join('')}</div>`;
+  };
+  // how many NCRs of this buyer are not closed, and where they are
+  function buyerLine(buyer) {
+    if (!buyer) return '';
+    const mine = open().filter((n) => (buyer === '__none' ? !n.Buyer : n.Buyer === buyer)), f = mine.filter(isFollowed).length;
+    return `<div class="buyer-line"><b>${esc(buyer === '__none' ? NO_BUYER : buyer)}</b>: <a href="#/list" data-filter='${esc(JSON.stringify({ buyer }))}'>${mine.length - f} to follow up</a> · <a href="#/followed" data-wfilter='${esc(JSON.stringify({ buyer }))}'>${f} followed up</a> · <b>${mine.length}</b> not closed</div>`;
+  }
+
   function openMain() {
     const v = visibleList(), buyers = S.buyers();
     const hidden = v.base.length - v.shown.length;
-    const per = {}; baseList().forEach((n) => { const b = buyerOf(n); per[b] = per[b] || { none: 0 }; if (inf(n).remarkGroup === 'none' && !isFollowed(n)) per[b].none++; });
-    const names = Object.keys(per).sort((x, y) => per[y].none - per[x].none || x.localeCompare(y));
-    const cur = LF.buyer === '__none' ? NO_BUYER : LF.buyer;
-    const pills = [`<button class="pill${LF.buyer ? '' : ' on'}" data-buyer="">All buyers</button>`].concat(names.map((b) => `<button class="pill${cur === b ? ' on' : ''}" data-buyer="${esc(b === NO_BUYER ? '__none' : b)}">${esc(b)} <b>${per[b].none}</b></button>`)).join('');
-    const tabs = [['none', '1 · No remark', v.none.length], ['has', '2 · Has remark', v.has.length], ['all', 'All to follow up', v.shown.length]]
-      .map(([k, l, n]) => `<button class="tab${LF.tab === k ? ' on' : ''}" data-tab="${k}">${l} <b>${n}</b></button>`).join('');
+    const per = {}; baseList(true).filter((n) => !isFollowed(n)).forEach((n) => { per[buyerOf(n)] = (per[buyerOf(n)] || 0) + 1; });
+    const total = Object.values(per).reduce((x, y) => x + y, 0), cur = LF.buyer === '__none' ? NO_BUYER : LF.buyer;
+    const pills = pillsHtml(per, total, LF.buyer, 'data-buyer');
+    const tabs = tabsHtml({ none: v.none.length, has: v.has.length, all: v.shown.length }, LF.tab, 'data-tab');
     let body;
     if (LF.tab === 'none') {
       body = `<section class="block"><h2>No remark: chase these first <span class="count">${v.none.length}</span></h2><p class="hint">The buyer has written nothing in Remarks. Oldest first.</p>${workTable(v.none.slice().sort(oldest), 'Every open NCR has a remark.', 'none', 25)}</section>`;
@@ -250,12 +262,11 @@ window.NCR = window.NCR || {};
       body = parts.map(([k, t, h, l]) => `<section class="block"><h2>${t} <span class="count">${l.length}</span></h2><p class="hint">${h}</p>${workTable(l, '', k, 25, true)}</section>`).join('')
         || '<div class="empty">No NCRs with a remark.</div>';
     } else {
-      body = `<section class="block"><h2>All to follow up <span class="count">${v.shown.length}</span></h2>${workTable(allSorted(v.shown), 'No open NCRs match.', 'all', 40, true)}</section>`;
+      body = `<section class="block"><h2>All <span class="count">${v.shown.length}</span></h2>${workTable(allSorted(v.shown), 'No open NCRs match.', 'all', 40, true)}</section>`;
     }
-    return `<div class="pills">${pills}</div>
-      <div class="tabs">${tabs}</div>
+    return `${pills}${buyerLine(LF.buyer)}${tabs}
       <div class="row-between wait-line"><span class="muted">${hidden ? `${hidden} already followed up — <a href="#/followed" data-wfilter='${esc(JSON.stringify({ buyer: LF.buyer }))}'>see Followed up</a>` : ''}</span>
-        <span class="inline">${LF.buyer ? `<button class="btn primary" data-action="chase" data-buyer="${esc(cur)}">Message ${esc(cur)} (${currentIds().length})</button>` : ''}</span></div>
+        <span class="inline">${LF.buyer ? `<button class="btn primary" data-action="chase" data-buyer="${esc(cur)}"${currentIds().length ? '' : ' disabled'}>Message ${esc(cur)} (${currentIds().length})</button>` : ''}</span></div>
       ${body}`;
   }
 
@@ -296,9 +307,9 @@ window.NCR = window.NCR || {};
   }
 
   // ---------- Followed up (stays until the NCR is closed; shows the timeline) ----------
-  const WF = { q: '', buyer: '' };
+  const WF = { q: '', buyer: '', tab: 'none' };
   const WF_OPEN = new Set(); // rows whose timeline is expanded
-  function setWaitFilter(f) { Object.assign(WF, { q: '', buyer: '' }, f); }
+  function setWaitFilter(f) { Object.assign(WF, { q: '', buyer: '', tab: 'none' }, f); }
   // what, if anything, needs QA's attention on a followed-up NCR
   function attention(n) {
     const i = inf(n);
@@ -318,10 +329,10 @@ window.NCR = window.NCR || {};
     return h.length ? h.map((x) => `<li><span class="t-date">${L.fmtDate(x.Date)}</span><span>${x.Followup_No ? `<span class="chip fu">Follow-up #${esc(x.Followup_No)}</span> ` : ''}${/^Buyer /.test(x.Action) ? '<span class="chip">Buyer</span> ' : ''}${esc(x.Action)}${x.Remark ? `<span class="sub"> · ${esc(x.Remark)}</span>` : ''}</span></li>`).join('') : '<li class="sub">No history yet.</li>';
   }
   function followedBody() {
-    const all = open().filter(isFollowed), list = followedList();
+    const all = open().filter(isFollowed), found = followedList();
     const per = {}; all.forEach((n) => { per[buyerOf(n)] = (per[buyerOf(n)] || 0) + 1; });
-    const names = Object.keys(per).sort((x, y) => per[y] - per[x] || x.localeCompare(y)), cur = WF.buyer === '__none' ? NO_BUYER : WF.buyer;
-    const pills = [`<button class="pill${WF.buyer ? '' : ' on'}" data-wbuyer="">All buyers <b>${all.length}</b></button>`].concat(names.map((b) => `<button class="pill${cur === b ? ' on' : ''}" data-wbuyer="${esc(b === NO_BUYER ? '__none' : b)}">${esc(b)} <b>${per[b]}</b></button>`)).join('');
+    const cnt = { none: found.filter((n) => inf(n).remarkGroup === 'none').length, has: found.filter((n) => inf(n).remarkGroup !== 'none').length, all: found.length };
+    const list = WF.tab === 'none' ? found.filter((n) => inf(n).remarkGroup === 'none') : WF.tab === 'has' ? found.filter((n) => inf(n).remarkGroup !== 'none') : found;
     sectionIds.followed = list.map((n) => n.NCR_ID);
     const attn = list.filter(attention).length;
     const rows = list.map((n) => {
@@ -337,10 +348,10 @@ window.NCR = window.NCR || {};
         <td class="right acts">${i.needsReview ? `<button class="btn sm" data-action="reviewed" data-id="${esc(n.NCR_ID)}" title="I read the buyer update">✓ Reviewed</button> ` : ''}<button class="btn sm" data-action="followup" data-id="${esc(n.NCR_ID)}">Follow up again</button></td></tr>
         ${open_ ? `<tr class="sub-row"><td colspan="8"><ul class="mini-tl">${timelineRows(n)}</ul><a href="#/ncr/${esc(n.NCR_ID)}">Full timeline →</a></td></tr>` : ''}`;
     }).join('');
-    return `<div class="pills">${pills}</div>
-      <p class="muted wait-line">${list.length ? `<b>${attn}</b> need your attention (buyer updated, check date reached, or ready to close). The rest are waiting.` : ''}</p>
+    return `${pillsHtml(per, all.length, WF.buyer, 'data-wbuyer')}${buyerLine(WF.buyer)}${tabsHtml(cnt, WF.tab, 'data-wtab')}
+      <p class="muted wait-line">${list.length ? `<b>${attn}</b> of these need your attention (buyer updated or check date reached). The rest are waiting.` : ''}</p>
       <section class="block">${list.length ? `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead}<th>NCR</th><th>Buyer / Defect</th><th>Latest remark</th><th>Last follow-up</th><th>Next check</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
-        : `<div class="empty">${all.length ? 'No NCRs match.' : 'Nothing here yet. Press Follow-up on an NCR in To follow up: it moves here and stays until it is closed.'}</div>`}</section>`;
+        : `<div class="empty">${all.length ? 'No NCRs in this tab.' : 'Nothing here yet. Press Follow-up on an NCR in To follow up: it moves here and stays until it is closed.'}</div>`}</section>`;
   }
   function followedPage() {
     if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Followed up</h1></div>' + emptyState() };
@@ -351,7 +362,7 @@ window.NCR = window.NCR || {};
     bind(root) {
       const main = root.querySelector('#followed-main'), refresh = () => { main.innerHTML = followedBody(); };
       root.querySelector('#w-q').addEventListener('input', (e) => { WF.q = e.target.value; refresh(); });
-      main.addEventListener('click', (e) => { const b = e.target.closest('[data-wbuyer]'); if (b) { WF.buyer = b.dataset.wbuyer; refresh(); } });
+      main.addEventListener('click', (e) => { const b = e.target.closest('[data-wbuyer]'), t = e.target.closest('[data-wtab]'); if (b) { WF.buyer = b.dataset.wbuyer; refresh(); } else if (t) { WF.tab = t.dataset.wtab; refresh(); } });
     } };
   }
 
