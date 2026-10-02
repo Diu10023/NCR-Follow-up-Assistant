@@ -84,10 +84,65 @@ window.NCR = window.NCR || {};
 
   const emptyState = () => `<div class="card empty-state"><h2>No NCRs yet</h2><p>All data comes from your Excel export. Upload the file to get started — upload the same export again every week and only new or changed NCRs are applied.</p><a class="btn primary" href="#/import">Import Excel</a></div>`;
 
+  // ---------- charts (inline SVG, no library) ----------
+  // Palette from the design colours, validated as one ordered set: dark, blue, grey, light blue.
+  const SEG = [
+    { k: 'none', label: 'No update', color: '#333333', ink: '#fff' },
+    { k: 'progress', label: 'In progress', color: '#007AC8', ink: '#fff' },
+    { k: 'hold', label: 'Hold / scrap', color: '#666666', ink: '#fff' },
+    { k: 'jira', label: 'Closed in Jira', color: '#A0C8EC', ink: '#000' },
+  ];
+  const niceStep = (max) => { const raw = Math.max(1, max) / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
+  // bar with only its right (data) end rounded; the baseline end stays square
+  const barPath = (x, y, w, h, r) => (w <= r * 2 ? `M${x},${y}h${w}v${h}h${-w}z` : `M${x},${y}h${w - r}a${r},${r} 0 0 1 ${r},${r}v${h - 2 * r}a${r},${r} 0 0 1 ${-r},${r}h${-(w - r)}z`);
+  const tipAttrs = (a, b, v, color) => `data-ta="${esc(a)}" data-tb="${esc(b)}" data-tv="${esc(v)}" data-tc="${color}" tabindex="0"`;
+
+  function buyerChart(rows) {
+    const list = rows.filter((r) => r.open).sort((a, b) => b.open - a.open);
+    if (!list.length) return '<div class="empty">No open NCRs.</div>';
+    const labelW = 150, right = 46, W = 600, rowH = 36, top = 8, axisH = 26;
+    const max = Math.max(...list.map((r) => r.open)), step = niceStep(max), top_ = Math.ceil(max / step) * step;
+    const plotW = W - labelW - right, sc = (v) => (v / top_) * plotW, H = top + list.length * rowH + axisH;
+    let g = '', bars = '';
+    for (let t = 0; t <= top_; t += step) g += `<line x1="${labelW + sc(t)}" x2="${labelW + sc(t)}" y1="${top}" y2="${H - axisH}" stroke="#dcdcdc" stroke-width="1"/><text x="${labelW + sc(t)}" y="${H - 8}" text-anchor="middle" font-size="12" fill="#444">${t}</text>`;
+    list.forEach((r, i) => {
+      const y = top + i * rowH + (rowH - 22) / 2;
+      const name = r.name.length > 18 ? r.name.slice(0, 17) + '…' : r.name;
+      bars += `<text x="${labelW - 10}" y="${y + 15}" text-anchor="end" font-size="14" font-weight="700" fill="#000">${esc(name)}</text>`;
+      let x = labelW; const parts = SEG.filter((sg) => r[sg.k] > 0);
+      parts.forEach((sg, j) => {
+        const w = sc(r[sg.k]), last = j === parts.length - 1, dw = Math.max(1, w - (last ? 0 : 2)); // 2px surface gap between segments
+        bars += `<path class="seg" d="${barPath(x, y, dw, 22, last ? 4 : 0)}" fill="${sg.color}" ${tipAttrs(r.name, sg.label, r[sg.k] + ' of ' + r.open + ' open', sg.color)}/>`;
+        if (w >= 26) bars += `<text x="${x + w / 2 - (last ? 0 : 1)}" y="${y + 16}" text-anchor="middle" font-size="12.5" font-weight="700" fill="${sg.ink}" pointer-events="none">${r[sg.k]}</text>`;
+        x += w;
+      });
+      bars += `<text x="${x + 8}" y="${y + 16}" font-size="14" font-weight="800" fill="#000">${r.open}</text>`;
+    });
+    const legend = SEG.map((sg) => `<span class="lg"><i style="background:${sg.color}"></i>${sg.label}</span>`).join('');
+    return `<div class="legend-row">${legend}</div><svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Open NCRs per buyer, split by buyer update status. Values are in the table below.">${g}${bars}</svg>`;
+  }
+
+  function agingChart(open_) {
+    const B = [['0–7 d', 0, 7], ['8–14 d', 8, 14], ['15–30 d', 15, 30], ['31–90 d', 31, 90], ['90+ d', 91, 1e9]];
+    const vals = B.map(([l, lo, hi]) => ({ l, v: open_.filter((n) => { const a = inf(n).aging; return a !== null && a >= lo && a <= hi; }).length }));
+    const W = 420, H = 270, left = 34, bottom = 36, top = 22, plotH = H - bottom - top, band = (W - left - 10) / vals.length, bw = 24;
+    const max = Math.max(1, ...vals.map((x) => x.v)), step = niceStep(max), top_ = Math.ceil(max / step) * step, sc = (v) => (v / top_) * plotH;
+    let g = '', bars = '';
+    for (let t = 0; t <= top_; t += step) g += `<line x1="${left}" x2="${W - 10}" y1="${top + plotH - sc(t)}" y2="${top + plotH - sc(t)}" stroke="#dcdcdc" stroke-width="1"/><text x="${left - 6}" y="${top + plotH - sc(t) + 4}" text-anchor="end" font-size="12" fill="#444">${t}</text>`;
+    vals.forEach((d, i) => {
+      const cx = left + band * i + band / 2, h = sc(d.v), x = cx - bw / 2, y = top + plotH - h;
+      bars += `<g ${tipAttrs(d.l + ' old', 'Open NCRs', d.v, '#007AC8')} class="seg"><rect x="${cx - band / 2 + 4}" y="${top}" width="${band - 8}" height="${plotH}" fill="transparent"/>`
+        + (d.v ? `<path d="M${x},${top + plotH}v${-(h - 4)}a4,4 0 0 1 4,-4h${bw - 8}a4,4 0 0 1 4,4v${h - 4}z" fill="#007AC8"/>` : '')
+        + `<text x="${cx}" y="${y - 6}" text-anchor="middle" font-size="14" font-weight="800" fill="#000">${d.v}</text></g>`
+        + `<text x="${cx}" y="${H - 12}" text-anchor="middle" font-size="12.5" fill="#000">${d.l}</text>`;
+    });
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Open NCRs by age: ${vals.map((x) => x.l + ' ' + x.v).join(', ')}">${g}${bars}</svg>`;
+  }
+
   // ---------- Home (summary by buyer) ----------
   const HOME_OPEN = new Set();
   function home() {
-    if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Summary</h1></div>' + emptyState() };
+    if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Home</h1></div>' + emptyState() };
     const by = {};
     const row = (name) => (by[name] = by[name] || { name, total: 0, open: 0, closed: 0, none: 0, progress: 0, hold: 0, jira: 0, noneIds: [] });
     st.ncrs.forEach((n) => {
@@ -105,8 +160,12 @@ window.NCR = window.NCR || {};
         <td>${link(r.name, 'none', r.none, 'bad strong')}</td><td>${link(r.name, 'progress', r.progress)}</td><td>${link(r.name, 'hold', r.hold)}</td><td>${link(r.name, 'jira', r.jira)}</td></tr>
       ${HOME_OPEN.has(r.name) ? `<tr class="sub-row"><td colspan="8"><div class="sub">No buyer update (${r.none}):</div><div class="nolist">${r.noneIds.length ? r.noneIds.slice().sort(byOldest).slice(0, 60).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(' ') + (r.noneIds.length > 60 ? ' …' : '') : '<span class="muted">none</span>'}</div></td></tr>` : ''}`).join('');
     const big = (v, l, f, href) => `<a class="big" href="${href}" data-filter='${esc(JSON.stringify(f))}'><b>${v}</b><span>${l}</span></a>`;
-    return { html: `<div class="page-head"><h1>Summary</h1><span class="muted">${L.fmtDate(L.todayISO())}</span></div>
+    return { html: `<div class="page-head"><h1>Home</h1><span class="muted">${L.fmtDate(L.todayISO())}</span></div>
       <div class="bigs">${big(tot.total, 'Total', { show: 'open' }, '#/list')}${big(tot.open, 'Open', { show: 'open' }, '#/list')}${big(tot.closed, 'Closed', {}, '#/closed')}</div>
+      <div class="charts">
+        <section class="block"><h2>Open NCRs by buyer</h2><p class="hint">Each bar is one buyer's open NCRs, split by what their Remarks say. Exact numbers are in the table below.</p>${buyerChart(rows)}</section>
+        <section class="block"><h2>How long they have been open</h2><p class="hint">Open NCRs grouped by days since the NCR date.</p>${agingChart(open())}</section>
+      </div>
       <section class="block"><h2>By buyer</h2><p class="hint">Open = No update + In progress + Hold / scrap + Closed in Jira. Click a number to see those NCRs; ▸ lists the NCRs with no update.</p>
         <div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th>Total</th><th>Open</th><th>Closed</th><th>No update</th><th>In progress</th><th>Hold / scrap</th><th>Closed in Jira</th></tr></thead>
         <tbody>${body}<tr class="total"><td><b>Total</b></td><td>${tot.total}</td><td>${tot.open}</td><td>${tot.closed}</td><td>${tot.none}</td><td>${tot.progress}</td><td>${tot.hold}</td><td>${tot.jira}</td></tr></tbody></table></div>

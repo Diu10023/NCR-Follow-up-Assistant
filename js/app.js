@@ -255,6 +255,20 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden) autoRefresh(); });
   setInterval(autoRefresh, 60000);
 
+  // one shared tooltip for chart marks (text only, via textContent)
+  const tip = document.createElement('div'); tip.id = 'tip'; tip.hidden = true;
+  tip.innerHTML = '<div class="tv"></div><div class="ta"></div><div class="tb"></div>'; document.body.appendChild(tip);
+  const showTip = (el, x, y) => {
+    tip.querySelector('.tv').textContent = el.dataset.tv; tip.querySelector('.ta').textContent = el.dataset.ta;
+    const b = tip.querySelector('.tb'); b.textContent = el.dataset.tb; b.style.setProperty('--c', el.dataset.tc);
+    tip.hidden = false;
+    const r = tip.getBoundingClientRect();
+    tip.style.left = Math.min(window.innerWidth - r.width - 8, x + 14) + 'px'; tip.style.top = Math.max(8, y - r.height - 10) + 'px';
+  };
+  document.addEventListener('pointermove', (e) => { const el = e.target.closest && e.target.closest('[data-tv]'); if (el) showTip(el, e.clientX, e.clientY); else tip.hidden = true; });
+  document.addEventListener('focusin', (e) => { const el = e.target.closest && e.target.closest('[data-tv]'); if (el) { const r = el.getBoundingClientRect(); showTip(el, r.left + r.width / 2, r.top); } });
+  document.addEventListener('focusout', () => { tip.hidden = true; });
+
   // keep the right-hand tab rail directly under the sticky header, whatever its height
   const fitRail = () => document.documentElement.style.setProperty('--hdr', $('.topbar').offsetHeight + 'px');
   window.addEventListener('resize', fitRail); fitRail();

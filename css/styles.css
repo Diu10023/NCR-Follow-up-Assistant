@@ -299,3 +299,15 @@ nav{gap:4px}
 .rail{top:var(--hdr,75px)}
 .rail a{letter-spacing:.06em;font-size:15px}
 .grid th{font-size:12.5px}
+
+/* charts */
+.charts{display:grid;grid-template-columns:3fr 2fr;gap:36px;margin-bottom:0}
+@media(max-width:1000px){.charts{grid-template-columns:1fr;gap:0}}
+.chart{display:block;max-width:100%;height:auto;margin-top:6px;overflow:visible}
+.chart text{font-family:var(--body)}
+.chart .seg{cursor:default;outline:none}.chart .seg:hover,.chart .seg:focus{opacity:.78}
+.legend-row{display:flex;flex-wrap:wrap;gap:6px 18px;margin:2px 0 6px;font-size:14px;font-weight:600}
+.lg{display:inline-flex;align-items:center;gap:7px}.lg i{width:14px;height:14px;display:inline-block}
+#tip{position:fixed;z-index:50;pointer-events:none;background:#fff;color:#000;border:3px solid #000;box-shadow:4px 4px 0 #000;padding:6px 12px;min-width:120px}
+#tip[hidden]{display:none}#tip .tv{font-family:var(--num);font-weight:800;font-size:20px;line-height:1.1}#tip .ta{font-size:13px;color:#444}
+#tip .tb{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}#tip .tb:before{content:"";width:12px;height:3px;background:var(--c,#000)}
