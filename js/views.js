@@ -38,30 +38,8 @@ window.NCR = window.NCR || {};
     + (i.remarkGroup === 'hold' ? '<div class="sub">⏳ Hold / scrap – cannot close yet</div>' : i.remarkGroup === 'none' ? '<div class="sub">📭 no buyer update</div>' : '');
   const newChip = (i) => (i.isNew ? ' <span class="chip new">NEW</span>' : '');
 
-  // Full list table. `full` shows every column from the spec; otherwise a compact set.
-  function fullTable(list, full) {
-    if (!list.length) return '<div class="empty">No NCRs match.</div>';
-    const rows = list.map((n) => {
-      const i = inf(n);
-      const stateCell = `<td class="nowrap">${stateBadge(i)}<div class="sub">${esc(n.Status)}</div>${i.reasons.length ? `<div class="why">${esc(i.reasons[0])}</div>` : ''}</td>`;
-      if (!full) return `<tr class="row-${i.state}" data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}<td class="nowrap"><b>${esc(n.NCR_No)}</b>${newChip(i)}<div class="sub">Item ${esc(n.Item_No)}</div></td>
-        <td>${esc(buyerOf(n))}</td><td class="nowrap">${L.fmtDate(n.NCR_Date)}<div class="sub">${agingText(i)}</div></td><td>${esc(n.Defect)}</td>
-        ${stateCell}<td class="nowrap">${dueText(n, i)}</td><td>${countText(n, i)}<div class="sub">${n.Last_Followup ? 'last ' + L.fmtDate(n.Last_Followup) : 'never'}</div></td></tr>`;
-      return `<tr class="row-${i.state}" data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}
-        <td class="nowrap"><b>${esc(n.NCR_No)}</b>${newChip(i)}</td><td>${esc(n.Item_No)}</td><td>${esc(n.Batch_No)}</td><td>${esc(buyerOf(n))}</td>
-        <td class="nowrap">${L.fmtDate(n.NCR_Date)}</td><td>${esc(n.Defect)}</td><td>${esc(n.Quantity)}</td>
-        <td>${esc(n.Disposition) || '–'}</td><td>${nextText(n, i)}</td><td class="remark">${remarkText(n, i)}</td><td>${esc(n.Owner) || '–'}</td><td>${esc(n.Waiting_For) || '–'}</td>
-        <td class="nowrap">${dueText(n, i)}</td><td class="nowrap">${agingText(i)}</td>${stateCell}
-        <td class="nowrap">${n.Last_Followup ? L.fmtDate(n.Last_Followup) : '–'}</td><td>${countText(n, i)}</td></tr>`;
-    }).join('');
-    const head = full
-      ? '<th>NCR No.</th><th>Item No.</th><th>Batch No.</th><th>Buyer</th><th>NCR Date</th><th>Defect</th><th>Qty</th><th>Disposition</th><th>Next Action</th><th>Buyer Remark</th><th>Owner</th><th>Waiting For</th><th>Due Date</th><th>Aging</th><th>Status</th><th>Last Follow-up</th><th>F/U #</th>'
-      : '<th>NCR</th><th>Buyer</th><th>Created</th><th>Defect</th><th>Status</th><th>Next check</th><th>Follow-ups</th>';
-    return `<div class="table-wrap"><table class="grid"><thead><tr>${cbHead}${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
-  }
-
-  // Worklist table used on Today: what, who, why, when — and one-click actions.
-  function workTable(list, emptyMsg, key, limit) {
+  // Worklist table: what, who, why, when — and one-click actions.
+  function workTable(list, emptyMsg, key, limit, withRemark) {
     if (!list.length) return `<div class="empty">${emptyMsg || 'Nothing here'}</div>`;
     limit = limit || 10;
     sectionIds[key] = list.map((n) => n.NCR_ID);
@@ -70,13 +48,13 @@ window.NCR = window.NCR || {};
       const i = inf(n);
       return `<tr data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}
         <td class="nowrap"><b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div></td>
-        <td class="wide">${esc(buyerOf(n))}<div class="sub clip" title="${esc(n.Buyer_Remark || n.Defect)}">${esc(n.Defect)}${n.Buyer_Remark ? ' · “' + esc(n.Buyer_Remark) + '”' : ''}</div></td>
-        <td>${whyText(i)}</td>
+        <td class="wide">${esc(buyerOf(n))}<div class="sub clip" title="${esc(n.Buyer_Remark || n.Defect)}">${esc(n.Defect)}${!withRemark && n.Buyer_Remark ? ' · “' + esc(n.Buyer_Remark) + '”' : ''}</div></td>
+        ${withRemark ? `<td class="remark">${remarkText(n, i)}</td>` : ''}<td>${whyText(i)}</td>
         <td class="nowrap">${dueText(n, i)}<div class="sub">${i.count ? i.count + ' follow-up' + (i.count > 1 ? 's' : '') : 'not followed up'}</div></td>
         <td class="right nowrap">${i.needsReview ? `<button class="btn sm" data-action="reviewed" data-id="${esc(n.NCR_ID)}" title="I read the buyer update – check again in ${st.settings.defaultCheckDays} days">✓ Reviewed</button> ` : ''}<button class="btn sm" data-action="followup" data-id="${esc(n.NCR_ID)}">Follow-up</button></td></tr>`;
     }).join('');
     const more = list.length > limit ? `<div class="more"><button class="link" data-action="showall" data-key="${key}">${showAll[key] ? 'Show fewer' : `Show all ${list.length}`}</button> · <button class="link" data-action="selsection" data-key="${key}">Select all ${list.length}</button></div>` : '';
-    return `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead}<th>NCR</th><th>Buyer / Defect</th><th>Why</th><th>Next check</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
+    return `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead}<th>NCR</th><th>Buyer / Defect</th>${withRemark ? '<th>Buyer remark</th>' : ''}<th>Why</th><th>Next check</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
   }
 
   const byDue = (a, b) => (a.Due_Date || '9999') < (b.Due_Date || '9999') ? -1 : (a.Due_Date || '9999') > (b.Due_Date || '9999') ? 1 : 0;
@@ -172,34 +150,6 @@ window.NCR = window.NCR || {};
         <p class="hint">Hold / scrap = Remarks contain “${esc(st.settings.holdKeywords.join('”, “'))}”. Closed in Jira = Remarks contain “${esc(st.settings.jiraKeywords.join('”, “'))}”. Change the keywords in Settings.</p></section>` };
   }
 
-  // ---------- Today ----------
-  const TF = { buyer: '' };
-  function today() {
-    if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Today</h1></div>' + emptyState() };
-    const mine = open();
-    const all = mine.filter((n) => !TF.buyer || buyerOf(n) === TF.buyer);
-    const sec = { jira: [], overdue: [], today: [], review: [], new: [], ready: [], soon: [] };
-    all.forEach((n) => { const k = inf(n).section; if (k) sec[k].push(n); });
-    sec.overdue.sort(byDue); sec.today.sort(byOldest); sec.new.sort(byOldest); sec.review.sort(byOldest); sec.soon.sort(byDue);
-    const need = sec.jira.length + sec.overdue.length + sec.today.length + sec.review.length + sec.new.length + sec.ready.length;
-    const waiting = all.length - need - sec.soon.length;
-    // buyer chips: how many each buyer still owes an action on
-    const per = {}; mine.forEach((n) => { const b = buyerOf(n); per[b] = per[b] || { a: 0, t: 0 }; per[b].t++; if (inf(n).actionRequired) per[b].a++; });
-    const names = Object.keys(per).sort((x, y) => per[y].a - per[x].a || x.localeCompare(y));
-    const chips = [`<button class="pill${TF.buyer ? '' : ' on'}" data-buyer="">All <b>${mine.filter((n) => inf(n).actionRequired).length}</b></button>`]
-      .concat(names.map((b) => `<button class="pill${TF.buyer === b ? ' on' : ''}" data-buyer="${esc(b)}">${esc(b)} <b>${per[b].a}</b></button>`)).join('');
-    const block = (key, title, hint) => (!sec[key].length ? '' : `<section class="block"><h2>${title} <span class="count">${sec[key].length}</span></h2><p class="hint">${hint}</p>${workTable(sec[key], '', key, 10)}</section>`);
-    const body = [block('jira', 'Closed in Jira', 'Remarks say Jira is closed. Tick the rows and press Verify &amp; close.'), block('overdue', 'Overdue', 'Next check date has passed.'), block('today', 'Due today', ''),
-      block('review', 'Buyer updated', 'Remarks changed since your last review — read, then ✓ Reviewed.'),
-      block('new', 'New', 'Not started. Oldest first. Follow up and set a next check date.'),
-      block('ready', 'Ready to close', 'Verify the evidence, then close.'), block('soon', 'Coming up', 'Next check within ' + st.settings.dueSoonDays + ' days.')].join('');
-    return { html: `<div class="page-head"><div><h1>Today</h1><div class="muted">${L.fmtDate(L.todayISO())} · ${need ? `<b>${need}</b> to do` : 'all clear'} · ${waiting} waiting for their next check date</div></div>
-        ${TF.buyer ? `<button class="btn primary" data-action="chase" data-buyer="${esc(TF.buyer)}"${per[TF.buyer] && per[TF.buyer].a ? '' : ' disabled'}>Message ${esc(TF.buyer)} (${per[TF.buyer] ? per[TF.buyer].a : 0})</button>` : ''}</div>
-      <div class="pills">${chips}</div>
-      ${body || '<div class="empty">Nothing to do today. 🎉</div>'}`,
-    bind(root) { root.querySelectorAll('.pill').forEach((b) => b.addEventListener('click', () => { TF.buyer = b.dataset.buyer; NCR.app.render(); })); } };
-  }
-
   // ---------- Closed archive ----------
   const CF = { q: '', buyer: '', month: '' };
   function closedList() {
@@ -228,88 +178,127 @@ window.NCR = window.NCR || {};
     } };
   }
 
-  // ---------- list ----------
-  const LF0 = { q: '', buyer: '', show: 'open', status: '', owner: '', waiting: '', disposition: '', due: '', overdueOnly: false, buyerUpdate: '', fu: '', age: '', sort: 'due', dir: 'asc', full: false };
+  // ---------- Open NCRs (one worklist: no remark first, then has remark) ----------
+  const LF0 = { q: '', buyer: '', tab: 'none', showWait: false, show: 'open', status: '', owner: '', waiting: '', disposition: '', due: '', buyerUpdate: '', fu: '', age: '', sort: 'due', dir: 'asc' };
   const LF = Object.assign({}, LF0);
-  function setFilter(f) { Object.keys(LF).forEach((k) => delete LF[k]); Object.assign(LF, LF0, f); }
+  // links from Home pass buyerUpdate; map them onto the two priority tabs
+  function setFilter(f) {
+    Object.keys(LF).forEach((k) => delete LF[k]); Object.assign(LF, LF0, f);
+    if (f.tab) return;
+    if (f.buyerUpdate === 'none') { LF.tab = 'none'; LF.buyerUpdate = ''; }
+    else if (['progress', 'hold', 'jira'].includes(f.buyerUpdate)) LF.tab = 'has';
+    else if (f.show === 'open' || f.show === 'ready' || f.show === 'action') LF.tab = 'all';
+    if (f.buyerUpdate === 'none' || f.show === 'open') LF.showWait = true; // coming from a count: show everything behind that number
+  }
 
-  function filtered() {
+  // every open NCR matching the non-tab filters; `tab` decides which part of it to show
+  function baseList() {
     const q = LF.q.trim().toLowerCase();
-    const list = st.ncrs.filter((n) => {
+    return st.ncrs.filter((n) => {
       const i = inf(n);
       if (i.closed) return false; // closed NCRs live on the Closed page
       if (q && !(`${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))) return false;
       if (LF.buyer && (LF.buyer === '__none' ? n.Buyer : n.Buyer !== LF.buyer)) return false;
-      if (LF.show === 'open' && i.closed) return false;
       if (LF.show === 'action' && !i.actionRequired) return false;
-      if (LF.show === 'waiting' && (i.closed || i.actionRequired)) return false;
       if (LF.show === 'ready' && !i.ready) return false;
-      if (LF.show === 'closed' && !i.closed) return false;
       if (LF.status && n.Status !== LF.status) return false;
       if (LF.owner && n.Owner !== LF.owner) return false;
       if (LF.waiting && (LF.waiting === '__none' ? n.Waiting_For : n.Waiting_For !== LF.waiting)) return false;
       if (LF.disposition && n.Disposition !== LF.disposition) return false;
-      if (LF.overdueOnly && !i.overdue) return false;
       if (LF.due === 'overdue' && !i.overdue) return false;
       if (LF.due === 'today' && !i.dueToday) return false;
       if (LF.due === 'soon' && !i.dueSoon) return false;
-      if (LF.due === 'week' && !(!i.closed && i.dueDiff !== null && i.dueDiff >= 0 && i.dueDiff <= 7)) return false;
+      if (LF.due === 'week' && !(i.dueDiff !== null && i.dueDiff >= 0 && i.dueDiff <= 7)) return false;
       if (LF.due === 'none' && n.Due_Date) return false;
-      if (LF.buyerUpdate && LF.buyerUpdate !== 'stale' && i.remarkGroup !== LF.buyerUpdate) return false;
-      if (LF.buyerUpdate === 'stale' && !i.stale) return false;
+      if (LF.buyerUpdate === 'stale' ? !i.stale : (LF.buyerUpdate && i.remarkGroup !== LF.buyerUpdate)) return false;
       if (LF.fu === 'never' && Number(n.Followup_Count) > 0) return false;
       if (LF.fu === 'escalate' && !i.escalate) return false;
       if (LF.age && !(i.aging > Number(LF.age))) return false;
       return true;
     });
-    const key = { due: (n) => n.Due_Date || '', aging: (n) => inf(n).aging, date: (n) => n.NCR_Date || '' }[LF.sort];
-    const dir = LF.dir === 'asc' ? 1 : -1;
-    list.sort((a, b) => {
-      const x = key(a), y = key(b);
-      if (LF.sort === 'due') { if (!x && y) return 1; if (x && !y) return -1; }
-      return (x < y ? -1 : x > y ? 1 : 0) * dir;
-    });
-    return list;
   }
-  function listBody() {
-    const list = filtered();
-    return `<div class="muted small">${list.length} of ${st.ncrs.length} NCRs · tick rows to follow up / update several at once</div>${fullTable(list, LF.full)}`;
+  const isWaiting = (n) => !inf(n).actionRequired; // followed up, next check date not reached yet
+  function visibleList() {
+    const base = baseList(), q = LF.q.trim();
+    const shown = LF.showWait || q ? base : base.filter((n) => !isWaiting(n));
+    return { base, shown, none: shown.filter((n) => inf(n).remarkGroup === 'none'), has: shown.filter((n) => inf(n).remarkGroup !== 'none') };
   }
+  const oldest = (a, b) => (inf(b).aging || 0) - (inf(a).aging || 0);
+  const allSorted = (list) => {
+    const key = { due: (n) => n.Due_Date || '', aging: (n) => inf(n).aging, date: (n) => n.NCR_Date || '' }[LF.sort], dir = LF.dir === 'asc' ? 1 : -1;
+    return list.slice().sort((a, b) => { const x = key(a), y = key(b); if (LF.sort === 'due') { if (!x && y) return 1; if (x && !y) return -1; } return (x < y ? -1 : x > y ? 1 : 0) * dir; });
+  };
+  // ids behind the "Message buyer" button = what the current tab is showing
+  function currentIds() { const v = visibleList(); return (LF.tab === 'none' ? v.none : LF.tab === 'has' ? v.has : v.shown).map((n) => n.NCR_ID); }
+
+  function openMain() {
+    const v = visibleList(), buyers = S.buyers();
+    const hidden = v.base.length - v.shown.length;
+    const per = {}; baseList().forEach((n) => { const b = buyerOf(n); per[b] = per[b] || { none: 0 }; if (inf(n).remarkGroup === 'none' && (LF.showWait || !isWaiting(n))) per[b].none++; });
+    const names = Object.keys(per).sort((x, y) => per[y].none - per[x].none || x.localeCompare(y));
+    const cur = LF.buyer === '__none' ? NO_BUYER : LF.buyer;
+    const pills = [`<button class="pill${LF.buyer ? '' : ' on'}" data-buyer="">All buyers</button>`].concat(names.map((b) => `<button class="pill${cur === b ? ' on' : ''}" data-buyer="${esc(b === NO_BUYER ? '__none' : b)}">${esc(b)} <b>${per[b].none}</b></button>`)).join('');
+    const tabs = [['none', '1 · No remark', v.none.length], ['has', '2 · Has remark', v.has.length], ['all', 'All open', v.shown.length]]
+      .map(([k, l, n]) => `<button class="tab${LF.tab === k ? ' on' : ''}" data-tab="${k}">${l} <b>${n}</b></button>`).join('');
+    let body;
+    if (LF.tab === 'none') {
+      body = `<section class="block"><h2>No remark — chase these first <span class="count">${v.none.length}</span></h2><p class="hint">The buyer has written nothing in Remarks. Oldest first.</p>${workTable(v.none.slice().sort(oldest), 'Every open NCR has a remark.', 'none', 25)}</section>`;
+    } else if (LF.tab === 'has') {
+      const g = (fn) => v.has.filter(fn).sort(oldest);
+      const parts = [
+        ['rv', 'Buyer updated — read, then ✓ Reviewed', 'Remarks changed since you last reviewed.', g((n) => inf(n).needsReview && inf(n).remarkGroup !== 'jira')],
+        ['pr', 'In progress', 'Remarks written, not finished. Follow up for the next step.', g((n) => inf(n).remarkGroup === 'progress' && !inf(n).needsReview)],
+        ['hd', 'Hold / scrap', 'Waiting for scrap. Cannot close yet.', g((n) => inf(n).remarkGroup === 'hold' && !inf(n).needsReview)],
+        ['jr', 'Closed in Jira — verify and close', 'Remarks say Jira is closed. Tick the rows and press Verify &amp; close.', g((n) => inf(n).remarkGroup === 'jira')],
+      ].filter((x) => x[3].length);
+      body = parts.map(([k, t, h, l]) => `<section class="block"><h2>${t} <span class="count">${l.length}</span></h2><p class="hint">${h}</p>${workTable(l, '', k, 25, true)}</section>`).join('')
+        || '<div class="empty">No NCRs with a remark.</div>';
+    } else {
+      body = `<section class="block"><h2>All open <span class="count">${v.shown.length}</span></h2>${workTable(allSorted(v.shown), 'No open NCRs match.', 'all', 40, true)}</section>`;
+    }
+    return `<div class="pills">${pills}</div>
+      <div class="tabs">${tabs}</div>
+      <div class="row-between wait-line"><span class="muted">${hidden && !LF.showWait ? `${hidden} waiting for their next check date (hidden)` : ''}</span>
+        <span class="inline">${LF.buyer ? `<button class="btn primary" data-action="chase" data-buyer="${esc(cur)}">Message ${esc(cur)} (${currentIds().length})</button>` : ''}</span></div>
+      ${body}`;
+  }
+
   function list() {
+    if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Open NCRs</h1></div>' + emptyState() };
     const s = st.settings;
     const sel = (id, label, html) => `<label>${label}<select id="${id}">${html}</select></label>`;
     const o = (pairs, cur) => pairs.map(([v, l]) => `<option value="${v}"${cur === v ? ' selected' : ''}>${l}</option>`).join('');
-    const buyers = S.buyers();
-    return { html: `<div class="page-head"><h1>Open NCRs</h1><button class="btn primary" data-action="add">+ Add NCR</button></div>
+    const total = open().length, noRem = open().filter((n) => inf(n).remarkGroup === 'none').length;
+    return { html: `<div class="page-head"><div><h1>Open NCRs</h1><div class="muted">${total} open · <b>${noRem}</b> with no remark</div></div><button class="btn primary" data-action="add">+ Add NCR</button></div>
       <div class="card filters">
         <label class="grow">Search<input id="f-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(LF.q)}"></label>
-        ${sel('f-buyer', 'Buyer', `<option value="">All</option>${buyers.length < st.ncrs.filter((n) => !n.Buyer).length + buyers.length ? '<option value="__none"' + (LF.buyer === '__none' ? ' selected' : '') + '>(No buyer)</option>' : ''}${options(buyers, LF.buyer)}`)}
-        ${sel('f-show', 'Show', o([['open', 'All open'], ['action', 'Needs my action'], ['waiting', 'Waiting (not due)'], ['ready', 'Ready to Close']], LF.show))}
-        ${sel('f-bu', 'Buyer update', o([['', 'Any'], ['none', 'No update'], ['progress', 'In progress'], ['hold', 'Hold / scrap'], ['jira', 'Closed in Jira'], ['stale', 'Stale']], LF.buyerUpdate))}
-        <label class="check"><input type="checkbox" id="f-full"${LF.full ? ' checked' : ''}> All columns</label>
+        <label class="check"><input type="checkbox" id="f-wait"${LF.showWait ? ' checked' : ''}> Include NCRs waiting for next check</label>
         <button class="btn" id="f-clear">Clear</button>
         <details class="full-row"><summary>More filters &amp; sorting</summary><div class="filters inner">
-          ${sel('f-status', 'Status', options(L.STATUSES, LF.status, 'Any'))}
+          ${sel('f-status', 'Status', options(L.STATUSES.filter((x) => x !== 'Closed'), LF.status, 'Any'))}
           ${sel('f-owner', 'Owner', options(S.owners(), LF.owner, 'All'))}
           ${sel('f-waiting', 'Waiting For', `<option value="">All</option><option value="__none"${LF.waiting === '__none' ? ' selected' : ''}>Not set</option>${options(s.waitingFor, LF.waiting)}`)}
           ${sel('f-disposition', 'Disposition', options(s.dispositions, LF.disposition, 'All'))}
           ${sel('f-due', 'Next check / Due', o([['', 'Any'], ['overdue', 'Overdue'], ['today', 'Today'], ['soon', 'Due soon'], ['week', 'Next 7 days'], ['none', 'Not set']], LF.due))}
-          ${sel('f-sort', 'Sort by', o([['due', 'Due Date'], ['aging', 'Aging'], ['date', 'NCR Date']], LF.sort))}
-          <button class="btn" id="f-dir" title="Toggle direction">${LF.dir === 'asc' ? '↑ Asc' : '↓ Desc'}</button>
-          <label class="check"><input type="checkbox" id="f-over"${LF.overdueOnly ? ' checked' : ''}> Overdue only</label></div></details>
+          ${sel('f-bu', 'Remark type', o([['', 'Any'], ['progress', 'In progress'], ['hold', 'Hold / scrap'], ['jira', 'Closed in Jira'], ['stale', 'Stale']], LF.buyerUpdate))}
+          ${sel('f-sort', 'Sort “All open” by', o([['due', 'Next check'], ['aging', 'Aging'], ['date', 'NCR date']], LF.sort))}
+          <button class="btn" id="f-dir" title="Toggle direction">${LF.dir === 'asc' ? '↑ Asc' : '↓ Desc'}</button></div></details>
       </div>
-      <div class="legend">🔴 Overdue &nbsp; 🆕 New &nbsp; 💬 Buyer updated &nbsp; 🟡 Due Soon &nbsp; 🟢 Waiting / On Track &nbsp; 🔵 Ready to Close &nbsp; ⚫ Closed</div>
-      <div id="list-body">${listBody()}</div>`,
+      <div id="open-main">${openMain()}</div>`,
     bind(root) {
-      const refresh = () => { root.querySelector('#list-body').innerHTML = listBody(); };
-      const map = { 'f-q': 'q', 'f-buyer': 'buyer', 'f-show': 'show', 'f-bu': 'buyerUpdate', 'f-status': 'status', 'f-owner': 'owner', 'f-waiting': 'waiting', 'f-disposition': 'disposition', 'f-due': 'due', 'f-sort': 'sort' };
+      const main = root.querySelector('#open-main');
+      const refresh = () => { main.innerHTML = openMain(); };
+      const map = { 'f-q': 'q', 'f-status': 'status', 'f-owner': 'owner', 'f-waiting': 'waiting', 'f-disposition': 'disposition', 'f-due': 'due', 'f-bu': 'buyerUpdate', 'f-sort': 'sort' };
       Object.keys(map).forEach((id) => root.querySelector('#' + id).addEventListener('input', (e) => { LF[map[id]] = e.target.value; refresh(); }));
-      root.querySelector('#f-over').addEventListener('change', (e) => { LF.overdueOnly = e.target.checked; refresh(); });
-      root.querySelector('#f-full').addEventListener('change', (e) => { LF.full = e.target.checked; refresh(); });
+      root.querySelector('#f-wait').addEventListener('change', (e) => { LF.showWait = e.target.checked; refresh(); });
       root.querySelector('#f-dir').addEventListener('click', (e) => { LF.dir = LF.dir === 'asc' ? 'desc' : 'asc'; e.target.textContent = LF.dir === 'asc' ? '↑ Asc' : '↓ Desc'; refresh(); });
       root.querySelector('#f-clear').addEventListener('click', () => { setFilter({}); NCR.app.render(); });
+      main.addEventListener('click', (e) => { // pills and tabs live inside the refreshed area
+        const b = e.target.closest('[data-buyer].pill'), t = e.target.closest('[data-tab]');
+        if (b) { LF.buyer = b.dataset.buyer; refresh(); } else if (t) { LF.tab = t.dataset.tab; refresh(); }
+      });
     },
-    refresh: () => { const el = document.querySelector('#list-body'); if (el) el.innerHTML = listBody(); } };
+    refresh: () => { const el = document.querySelector('#open-main'); if (el) el.innerHTML = openMain(); } };
   }
 
   // ---------- detail ----------
@@ -487,5 +476,5 @@ window.NCR = window.NCR || {};
     } };
   }
 
-  NCR.views = { esc, options, withCurrent, home, closedPage, today, list, CF, detail, importPage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, buyerOf, open, NO_BUYER, filtered };
+  NCR.views = { esc, options, withCurrent, home, closedPage, list, currentIds, CF, detail, importPage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, buyerOf, open, NO_BUYER };
 })(window.NCR);

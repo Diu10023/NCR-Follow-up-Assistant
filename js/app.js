@@ -13,7 +13,7 @@
   function render() {
     if (!st.loaded) { main.innerHTML = `<div class="empty">${st.error ? esc(st.error) : 'Loading…'}</div>`; return; }
     const { page, arg } = route();
-    const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, today: V.today, list: V.list, ncr: () => V.detail(arg), import: V.importPage, settings: V.settings };
+    const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, settings: V.settings };
     current = (views[page] || V.home)();
     current.closed = page === 'ncr' && (S.getNcr(arg) || {}).Status === 'Closed';
     main.innerHTML = current.html;
@@ -24,7 +24,7 @@
   }
 
   function status() {
-    const open = st.ncrs.filter((n) => n.Status !== 'Closed' && V.inf(n).actionRequired).length;
+    const open = st.ncrs.filter((n) => n.Status !== 'Closed' && V.inf(n).remarkGroup === 'none').length; // priority 1: no remark
     $('#today-badge').textContent = open || '';
     const el = $('#sync');
     el.className = 'sync' + (st.error ? ' err' : '');
@@ -119,7 +119,7 @@
       <label>Date<input type="date" name="date" value="${L.todayISO()}" required></label>
       <label>Person / department<input name="by" value="${esc(who)}"></label>
       <label class="full">Action / note *<input name="action" required value="${esc('Asked ' + who + ' for status update')}"></label>
-      <label class="full">Next check date * <span class="muted">– the NCR leaves Today until this date</span>
+      <label class="full">Next check date * <span class="muted">– the NCR is hidden from Open NCRs until this date</span>
         <div class="inline"><input type="date" name="nextDate" id="nd" value="${nextDefault}" required>
         ${[3, 7, 14].map((d) => `<button type="button" class="btn sm" data-plus="${d}">+${d}d</button>`).join('')}</div></label>
       <label>Waiting For<select name="waiting">${V.options(V.withCurrent(s.waitingFor, allWaiting.length === 1 ? allWaiting[0] : ''), allWaiting.length === 1 ? allWaiting[0] : '', one ? '— unchanged —' : '— unchanged —')}</select></label>
@@ -219,7 +219,7 @@
     selsection: (el) => { (V.sectionIds[el.dataset.key] || []).forEach((id) => V.SEL.add(id)); window.__keepScroll = window.scrollY; render(); },
     reviewed: (el) => { S.markReviewed([el.dataset.id], plusDays(st.settings.defaultCheckDays)); toast(`Reviewed – next check in ${st.settings.defaultCheckDays} days`); },
     chase: (el) => {
-      const ids = V.open().filter((n) => V.buyerOf(n) === el.dataset.buyer && V.inf(n).actionRequired).map((n) => n.NCR_ID);
+      const ids = V.currentIds();
       if (ids.length) followupModal(ids);
     },
     close: (el) => closeModal([el.dataset.id]),
