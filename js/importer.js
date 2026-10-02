@@ -92,6 +92,7 @@ window.NCR = window.NCR || {};
       const rec = { NCR_No: no };
       ['Item_No', 'Batch_No', 'Supplier', 'Buyer', 'Defect', 'Quantity', 'Disposition', 'Buyer_Remark'].forEach((k) => { rec[k] = String(get(k)).trim(); });
       rec.Closed = isClosedValue(get('Closed'));
+      rec.RemarkMapped = col.Buyer_Remark >= 0;
       rec.NCR_Date = parseDate(get('NCR_Date'));
       if (get('NCR_Date') !== '' && !rec.NCR_Date) bad.push({ row: table.headerRow + 1 + i, reason: 'Unreadable date "' + get('NCR_Date') + '" (NCR ' + no + ')' });
       out.push(rec);
@@ -99,7 +100,7 @@ window.NCR = window.NCR || {};
     return { records: out, bad };
   }
 
-  const UPDATABLE = ['Item_No', 'Batch_No', 'Supplier', 'Buyer', 'NCR_Date', 'Defect', 'Quantity', 'Buyer_Remark'];
+  const UPDATABLE = ['Item_No', 'Batch_No', 'Supplier', 'Buyer', 'NCR_Date', 'Defect', 'Quantity'];
 
   // Compare against existing NCRs (key = NCR No., case-insensitive). Follow-up fields are never touched.
   function plan(records, existing) {
@@ -113,6 +114,8 @@ window.NCR = window.NCR || {};
       if (r.Closed && old.Status !== 'Closed') closedInFile.push(old);
       const changes = [];
       UPDATABLE.forEach((f) => { if (r[f] && String(r[f]) !== String(old[f] || '')) changes.push({ field: f, from: old[f] || '', to: r[f] }); });
+      // Remarks mirror the file: a change (including the buyer clearing it) is recorded, never silently lost.
+      if (r.RemarkMapped && (r.Buyer_Remark || '') !== String(old.Buyer_Remark || '').trim()) changes.push({ field: 'Buyer_Remark', from: old.Buyer_Remark || '', to: r.Buyer_Remark || '' });
       ['Disposition'].forEach((f) => { if (r[f] && !old[f]) changes.push({ field: f, from: '', to: r[f] }); });
       if (changes.length) updated.push({ rec: r, old, changes }); else unchanged.push(old);
     });
@@ -124,13 +127,14 @@ window.NCR = window.NCR || {};
   function apply(p, opts) {
     const ncrs = [], history = [];
     const now = L.nowStamp(), today = L.todayISO();
-    const H = (n, action) => history.push({ History_ID: L.uid('H'), NCR_ID: n.NCR_ID, NCR_No: n.NCR_No, Date: today, Followup_No: '', Action: action, Waiting_For: '', Remark: '', Created_By: 'Import', Created_At: now });
+    const H = (n, action, remark, by) => history.push({ History_ID: L.uid('H'), NCR_ID: n.NCR_ID, NCR_No: n.NCR_No, Date: today, Followup_No: '', Action: action, Waiting_For: '', Remark: remark || '', Created_By: by || 'Import', Created_At: now });
     p.added.forEach((r) => {
       const n = {}; NCR.store.NCR_FIELDS.forEach((f) => { n[f] = ''; });
       Object.assign(n, r, { NCR_ID: L.uid('NCR'), Status: 'Not Started', Followup_Count: 0, Created_At: now, Updated_At: now });
       n.Aging = L.daysBetween(n.NCR_Date, today);
       if (n.Buyer_Remark) n.Buyer_Remark_Date = today;
-      delete n.Closed; ncrs.push(n); H(n, 'NCR imported from Excel');
+      delete n.RemarkMapped; delete n.Closed; ncrs.push(n); H(n, 'NCR imported from Excel');
+      if (n.Buyer_Remark) H(n, 'Buyer update (Remarks): ' + n.Buyer_Remark, '', 'Buyer (Excel)');
     });
     p.updated.forEach(({ rec, old, changes }) => {
       const n = Object.assign({}, old);
@@ -138,7 +142,10 @@ window.NCR = window.NCR || {};
       n.Aging = L.daysBetween(n.NCR_Date, n.Status === 'Closed' ? n.Closed_Date || today : today);
       n.Updated_At = now;
       const br = changes.find((c) => c.field === 'Buyer_Remark'), others = changes.filter((c) => c.field !== 'Buyer_Remark');
-      if (br) { n.Buyer_Remark_Date = today; H(n, 'Buyer update (Remarks): ' + br.to); }
+      if (br) {
+        n.Buyer_Remark_Date = today;
+        H(n, br.to ? 'Buyer update (Remarks): ' + br.to : 'Buyer cleared Remarks', br.from ? 'Previous: ' + br.from : '', 'Buyer (Excel)');
+      }
       if (others.length) H(n, 'Updated from Excel: ' + others.map((c) => c.field.replace('_', ' ')).join(', '));
       ncrs.push(n);
     });

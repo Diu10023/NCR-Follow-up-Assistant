@@ -12,6 +12,7 @@ window.NCR = window.NCR || {};
     owners: [],
     dueSoonDays: 2,
     escalationThreshold: 3,
+    buyerStaleDays: 7,
     agingBands: [
       { max: 7, label: 'Normal', cls: 'age-normal' },
       { max: 14, label: 'Follow-up', cls: 'age-followup' },
@@ -62,6 +63,8 @@ window.NCR = window.NCR || {};
     const dueSoon = !closed && dueDiff !== null && dueDiff >= 1 && dueDiff <= s.dueSoonDays;
     const missingNext = !closed && !ready && !n.Next_Action;
     const noUpdate = !closed && !String(n.Buyer_Remark || '').trim(); // buyer has not written progress in Remarks
+    const staleDays = !closed && !noUpdate && n.Buyer_Remark_Date ? daysBetween(n.Buyer_Remark_Date, today) : null;
+    const stale = staleDays !== null && staleDays >= s.buyerStaleDays;
     const count = Number(n.Followup_Count) || 0;
     const escalate = !closed && count >= s.escalationThreshold;
     let state = 'ontrack';
@@ -70,8 +73,8 @@ window.NCR = window.NCR || {};
     else if (ready) state = 'ready';
     else if (dueToday || dueSoon) state = 'soon';
     const band = agingBand(aging, s);
-    const actionRequired = !closed && (overdue || dueToday || ready || missingNext || noUpdate);
-    return { closed, aging, dueDiff, ready, overdue, dueToday, dueSoon, missingNext, noUpdate, count, escalate, state, band, actionRequired };
+    const actionRequired = !closed && (overdue || dueToday || ready || missingNext || noUpdate || stale);
+    return { closed, aging, dueDiff, ready, overdue, dueToday, dueSoon, missingNext, noUpdate, stale, staleDays, count, escalate, state, band, actionRequired };
   }
 
   const STATE_META = {
@@ -105,7 +108,7 @@ window.NCR = window.NCR || {};
     lines.push(`Due Date: ${n.Due_Date ? fmtDate(n.Due_Date) : 'Not set'}`);
     if (n.Waiting_For) lines.push(`Waiting For: ${n.Waiting_For}`);
     lines.push(`Follow-up #${count}`);
-    if (n.Buyer_Remark) lines.push(`Latest Remarks: ${n.Buyer_Remark}`);
+    if (n.Buyer_Remark) lines.push(`Latest Remarks: ${n.Buyer_Remark}` + (n.Buyer_Remark_Date ? ` (updated ${fmtDate(n.Buyer_Remark_Date)})` : ''));
     else lines.push('Remarks: no progress update recorded yet');
     lines.push('');
     lines.push('"Could you please confirm the current status and next action for this NCR?"');

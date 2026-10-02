@@ -25,7 +25,7 @@ window.NCR = window.NCR || {};
   function remarkText(n, i) {
     if (i.closed) return n.Buyer_Remark ? `<span title="${esc(n.Buyer_Remark)}">${esc(n.Buyer_Remark)}</span>` : '–';
     if (i.noUpdate) return '<span class="chip age-escalation">📭 No buyer update</span>';
-    return `<span title="${esc(n.Buyer_Remark)}">${esc(n.Buyer_Remark)}</span>${n.Buyer_Remark_Date ? `<div class="sub">${L.fmtDate(n.Buyer_Remark_Date)}</div>` : ''}`;
+    return `<span title="${esc(n.Buyer_Remark)}">${esc(n.Buyer_Remark)}</span>${n.Buyer_Remark_Date ? `<div class="sub">${L.fmtDate(n.Buyer_Remark_Date)}</div>` : ''}${i.stale ? `<div><span class="chip age-attention" title="Remarks unchanged for ${i.staleDays} days">⏳ No change ${i.staleDays}d</span></div>` : ''}`;
   }
   const countText = (n, i) => `${i.count}${i.escalate ? ' <span class="chip age-escalation" title="Escalation Recommended">⚠️ Escalate</span>' : ''}`;
 
@@ -71,6 +71,7 @@ window.NCR = window.NCR || {};
       ready: pick((x) => x.i.ready),
       missing: pick((x) => x.i.missingNext),
       noUpdate: pick((x) => x.i.noUpdate).sort(byDue),
+      stale: pick((x) => x.i.stale).sort((a, b) => String(a.Buyer_Remark_Date).localeCompare(String(b.Buyer_Remark_Date))),
       action: pick((x) => x.i.actionRequired).sort((a, b) => {
         const rank = (n) => { const i = inf(n); return i.overdue ? 0 : i.dueToday ? 1 : i.ready ? 2 : 3; };
         return rank(a) - rank(b) || byDue(a, b);
@@ -100,8 +101,9 @@ window.NCR = window.NCR || {};
       </div>
       ${b.missing.length ? `<div class="alert warn">⚠️ ${b.missing.length} open NCR${b.missing.length > 1 ? 's have' : ' has'} no Next Action: ${b.missing.slice(0, 6).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(', ')}${b.missing.length > 6 ? '…' : ''}</div>` : ''}
       ${b.noUpdate.length ? `<div class="alert warn">📭 ${b.noUpdate.length} open NCR${b.noUpdate.length > 1 ? 's have' : ' has'} no buyer update in Remarks — QA must follow up. <a href="#/list" data-filter='${esc(JSON.stringify({ status: 'active', buyerUpdate: 'none' }))}'>View list</a></div>` : ''}
+      ${b.stale.length ? `<div class="alert warn">⏳ ${b.stale.length} NCR${b.stale.length > 1 ? 's have' : ' has'} had no buyer update for ${st.settings.buyerStaleDays}+ days. <a href="#/list" data-filter='${esc(JSON.stringify({ status: 'active', buyerUpdate: 'stale' }))}'>View list</a></div>` : ''}
       <div class="grid2">
-        <section class="card"><h2>Action Required <span class="count">${b.action.length}</span></h2><p class="hint">Overdue, due today, ready to close, missing a Next Action, or no buyer update.</p>${compactTable(b.action.slice(0, 10), 'Nothing needs action today.')}${b.action.length > 10 ? '<a href="#/today">See all on Today →</a>' : ''}</section>
+        <section class="card"><h2>Action Required <span class="count">${b.action.length}</span></h2><p class="hint">Overdue, due today, ready to close, missing a Next Action, or no buyer update, or a buyer update gone stale.</p>${compactTable(b.action.slice(0, 10), 'Nothing needs action today.')}${b.action.length > 10 ? '<a href="#/today">See all on Today →</a>' : ''}</section>
         <section class="card"><h2>Waiting For</h2><p class="hint">Where open NCRs are blocked.</p><div class="waiting">${wf || '<div class="empty">No open NCRs.</div>'}</div></section>
       </div>
       <section class="card"><h2>🔴 Overdue NCRs <span class="count">${b.overdue.length}</span></h2>${compactTable(b.overdue, 'No overdue NCRs.')}</section>
@@ -117,6 +119,7 @@ window.NCR = window.NCR || {};
       ${sec('🟠 Due Soon', b.soon, 'Nothing due in the next ' + st.settings.dueSoonDays + ' days.')}
       ${sec('🔵 Ready to Close', b.ready, 'Nothing waiting for QA verification.')}
       ${sec('📭 No Buyer Update (Remarks empty) – QA follows up', b.noUpdate, 'Every open NCR has a buyer update.')}
+      ${sec('⏳ Buyer Update Stale (Remarks unchanged ' + st.settings.buyerStaleDays + '+ days)', b.stale, 'No stale buyer updates.')}
       ${b.missing.length ? sec('⚠️ Missing Next Action', b.missing) : ''}` };
   }
 
@@ -136,6 +139,7 @@ window.NCR = window.NCR || {};
       if (LF.disposition && n.Disposition !== LF.disposition) return false;
       if (LF.overdueOnly && !i.overdue) return false;
       if (LF.buyerUpdate === 'none' && !(String(n.Buyer_Remark || '').trim() === '')) return false;
+      if (LF.buyerUpdate === 'stale' && !i.stale) return false;
       if (LF.buyerUpdate === 'has' && String(n.Buyer_Remark || '').trim() === '') return false;
       if (LF.due === 'overdue' && !i.overdue) return false;
       if (LF.due === 'today' && !i.dueToday) return false;
@@ -169,7 +173,7 @@ window.NCR = window.NCR || {};
         ${sel('f-waiting', 'Waiting For', `<option value="">All</option><option value="__none"${LF.waiting === '__none' ? ' selected' : ''}>Not set</option>${options(s.waitingFor, LF.waiting)}`)}
         ${sel('f-disposition', 'Disposition', options(s.dispositions, LF.disposition, 'All'))}
         ${sel('f-due', 'Due Date', [['', 'Any'], ['overdue', 'Overdue'], ['today', 'Today'], ['soon', 'Due soon'], ['week', 'Next 7 days'], ['none', 'No due date']].map(([v, l]) => `<option value="${v}"${LF.due === v ? ' selected' : ''}>${l}</option>`).join(''))}
-        ${sel('f-bu', 'Buyer Update', [['', 'Any'], ['none', 'No update'], ['has', 'Has update']].map(([v, l]) => `<option value="${v}"${LF.buyerUpdate === v ? ' selected' : ''}>${l}</option>`).join(''))}
+        ${sel('f-bu', 'Buyer Update', [['', 'Any'], ['none', 'No update'], ['has', 'Has update'], ['stale', 'Stale update']].map(([v, l]) => `<option value="${v}"${LF.buyerUpdate === v ? ' selected' : ''}>${l}</option>`).join(''))}
         ${sel('f-sort', 'Sort by', [['due', 'Due Date'], ['aging', 'Aging'], ['date', 'NCR Date']].map(([v, l]) => `<option value="${v}"${LF.sort === v ? ' selected' : ''}>${l}</option>`).join(''))}
         <button class="btn" id="f-dir" title="Toggle direction">${LF.dir === 'asc' ? '↑ Asc' : '↓ Desc'}</button>
         <label class="check"><input type="checkbox" id="f-over"${LF.overdueOnly ? ' checked' : ''}> Overdue only</label>
@@ -195,7 +199,7 @@ window.NCR = window.NCR || {};
     if (!n) return { html: '<div class="empty">NCR not found. <a href="#/list">Back to list</a></div>' };
     const i = inf(n), s = st.settings;
     const hist = S.historyFor(id).map((h) => `<li><div class="t-date">${L.fmtDate(h.Date)}</div><div class="t-body">
-      ${h.Followup_No ? `<span class="chip fu">Follow-up #${esc(h.Followup_No)}</span> ` : ''}<b>${esc(h.Action)}</b>
+      ${h.Followup_No ? `<span class="chip fu">Follow-up #${esc(h.Followup_No)}</span> ` : ''}${/^Buyer /.test(h.Action) ? '<span class="chip age-followup">Buyer</span> ' : ''}<b>${esc(h.Action)}</b>
       ${h.Waiting_For ? `<div class="sub">Waiting for: ${esc(h.Waiting_For)}</div>` : ''}${h.Created_By ? `<div class="sub">By: ${esc(h.Created_By)}</div>` : ''}
       ${h.Remark ? `<div class="sub">${esc(h.Remark)}</div>` : ''}</div></li>`).join('');
     const info = (l, v) => `<div class="kv"><span>${l}</span><b>${esc(v) || '–'}</b></div>`;
@@ -210,6 +214,7 @@ window.NCR = window.NCR || {};
         </div></div>
       ${i.missingNext ? '<div class="alert bad">⚠️ Next Action is required for this NCR.</div>' : ''}
       ${i.noUpdate ? '<div class="alert warn">📭 Buyer has not written any progress in Remarks — QA must follow up with the Buyer.</div>' : ''}
+      ${i.stale ? `<div class="alert warn">⏳ Buyer's Remarks have not changed for ${i.staleDays} days (since ${L.fmtDate(n.Buyer_Remark_Date)}) — follow up with the Buyer.</div>` : ''}
       ${i.escalate ? `<div class="alert warn">⚠️ Escalation Recommended — ${i.count} follow-ups so far (threshold ${s.escalationThreshold}).</div>` : ''}
       ${i.ready ? '<div class="alert info">🔵 Required action is complete. QA to verify evidence and close.</div>' : ''}
       <div class="grid2">
@@ -331,7 +336,8 @@ window.NCR = window.NCR || {};
       <form id="cfg" class="card"><h2>Dropdowns &amp; thresholds</h2><p class="hint">One option per line.</p>
         <div class="form cols3">${ta('dispositions', 'Disposition')}${ta('nextActions', 'Next Action')}${ta('waitingFor', 'Waiting For')}${ta('owners', 'Owners (suggestions)')}</div>
         <div class="form cols3"><label>Due Soon window (days)<input type="number" min="1" name="dueSoonDays" value="${s.dueSoonDays}"></label>
-          <label>Escalate at follow-up count ≥<input type="number" min="1" name="escalationThreshold" value="${s.escalationThreshold}"></label></div>
+          <label>Escalate at follow-up count ≥<input type="number" min="1" name="escalationThreshold" value="${s.escalationThreshold}"></label>
+          <label>Buyer update stale after (days)<input type="number" min="1" name="buyerStaleDays" value="${s.buyerStaleDays}"></label></div>
         <h3>Aging bands (days)</h3><div class="form cols3">
           <label>Normal up to<input type="number" min="1" name="b0" value="${bands[0].max}"></label>
           <label>Follow-up up to<input type="number" min="1" name="b1" value="${bands[1].max}"></label>
@@ -351,7 +357,7 @@ window.NCR = window.NCR || {};
         const b0 = num('b0', 7), b1 = Math.max(b0 + 1, num('b1', 14)), b2 = Math.max(b1 + 1, num('b2', 30));
         const B = L.DEFAULT_SETTINGS.agingBands;
         S.saveSettings({ dispositions: lines('dispositions'), nextActions: lines('nextActions'), waitingFor: lines('waitingFor'), owners: lines('owners'),
-          dueSoonDays: num('dueSoonDays', 2), escalationThreshold: num('escalationThreshold', 3),
+          dueSoonDays: num('dueSoonDays', 2), escalationThreshold: num('escalationThreshold', 3), buyerStaleDays: num('buyerStaleDays', 7),
           agingBands: [Object.assign({}, B[0], { max: b0 }), Object.assign({}, B[1], { max: b1 }), Object.assign({}, B[2], { max: b2 }), B[3]] });
         NCR.app.toast('Settings saved');
       });
