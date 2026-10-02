@@ -18,7 +18,7 @@
     current.closed = page === 'ncr' && (S.getNcr(arg) || {}).Status === 'Closed';
     main.innerHTML = current.html;
     if (current.bind) current.bind(main);
-    document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'ncr' ? (current.closed ? 'closed' : 'list') : page === 'overview' || page === 'dashboard' ? 'home' : page)));
+    document.querySelectorAll('nav a, .rail a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'ncr' ? (current.closed ? 'closed' : 'list') : page === 'overview' || page === 'dashboard' ? 'home' : page)));
     updateBulkBar();
     window.scrollTo(0, window.__keepScroll || 0); window.__keepScroll = 0;
   }
