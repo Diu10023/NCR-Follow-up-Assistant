@@ -31,6 +31,9 @@ Sheets `NCR_Master`, `Followup_History` and `Settings` are created automatically
 4. **In Followed up**, NCRs that need you rise to the top: *Buyer updated*, *Check due*. Press ▸ on a row to see its latest timeline; **Follow up again** records another round.
 5. **Closing happens from the file, not by hand**: at import an NCR is closed when its *Closed* column says yes (any letter case) or its Remarks contain a close keyword such as *Jira* (any letter case, editable in Settings). Closed NCRs go to the Closed page. (Manual *Verify & close* still exists on the NCR page.)
 
+## Hold for scrap and Jira
+Remarks containing **hold** or **scrap** (any letter case) are kept out of To follow up and Followed up and listed on **Hold & Jira → Hold for scrap**. Remarks containing **jira** (any letter case, “JIRA: unable to approve - Closed”) are closed at import and listed on **Hold & Jira → Jira closed** (not on the Closed page). Keywords are editable in Settings; Jira wins if a remark has both.
+
 ## Pages
 Home (by buyer) · To follow up (no remark first) · Followed up (waiting for the next check date) · Closed archive (search/filter/sort) · NCR Detail (follow-up control, history timeline, quick Follow-up message) · Add/Edit NCR · Import Excel · Settings (dropdowns, due-soon window, escalation threshold, aging bands).
 

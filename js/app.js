@@ -13,7 +13,7 @@
   function render() {
     if (!st.loaded) { main.innerHTML = `<div class="empty">${st.error ? esc(st.error) : 'Loading…'}</div>`; return; }
     const { page, arg } = route();
-    const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, followed: V.followedPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, settings: V.settings };
+    const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, followed: V.followedPage, hold: V.holdPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, settings: V.settings };
     current = (views[page] || V.home)();
     current.closed = page === 'ncr' && (S.getNcr(arg) || {}).Status === 'Closed';
     main.innerHTML = (page === 'home' || page === 'overview' || page === 'dashboard' ? '' : '<div class="backbar"><button class="btn sm" data-action="back">← Back</button></div>') + current.html;
@@ -24,10 +24,11 @@
   }
 
   function status() {
-    const openNcrs = st.ncrs.filter((n) => n.Status !== 'Closed');
-    const followed = openNcrs.filter(V.isFollowed).length;
-    $('#today-badge').textContent = openNcrs.length - followed || '0';   // still to follow up
-    $('#fu-badge').textContent = followed || '0';                       // followed up, not closed yet
+    const by = { todo: 0, followed: 0, hold: 0, jira: 0 };
+    st.ncrs.forEach((n) => { const k = V.inf(n).bucket; if (k in by) by[k]++; });
+    $('#today-badge').textContent = by.todo;      // still to follow up
+    $('#fu-badge').textContent = by.followed;     // followed up, not closed yet
+    $('#hold-badge').textContent = by.hold + by.jira;
     const el = $('#sync');
     el.className = 'sync' + (st.error ? ' err' : '');
     el.textContent = st.error ? '⚠️ ' + st.error : st.saving ? 'Saving…' : st.mode === 'sheets' ? '✓ Synced with Google Sheets' : '';
@@ -262,7 +263,9 @@
     if (f) V.setFilter(JSON.parse(f.dataset.filter));
     const w = e.target.closest('[data-wfilter]');
     if (w) V.setWaitFilter(JSON.parse(w.dataset.wfilter));
-    const link = (f || w) && e.target.closest('a');
+    const hj = e.target.closest('[data-hjfilter]');
+    if (hj) V.setHJ(JSON.parse(hj.dataset.hjfilter));
+    const link = (f || w || hj) && e.target.closest('a');
     if (link && link.getAttribute('href') === location.hash) render(); // already on that page: no hashchange will fire
     const row = e.target.closest('tr[data-href]');
     if (row && !e.target.closest('a,button,input,select')) location.hash = row.dataset.href;

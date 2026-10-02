@@ -67,7 +67,6 @@ window.NCR = window.NCR || {};
   const SEG = [
     { k: 'none', label: 'No update', color: 'var(--c-none)', ink: 'var(--i-none)' },
     { k: 'progress', label: 'In progress', color: 'var(--c-progress)', ink: 'var(--i-progress)' },
-    { k: 'hold', label: 'Hold / scrap', color: 'var(--c-hold)', ink: 'var(--i-hold)' },
   ];
   const niceStep = (max) => { const raw = Math.max(1, max) / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
   // bar with only its right (data) end rounded; the baseline end stays square
@@ -121,12 +120,14 @@ window.NCR = window.NCR || {};
   function home() {
     if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Home</h1></div>' + emptyState() };
     const by = {};
-    const row = (name) => (by[name] = by[name] || { name, total: 0, todo: 0, followed: 0, closed: 0, none: 0, progress: 0, hold: 0, noneIds: [] });
+    const row = (name) => (by[name] = by[name] || { name, total: 0, todo: 0, followed: 0, closed: 0, none: 0, progress: 0, hold: 0, jira: 0, noneIds: [] });
     st.ncrs.forEach((n) => {
       const r = row(buyerOf(n)), i = inf(n);
       r.total++;
-      if (i.closed) { r.closed++; return; }
-      if (isFollowed(n)) { r.followed++; return; }       // followed up: waits here until closed
+      if (i.bucket === 'closed') { r.closed++; return; }
+      if (i.bucket === 'jira') { r.jira++; return; }       // "Jira: closed" tab
+      if (i.bucket === 'hold') { r.hold++; return; }       // "Hold for scrap" tab
+      if (i.bucket === 'followed') { r.followed++; return; } // followed up: waits here until closed
       r.todo++; r[i.remarkGroup]++;                       // still to follow up, split by what the remark says
       if (i.remarkGroup === 'none') r.noneIds.push(n);
     });
@@ -136,28 +137,30 @@ window.NCR = window.NCR || {};
     const link = (buyer, group, n, cls) => (n ? `<a href="#/list" data-filter='${esc(JSON.stringify({ buyer: bf(buyer), buyerUpdate: group, tab: group === 'none' ? 'none' : group ? 'has' : 'all' }))}' class="${cls || ''}">${n}</a>` : '<span class="muted">0</span>');
     const body = rows.map((r) => `<tr><td><button class="link tog" data-action="togglebuyer" data-buyer="${esc(r.name)}">${HOME_OPEN.has(r.name) ? '▾' : '▸'}</button> <b>${esc(r.name)}</b></td>
         <td>${r.total}</td><td>${link(r.name, '', r.todo)}</td>
-        <td>${link(r.name, 'none', r.none, 'bad strong')}</td><td>${link(r.name, 'progress', r.progress)}</td><td>${link(r.name, 'hold', r.hold)}</td>
+        <td>${link(r.name, 'none', r.none, 'bad strong')}</td><td>${link(r.name, 'progress', r.progress)}</td>
         <td>${r.followed ? `<a href="#/followed" data-wfilter='${esc(JSON.stringify({ buyer: bf(r.name) }))}'>${r.followed}</a>` : '<span class="muted">0</span>'}</td>
+        <td>${r.hold ? `<a href="#/hold" data-hjfilter='${esc(JSON.stringify({ tab: 'hold', buyer: bf(r.name) }))}'>${r.hold}</a>` : '<span class="muted">0</span>'}</td>
+        <td>${r.jira ? `<a href="#/hold" data-hjfilter='${esc(JSON.stringify({ tab: 'jira', buyer: bf(r.name) }))}'>${r.jira}</a>` : '<span class="muted">0</span>'}</td>
         <td>${r.closed ? `<a href="#/closed" data-closed="${esc(r.name)}">${r.closed}</a>` : '<span class="muted">0</span>'}</td></tr>
-      ${HOME_OPEN.has(r.name) ? `<tr class="sub-row"><td colspan="8"><div class="sub">No remark, still to follow up (${r.none}):</div><div class="nolist">${r.noneIds.length ? r.noneIds.slice().sort(byOldest).slice(0, 60).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(' ') + (r.noneIds.length > 60 ? ' …' : '') : '<span class="muted">none</span>'}</div></td></tr>` : ''}`).join('');
+      ${HOME_OPEN.has(r.name) ? `<tr class="sub-row"><td colspan="10"><div class="sub">No remark, still to follow up (${r.none}):</div><div class="nolist">${r.noneIds.length ? r.noneIds.slice().sort(byOldest).slice(0, 60).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(' ') + (r.noneIds.length > 60 ? ' …' : '') : '<span class="muted">none</span>'}</div></td></tr>` : ''}`).join('');
     const big = (v, l, href, attr) => `<a class="big" href="${href}" ${attr || ''}><b>${v}</b><span>${l}</span></a>`;
     return { html: `<div class="page-head"><h1>Home</h1><span class="muted">${L.fmtDate(L.todayISO())}</span></div>
-      <div class="bigs">${big(tot.total, 'Total', '#/home')}${big(tot.todo, 'To follow up', '#/list', `data-filter='${esc(JSON.stringify({ tab: 'none' }))}'`)}${big(tot.followed, 'Followed up', '#/followed', `data-wfilter='{}'`)}${big(tot.closed, 'Closed', '#/closed', 'data-closed=""')}</div>
+      <div class="bigs">${big(tot.total, 'Total', '#/home')}${big(tot.todo, 'To follow up', '#/list', `data-filter='${esc(JSON.stringify({ tab: 'none' }))}'`)}${big(tot.followed, 'Followed up', '#/followed', `data-wfilter='{}'`)}${big(tot.hold, 'Hold for scrap', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'hold' }))}'`)}${big(tot.jira, 'Jira closed', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'jira' }))}'`)}${big(tot.closed, 'Closed', '#/closed', 'data-closed=""')}</div>
       <div class="charts">
         <section class="block"><h2>To follow up, by buyer</h2><p class="hint">Each bar is one buyer's NCRs still to follow up, split by what their Remarks say. Exact numbers are in the table below.</p>${buyerChart(rows)}</section>
         <section class="block"><h2>How long they have been open</h2><p class="hint">All open NCRs grouped by days since the NCR date.</p>${agingChart(open())}</section>
       </div>
-      <section class="block"><h2>By buyer</h2><p class="hint">To follow up = No remark + In progress + Hold / scrap. <b>Followed up</b> are waiting for their next check date. Click a number to see those NCRs; ▸ lists the NCRs with no remark.</p>
-        <div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th>Total</th><th>To follow up</th><th>No remark</th><th>In progress</th><th>Hold / scrap</th><th>Followed up</th><th>Closed</th></tr></thead>
-        <tbody>${body}<tr class="total"><td><b>Total</b></td><td>${tot.total}</td><td>${tot.todo}</td><td>${tot.none}</td><td>${tot.progress}</td><td>${tot.hold}</td><td>${tot.followed}</td><td>${tot.closed}</td></tr></tbody></table></div>
-        <p class="hint">Hold / scrap = Remarks contain “${esc(st.settings.holdKeywords.join('”, “'))}”. NCRs are closed automatically at import when Closed = Yes, or when Remarks contain “${esc(st.settings.jiraKeywords.join('”, “'))}”. Change the keywords in Settings.</p></section>` };
+      <section class="block"><h2>By buyer</h2><p class="hint">To follow up = No remark + In progress. <b>Followed up</b> are waiting for their next check date. Click a number to see those NCRs; ▸ lists the NCRs with no remark.</p>
+        <div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th>Total</th><th>To follow up</th><th>No remark</th><th>In progress</th><th>Followed up</th><th>Hold for scrap</th><th>Jira closed</th><th>Closed</th></tr></thead>
+        <tbody>${body}<tr class="total"><td><b>Total</b></td><td>${tot.total}</td><td>${tot.todo}</td><td>${tot.none}</td><td>${tot.progress}</td><td>${tot.followed}</td><td>${tot.hold}</td><td>${tot.jira}</td><td>${tot.closed}</td></tr></tbody></table></div>
+        <p class="hint">Hold for scrap = Remarks contain “${esc(st.settings.holdKeywords.join('”, “'))}”. Jira closed = Remarks contain “${esc(st.settings.jiraKeywords.join('”, “'))}”; those NCRs are closed when the file is imported. Any letter case. Change the keywords in Settings.</p></section>` };
   }
 
   // ---------- Closed archive ----------
   const CF = { q: '', buyer: '', month: '' };
   function closedList() {
     const q = CF.q.trim().toLowerCase();
-    return st.ncrs.filter((n) => n.Status === 'Closed' && (!q || `${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))
+    return st.ncrs.filter((n) => inf(n).bucket === 'closed' && (!q || `${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))
       && (!CF.buyer || buyerOf(n) === CF.buyer))
       .sort((a, b) => String(b.NCR_Date).localeCompare(String(a.NCR_Date)));
   }
@@ -169,9 +172,9 @@ window.NCR = window.NCR || {};
     return `<div class="muted small">${list.length} closed</div><div class="table-wrap"><table class="grid"><thead><tr><th>NCR</th><th>Buyer</th><th>Defect</th><th>Created</th><th>Follow-ups</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   function closedPage() {
-    const done = st.ncrs.filter((n) => n.Status === 'Closed');
+    const done = st.ncrs.filter((n) => inf(n).bucket === 'closed');
     const buyers = [...new Set(done.map(buyerOf))].sort();
-    return { html: `<div class="page-head"><h1>Closed</h1><span class="muted">${done.length} closed</span></div>
+    return { html: `<div class="page-head"><h1>Closed</h1><span class="muted">${done.length} closed · <a href="#/hold" data-hjfilter='{"tab":"jira"}'>${st.ncrs.filter((n) => inf(n).bucket === 'jira').length} Jira closed</a></span></div>
       <div class="filters"><label class="grow">Search<input id="c-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(CF.q)}"></label>
         <label>Buyer<select id="c-buyer">${options(buyers, CF.buyer, 'All')}</select></label></div>
       <div id="closed-body">${closedBody()}</div>`,
@@ -192,7 +195,7 @@ window.NCR = window.NCR || {};
     const q = LF.q.trim().toLowerCase();
     return st.ncrs.filter((n) => {
       const i = inf(n);
-      if (i.closed) return false; // closed NCRs live on the Closed page
+      if (i.bucket !== 'todo' && i.bucket !== 'followed') return false; // closed, Hold for scrap and Jira NCRs live on their own pages
       if (q && !(`${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))) return false;
       if (!ignoreBuyer && LF.buyer && (LF.buyer === '__none' ? n.Buyer : n.Buyer !== LF.buyer)) return false;
       if (LF.show === 'action' && !i.actionRequired) return false;
@@ -214,7 +217,7 @@ window.NCR = window.NCR || {};
     });
   }
   // Once followed up, an open NCR stays in Followed up until it is closed, so its timeline keeps building across weekly imports.
-  const isFollowed = (n) => !inf(n).closed && (Number(n.Followup_Count) || 0) > 0;
+  const isFollowed = (n) => inf(n).bucket === 'followed';
   function visibleList() {
     const base = baseList(), q = LF.q.trim();
     const shown = q ? base : base.filter((n) => !isFollowed(n)); // searching also finds NCRs that were already followed up
@@ -238,7 +241,7 @@ window.NCR = window.NCR || {};
   // how many NCRs of this buyer are not closed, and where they are
   function buyerLine(buyer) {
     if (!buyer) return '';
-    const mine = open().filter((n) => (buyer === '__none' ? !n.Buyer : n.Buyer === buyer)), f = mine.filter(isFollowed).length;
+    const mine = st.ncrs.filter((n) => ['todo', 'followed'].includes(inf(n).bucket) && (buyer === '__none' ? !n.Buyer : n.Buyer === buyer)), f = mine.filter(isFollowed).length;
     return `<div class="buyer-line"><b>${esc(buyer === '__none' ? NO_BUYER : buyer)}</b>: <a href="#/list" data-filter='${esc(JSON.stringify({ buyer }))}'>${mine.length - f} to follow up</a> · <a href="#/followed" data-wfilter='${esc(JSON.stringify({ buyer }))}'>${f} followed up</a> · <b>${mine.length}</b> not closed</div>`;
   }
 
@@ -275,7 +278,7 @@ window.NCR = window.NCR || {};
     const s = st.settings;
     const sel = (id, label, html) => `<label>${label}<select id="${id}">${html}</select></label>`;
     const o = (pairs, cur) => pairs.map(([v, l]) => `<option value="${v}"${cur === v ? ' selected' : ''}>${l}</option>`).join('');
-    const todo = open().filter((n) => !isFollowed(n)).length, noRem = open().filter((n) => !isFollowed(n) && inf(n).remarkGroup === 'none').length;
+    const todo = st.ncrs.filter((n) => inf(n).bucket === 'todo').length, noRem = st.ncrs.filter((n) => inf(n).bucket === 'todo' && inf(n).remarkGroup === 'none').length;
     return { html: `<div class="page-head"><div><h1>To follow up</h1><div class="muted"><b>${todo}</b> to follow up · <b>${noRem}</b> with no remark</div></div><button class="btn primary" data-action="add">+ Add NCR</button></div>
       <div class="card filters">
         <label class="grow">Search<input id="f-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(LF.q)}"></label>
@@ -320,7 +323,7 @@ window.NCR = window.NCR || {};
   }
   function followedList() {
     const q = WF.q.trim().toLowerCase();
-    return open().filter((n) => isFollowed(n) && (!q || `${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))
+    return st.ncrs.filter((n) => isFollowed(n) && (!q || `${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))
       && (!WF.buyer || (WF.buyer === '__none' ? !n.Buyer : n.Buyer === WF.buyer)))
       .sort((a, b) => { const x = attention(a), y = attention(b); return (x ? x.rank : 9) - (y ? y.rank : 9) || (a.Due_Date || '9999').localeCompare(b.Due_Date || '9999') || oldest(a, b); });
   }
@@ -329,7 +332,7 @@ window.NCR = window.NCR || {};
     return h.length ? h.map((x) => `<li><span class="t-date">${L.fmtDate(x.Date)}</span><span>${x.Followup_No ? `<span class="chip fu">Follow-up #${esc(x.Followup_No)}</span> ` : ''}${/^Buyer /.test(x.Action) ? '<span class="chip">Buyer</span> ' : ''}${esc(x.Action)}${x.Remark ? `<span class="sub"> · ${esc(x.Remark)}</span>` : ''}</span></li>`).join('') : '<li class="sub">No history yet.</li>';
   }
   function followedBody() {
-    const all = open().filter(isFollowed), found = followedList();
+    const all = st.ncrs.filter(isFollowed), found = followedList();
     const per = {}; all.forEach((n) => { per[buyerOf(n)] = (per[buyerOf(n)] || 0) + 1; });
     const cnt = { none: found.filter((n) => inf(n).remarkGroup === 'none').length, has: found.filter((n) => inf(n).remarkGroup !== 'none').length, all: found.length };
     const list = WF.tab === 'none' ? found.filter((n) => inf(n).remarkGroup === 'none') : WF.tab === 'has' ? found.filter((n) => inf(n).remarkGroup !== 'none') : found;
@@ -363,6 +366,48 @@ window.NCR = window.NCR || {};
       const main = root.querySelector('#followed-main'), refresh = () => { main.innerHTML = followedBody(); };
       root.querySelector('#w-q').addEventListener('input', (e) => { WF.q = e.target.value; refresh(); });
       main.addEventListener('click', (e) => { const b = e.target.closest('[data-wbuyer]'), t = e.target.closest('[data-wtab]'); if (b) { WF.buyer = b.dataset.wbuyer; refresh(); } else if (t) { WF.tab = t.dataset.wtab; refresh(); } });
+    } };
+  }
+
+  // ---------- Hold for scrap / Jira closed (kept out of the follow-up flow) ----------
+  const HJ = { tab: 'hold', buyer: '', q: '' };
+  function setHJ(f) { Object.assign(HJ, { tab: 'hold', buyer: '', q: '' }, f); }
+  const HJ_TABS = [['hold', 'Hold for scrap'], ['jira', 'Jira closed']];
+  function hjItems(tab, ignoreBuyer) {
+    const q = HJ.q.trim().toLowerCase();
+    return st.ncrs.filter((n) => inf(n).bucket === tab && (!q || `${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))
+      && (ignoreBuyer || !HJ.buyer || (HJ.buyer === '__none' ? !n.Buyer : n.Buyer === HJ.buyer))).sort(oldest);
+  }
+  function holdBody() {
+    const per = {}; hjItems(HJ.tab, true).forEach((n) => { per[buyerOf(n)] = (per[buyerOf(n)] || 0) + 1; });
+    const total = Object.values(per).reduce((x, y) => x + y, 0), list = hjItems(HJ.tab);
+    const tabs = `<div class="tabs">${HJ_TABS.map(([k, l]) => `<button class="tab${HJ.tab === k ? ' on' : ''}" data-hjtab="${k}">${l} <b>${hjItems(k).length}</b></button>`).join('')}</div>`;
+    const isHold = HJ.tab === 'hold';
+    sectionIds.hold = list.map((n) => n.NCR_ID);
+    const rows = list.map((n) => {
+      const i = inf(n);
+      return `<tr data-href="#/ncr/${esc(n.NCR_ID)}">${isHold ? cbCell(n) : '<td class="cb"></td>'}
+        <td class="nowrap"><b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div></td>
+        <td class="wide">${esc(buyerOf(n))}<div class="sub clip">${esc(n.Defect)}</div></td>
+        <td class="remark"><div class="rtext" title="${esc(n.Buyer_Remark)}">${esc(n.Buyer_Remark)}</div></td>
+        ${isHold ? `<td class="nowrap">${i.count} follow-up${i.count === 1 ? '' : 's'}<div class="sub">${n.Last_Followup ? 'last ' + L.fmtDate(n.Last_Followup) : 'never'}</div></td><td class="right"><button class="btn sm" data-action="followup" data-id="${esc(n.NCR_ID)}">Follow-up</button></td>`
+          : `<td>${i.closed ? '<span class="badge b-closed">Closed</span>' : '<span class="badge b-soon">Closes at next import</span>'}</td><td></td>`}</tr>`;
+    }).join('');
+    const head = isHold ? '<th>Follow-ups</th><th></th>' : '<th>Status</th><th></th>';
+    return `${pillsHtml(per, total, HJ.buyer, 'data-hjbuyer')}${tabs}
+      <p class="muted wait-line">${isHold ? 'Remarks contain “' + esc(st.settings.holdKeywords.join('”, “')) + '” (any letter case). Kept out of To follow up and Followed up.' : 'Remarks contain “' + esc(st.settings.jiraKeywords.join('”, “')) + '” (any letter case): “JIRA: unable to approve - Closed”. They are closed when the file is imported and are listed here instead of the Closed page.'}</p>
+      <section class="block">${list.length ? `<div class="table-wrap"><table class="grid compact"><thead><tr><th class="cb">${isHold ? '<input type="checkbox" class="sel-all" title="Select all in this table">' : ''}</th><th>NCR</th><th>Buyer / Defect</th><th>Remark</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`
+        : '<div class="empty">None.</div>'}</section>`;
+  }
+  function holdPage() {
+    if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Hold &amp; Jira</h1></div>' + emptyState() };
+    return { html: `<div class="page-head"><div><h1>Hold &amp; Jira</h1><div class="muted">NCRs whose Remarks say hold / scrap, or Jira. They are not part of the follow-up flow.</div></div></div>
+      <div class="card filters"><label class="grow">Search<input id="h-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(HJ.q)}"></label></div>
+      <div id="hold-main">${holdBody()}</div>`,
+    bind(root) {
+      const main = root.querySelector('#hold-main'), refresh = () => { main.innerHTML = holdBody(); };
+      root.querySelector('#h-q').addEventListener('input', (e) => { HJ.q = e.target.value; refresh(); });
+      main.addEventListener('click', (e) => { const b = e.target.closest('[data-hjbuyer]'), t = e.target.closest('[data-hjtab]'); if (b) { HJ.buyer = b.dataset.hjbuyer; refresh(); } else if (t) { HJ.tab = t.dataset.hjtab; refresh(); } });
     } };
   }
 
@@ -543,5 +588,5 @@ window.NCR = window.NCR || {};
     } };
   }
 
-  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, setWaitFilter, currentIds, CF, detail, importPage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
+  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
 })(window.NCR);

@@ -14,8 +14,8 @@ window.NCR = window.NCR || {};
     escalationThreshold: 3,
     buyerStaleDays: 7,
     defaultCheckDays: 7,
-    holdKeywords: ['hold', 'scrap'], // Remarks containing these = waiting for scrap, cannot close yet
-    jiraKeywords: ['jira'], // a Remarks value containing any of these (any letter case) closes the NCR when the file is imported
+    holdKeywords: ['hold', 'scrap'], // Remarks containing these (any letter case) = waiting for scrap: own tab, kept out of To follow up / Followed up
+    jiraKeywords: ['jira'], // Remarks containing these (any letter case) = "Jira: unable to approve - Closed": closed at import, own tab
     agingBands: [
       { max: 7, label: 'Normal', cls: 'age-normal' },
       { max: 14, label: 'Follow-up', cls: 'age-followup' },
@@ -75,7 +75,10 @@ window.NCR = window.NCR || {};
     const needsReview = !closed && !ready && !notStarted && !!n.Buyer_Remark && !!n.Buyer_Remark_Date && String(n.Buyer_Remark_Date) > String(n.Last_Review || '');
     const rem = String(n.Buyer_Remark || '').toLowerCase();
     const hasKw = (list) => (list || []).some((k) => k && rem.includes(String(k).toLowerCase()));
-    const remarkGroup = closed ? '' : !rem.trim() ? 'none' : hasKw(s.holdKeywords) ? 'hold' : 'progress';
+    const jiraRem = hasKw(s.jiraKeywords), holdRem = hasKw(s.holdKeywords);
+    const remarkGroup = closed ? '' : !rem.trim() ? 'none' : jiraRem ? 'jira' : holdRem ? 'hold' : 'progress';
+    // Which list the NCR lives in. Jira and Hold/scrap remarks are kept out of the normal follow-up flow.
+    const bucket = jiraRem ? 'jira' : closed ? 'closed' : holdRem ? 'hold' : (Number(n.Followup_Count) || 0) > 0 ? 'followed' : 'todo';
     // followed up / reviewed since the buyer's last remark, and the next check date is still ahead: nothing to do yet
     const scheduled = !closed && dueDiff !== null && dueDiff > 0 && (!n.Buyer_Remark_Date || String(n.Last_Review || '') >= String(n.Buyer_Remark_Date));
     const triage = notStarted && !(scheduled && (Number(n.Followup_Count) || 0) > 0); // a followed-up NCR is no longer "new"
@@ -98,7 +101,7 @@ window.NCR = window.NCR || {};
     // primary section on the Today page (each NCR appears once)
     const section = closed ? null : overdue ? 'overdue' : dueToday ? 'today' : ready ? 'ready' : triage ? 'new' : needsReview ? 'review' : dueSoon ? 'soon' : null;
     const band = agingBand(aging, s);
-    return { remarkGroup, notStarted, needsReview, isNew, reasons, section, closed, aging, dueDiff, ready, overdue, dueToday, dueSoon, missingNext, noUpdate, stale, staleDays, count, escalate, state, band, actionRequired };
+    return { bucket, remarkGroup, notStarted, needsReview, isNew, reasons, section, closed, aging, dueDiff, ready, overdue, dueToday, dueSoon, missingNext, noUpdate, stale, staleDays, count, escalate, state, band, actionRequired };
   }
 
   const STATE_META = {
