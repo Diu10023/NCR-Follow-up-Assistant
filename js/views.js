@@ -238,7 +238,7 @@ window.NCR = window.NCR || {};
   }
 
   // ---------- import ----------
-  const imp = { wb: null, name: '', sheet: '', table: null, mapping: {}, opts: { markMissingReady: false }, done: null };
+  const imp = { wb: null, name: '', sheet: '', table: null, mapping: {}, opts: { markMissingReady: false, markClosedReady: true }, done: null };
   function importPage() {
     const I = NCR.importer;
     let body = '';
@@ -256,13 +256,15 @@ window.NCR = window.NCR || {};
           <div class="cards small"><div class="card stat"><div class="num">${p.added.length}</div><div class="lbl">New NCRs</div></div>
           <div class="card stat"><div class="num">${p.updated.length}</div><div class="lbl">Updated</div></div>
           <div class="card stat"><div class="num">${p.unchanged.length}</div><div class="lbl">Unchanged</div></div>
-          <div class="card stat ${p.missing.length ? 'c-soon' : ''}"><div class="num">${p.missing.length}</div><div class="lbl">Open but not in file</div></div></div>
+          <div class="card stat ${p.closedInFile.length ? 'c-ready' : ''}"><div class="num">${p.closedInFile.length}</div><div class="lbl">Closed in file (still open here)</div></div></div>
           <p class="hint">Existing follow-up data (Next Action, Owner, Due Date, Status, history…) is never overwritten. Only raw fields (item, batch, supplier, buyer, date, defect, quantity) are refreshed.</p>
           ${bad.length ? `<details class="alert warn"><summary>${bad.length} row(s) with issues</summary>${bad.slice(0, 20).map((b) => `<div>Row ${b.row}: ${esc(b.reason)}</div>`).join('')}</details>` : ''}
-          ${p.added.length ? `<h3>New</h3><div class="table-wrap"><table class="grid compact"><thead><tr><th>NCR</th><th>Item</th><th>Batch</th><th>Date</th><th>Buyer</th><th>Defect</th><th>Qty</th></tr></thead><tbody>${sample(p.added, (r) => `<tr><td>${esc(r.NCR_No)}</td><td>${esc(r.Item_No)}</td><td>${esc(r.Batch_No)}</td><td>${L.fmtDate(r.NCR_Date)}</td><td>${esc(r.Buyer)}</td><td>${esc(r.Defect)}</td><td>${esc(r.Quantity)}</td></tr>`)}</tbody></table></div>${p.added.length > 8 ? `<div class="muted small">…and ${p.added.length - 8} more</div>` : ''}` : ''}
+          ${p.added.length ? `<h3>New</h3><div class="table-wrap"><table class="grid compact"><thead><tr><th>NCR</th><th>Item</th><th>Batch</th><th>Date</th><th>Buyer</th><th>Defect</th></tr></thead><tbody>${sample(p.added, (r) => `<tr><td>${esc(r.NCR_No)}</td><td>${esc(r.Item_No)}</td><td>${esc(r.Batch_No)}</td><td>${L.fmtDate(r.NCR_Date)}</td><td>${esc(r.Buyer)}</td><td>${esc(r.Defect)}</td></tr>`)}</tbody></table></div>${p.added.length > 8 ? `<div class="muted small">…and ${p.added.length - 8} more</div>` : ''}` : ''}
           ${p.updated.length ? `<h3>Updated</h3>${sample(p.updated, (u) => `<div class="small"><b>${esc(u.rec.NCR_No)}</b>: ${u.changes.map((c) => `${esc(c.field.replace('_', ' '))} "${esc(c.from)}" → "${esc(c.to)}"`).join('; ')}</div>`)}${p.updated.length > 8 ? `<div class="muted small">…and ${p.updated.length - 8} more</div>` : ''}` : ''}
+          ${p.skippedClosed.length ? `<p class="hint">${p.skippedClosed.length} new NCR(s) already Closed in the file are skipped.</p>` : ''}
+          ${p.closedInFile.length ? `<label class="check block"><input type="checkbox" id="imp-closed"${imp.opts.markClosedReady ? ' checked' : ''}> Mark the ${p.closedInFile.length} NCR(s) closed in the file as <b>Ready to Close</b> (QA still verifies and closes): ${esc(p.closedInFile.slice(0, 6).map((n) => n.NCR_No).join(', '))}${p.closedInFile.length > 6 ? '…' : ''}</label>` : ''}
           ${p.missing.length ? `<label class="check block"><input type="checkbox" id="imp-missing"${imp.opts.markMissingReady ? ' checked' : ''}> Mark the ${p.missing.length} open NCR(s) not in this file as <b>Ready to Close</b> (QA still verifies and closes): ${esc(p.missing.slice(0, 6).map((n) => n.NCR_No).join(', '))}${p.missing.length > 6 ? '…' : ''}</label>` : ''}
-          <div class="actions"><button class="btn primary" id="imp-go"${missingReq.length || (!p.added.length && !p.updated.length && !(imp.opts.markMissingReady && p.missing.length)) ? ' disabled' : ''}>Import into NCR Master</button>
+          <div class="actions"><button class="btn primary" id="imp-go"${missingReq.length || (!p.added.length && !p.updated.length && !(imp.opts.markMissingReady && p.missing.length) && !(imp.opts.markClosedReady && p.closedInFile.length)) ? ' disabled' : ''}>Import into NCR Master</button>
           <button class="btn" id="imp-cancel">Cancel</button></div></section>`;
     }
     return { html: `<div class="page-head"><h1>Import from Excel</h1></div>
@@ -288,6 +290,7 @@ window.NCR = window.NCR || {};
       const sh = root.querySelector('#imp-sheet'); if (sh) sh.addEventListener('change', () => pickSheet(sh.value));
       root.querySelectorAll('[data-map]').forEach((s) => s.addEventListener('change', () => { imp.mapping[s.dataset.map] = s.value; NCR.app.render(); }));
       const miss = root.querySelector('#imp-missing'); if (miss) miss.addEventListener('change', () => { imp.opts.markMissingReady = miss.checked; NCR.app.render(); });
+      const cl = root.querySelector('#imp-closed'); if (cl) cl.addEventListener('change', () => { imp.opts.markClosedReady = cl.checked; NCR.app.render(); });
       const cancel = root.querySelector('#imp-cancel'); if (cancel) cancel.addEventListener('click', () => { imp.table = null; imp.wb = null; NCR.app.render(); });
       const go = root.querySelector('#imp-go');
       if (go) go.addEventListener('click', () => {
@@ -295,7 +298,7 @@ window.NCR = window.NCR || {};
         const p = I2.plan(records, st.ncrs), r = I2.apply(p, imp.opts);
         S.saveMany(r.ncrs, r.history);
         S.saveSettings({ importMapping: Object.assign({}, imp.mapping) });
-        imp.done = `${p.added.length} added, ${p.updated.length} updated${imp.opts.markMissingReady ? ', ' + p.missing.length + ' marked Ready to Close' : ''}.`;
+        imp.done = `${p.added.length} added, ${p.updated.length} updated${imp.opts.markClosedReady && p.closedInFile.length ? ', ' + p.closedInFile.length + ' closed-in-file marked Ready to Close' : ''}${imp.opts.markMissingReady && p.missing.length ? ', ' + p.missing.length + ' missing marked Ready to Close' : ''}.`;
         imp.table = null; imp.wb = null; NCR.app.render();
       });
     } };

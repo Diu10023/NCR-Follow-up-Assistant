@@ -19,6 +19,8 @@ Sheets `NCR_Master`, `Followup_History` and `Settings` are created automatically
 **Import Excel** page: upload the raw-data export (.xlsx/.xls/.csv). Columns are auto-detected (and remembered); check the mapping, review the preview, import.
 - New NCR No. → added as *Not Started*.
 - Existing NCR No. → only raw fields (item, batch, supplier, buyer, date, defect, quantity) are refreshed; Next Action, Owner, Due Date, Status and history are never overwritten.
+- Expected columns: Created date, NCR Number, Item number, Batch number, Closed, Sub nonconformance category id (→ Defect), Remarks, Buyer. Quantity and Supplier are optional.
+- NCRs already **Closed** in the file are not imported as new; NCRs still open here but Closed in the file are marked *Ready to Close* (QA verifies and closes).
 - Optional: mark open NCRs missing from the file as *Ready to Close* (QA still verifies and closes).
 
 ## Pages
