@@ -130,7 +130,9 @@
     const one = list.length === 1, n0 = list[0];
     const groups = {}; list.forEach((n) => { (groups[V.buyerOf(n)] = groups[V.buyerOf(n)] || []).push(n); });
     const msgs = one ? [['', L.followupMessage(n0, s)]] : Object.keys(groups).sort().map((b) => [b, L.buyerMessage(b === V.NO_BUYER ? '' : b, groups[b].slice().sort((x, y) => String(x.NCR_Date).localeCompare(String(y.NCR_Date))))]);
-    const who = one ? (n0.Waiting_For || n0.Buyer || 'Purchasing') : '{buyer}'; // several NCRs: each history entry names its own buyer
+    // Several NCRs: if they share one buyer use that name; if not, each NCR's history gets its own buyer's name automatically.
+    const buyersSel = buyerNames(list), multi = !one && buyersSel.length > 1;
+    const who = one ? (n0.Waiting_For || n0.Buyer || 'Purchasing') : buyersSel[0];
     const nextDefault = plusDays(s.defaultCheckDays);
     const allWaiting = [...new Set(list.map((n) => n.Waiting_For))];
     openModal(`<form id="hf" class="form modal-form"><h2>${one ? `Follow-up #${(Number(n0.Followup_Count) || 0) + 1} – ${esc(n0.NCR_No)}` : `Follow-up – ${list.length} NCRs`}</h2>
@@ -139,20 +141,20 @@
         <button type="button" class="btn sm copy" data-k="${k}">📋 Copy message</button></div>`).join('')}
       <div class="full muted small">Paste into Teams / email, then record the follow-up below.</div><hr class="full">
       <label>Date<input type="date" name="date" value="${L.todayISO()}" required></label>
-      <label>Person / department<input name="by" value="${esc(who)}"></label>
-      <label class="full">Action / note *<input name="action" required value="${esc('Asked ' + who + ' for status update')}"></label>
+      <label>Person / department${multi ? '<input value="Each NCR\'s own buyer" disabled>' : `<input name="by" value="${esc(who)}">`}</label>
+      <label class="full">Action / note *<input name="action" required value="${esc(multi ? 'Asked for status update' : 'Asked ' + who + ' for status update')}"></label>
       <label class="full">Next check date * <span class="muted">– flagged in Followed up when this date arrives</span>
         <div class="inline"><input type="date" name="nextDate" id="nd" value="${nextDefault}" min="${plusDays(1)}" required>
         ${[3, 7, 14].map((d) => `<button type="button" class="btn sm" data-plus="${d}">+${d}d</button>`).join('')}</div></label>
       <label>Waiting For<select name="waiting">${V.options(V.withCurrent(s.waitingFor, allWaiting.length === 1 ? allWaiting[0] : ''), allWaiting.length === 1 ? allWaiting[0] : '', one ? '— unchanged —' : '— unchanged —')}</select></label>
       <label>Remark<input name="remark"></label>
-      ${one ? '' : '<p class="full muted small">{buyer} is replaced by each NCR\'s own buyer, so every NCR\'s history names only that buyer.</p>'}
+      ${multi ? '<p class="full muted small">Each NCR\'s history is saved with its own buyer\'s name, for example “Asked for status update – Pikko Choosuk”.</p>' : ''}
       <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">I sent it, record${one ? '' : ' (' + list.length + ')'}</button></div></form>`, (m) => {
       m.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', () => copyText(m.querySelectorAll('.msg')[b.dataset.k].value)));
       m.querySelectorAll('[data-plus]').forEach((b) => b.addEventListener('click', () => { m.querySelector('#nd').value = plusDays(Number(b.dataset.plus)); }));
       m.querySelector('#hf').addEventListener('submit', (e) => {
         e.preventDefault(); const f = new FormData(e.target);
-        S.recordFollowups(ids, { date: f.get('date'), by: f.get('by'), action: f.get('action'), waiting: f.get('waiting'), remark: f.get('remark'), nextDate: f.get('nextDate') });
+        S.recordFollowups(ids, { date: f.get('date'), by: multi ? '{buyer}' : f.get('by'), action: multi ? f.get('action') + ' – {buyer}' : f.get('action'), waiting: f.get('waiting'), remark: f.get('remark'), nextDate: f.get('nextDate') });
         V.SEL.clear(); modal.close(); toast(`Recorded. ${one ? 'It is' : list.length + ' NCRs are'} now in Followed up, flagged again on ${L.fmtDate(f.get('nextDate'))}`);
       });
     });
