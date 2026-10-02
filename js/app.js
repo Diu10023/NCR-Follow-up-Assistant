@@ -24,8 +24,10 @@
   }
 
   function status() {
-    const open = st.ncrs.filter((n) => n.Status !== 'Closed' && V.inf(n).actionRequired && V.inf(n).remarkGroup === 'none').length; // priority 1: no remark, not yet followed up
-    $('#today-badge').textContent = open || '';
+    const openNcrs = st.ncrs.filter((n) => n.Status !== 'Closed');
+    const followed = openNcrs.filter(V.isFollowed).length;
+    $('#today-badge').textContent = openNcrs.length - followed || '0';   // still to follow up
+    $('#fu-badge').textContent = followed || '0';                       // followed up, not closed yet
     const el = $('#sync');
     el.className = 'sync' + (st.error ? ' err' : '');
     el.textContent = st.error ? '⚠️ ' + st.error : st.saving ? 'Saving…' : st.mode === 'sheets' ? '✓ Synced with Google Sheets' : '';
@@ -119,14 +121,14 @@
     const nextDefault = plusDays(s.defaultCheckDays);
     const allWaiting = [...new Set(list.map((n) => n.Waiting_For))];
     openModal(`<form id="hf" class="form modal-form"><h2>${one ? `Follow-up #${(Number(n0.Followup_Count) || 0) + 1} – ${esc(n0.NCR_No)}` : `Follow-up – ${list.length} NCRs`}</h2>
-      <ol class="steps full"><li><b>Copy</b> the message below and send it to the buyer (Teams or email).</li><li><b>Choose</b> when you will check again.</li><li><b>Press Record</b>. The NCR is hidden until that date and the follow-up is saved in its history.</li></ol>
+      <ol class="steps full"><li><b>Copy</b> the message below and send it to the buyer (Teams or email).</li><li><b>Choose</b> when you will check again.</li><li><b>Press Record</b>. The NCR moves to Followed up and stays there until it is closed. On the check date it is flagged so you chase again.</li></ol>
       ${msgs.map(([b, m], k) => `<div class="full"><label>${one ? 'Message (editable)' : 'Message for ' + esc(b) + ' (' + groups[b].length + ' NCRs)'}<textarea class="msg" rows="${one ? 9 : Math.min(14, 6 + groups[b].length)}">${esc(m)}</textarea></label>
         <button type="button" class="btn sm copy" data-k="${k}">📋 Copy message</button></div>`).join('')}
       <div class="full muted small">Paste into Teams / email, then record the follow-up below.</div><hr class="full">
       <label>Date<input type="date" name="date" value="${L.todayISO()}" required></label>
       <label>Person / department<input name="by" value="${esc(who)}"></label>
       <label class="full">Action / note *<input name="action" required value="${esc('Asked ' + who + ' for status update')}"></label>
-      <label class="full">Next check date * <span class="muted">– the NCR is hidden from Open NCRs until this date</span>
+      <label class="full">Next check date * <span class="muted">– flagged in Followed up when this date arrives</span>
         <div class="inline"><input type="date" name="nextDate" id="nd" value="${nextDefault}" min="${plusDays(1)}" required>
         ${[3, 7, 14].map((d) => `<button type="button" class="btn sm" data-plus="${d}">+${d}d</button>`).join('')}</div></label>
       <label>Waiting For<select name="waiting">${V.options(V.withCurrent(s.waitingFor, allWaiting.length === 1 ? allWaiting[0] : ''), allWaiting.length === 1 ? allWaiting[0] : '', one ? '— unchanged —' : '— unchanged —')}</select></label>
@@ -138,7 +140,7 @@
       m.querySelector('#hf').addEventListener('submit', (e) => {
         e.preventDefault(); const f = new FormData(e.target);
         S.recordFollowups(ids, { date: f.get('date'), by: f.get('by'), action: f.get('action'), waiting: f.get('waiting'), remark: f.get('remark'), nextDate: f.get('nextDate') });
-        V.SEL.clear(); modal.close(); toast(`Recorded. ${one ? 'It is' : list.length + ' NCRs are'} now in Followed up until ${L.fmtDate(f.get('nextDate'))}`);
+        V.SEL.clear(); modal.close(); toast(`Recorded. ${one ? 'It is' : list.length + ' NCRs are'} now in Followed up, flagged again on ${L.fmtDate(f.get('nextDate'))}`);
       });
     });
   }
@@ -229,7 +231,7 @@
     'bulk-clear': () => { V.SEL.clear(); render(); },
     showall: (el) => { V.showAll[el.dataset.key] = !V.showAll[el.dataset.key]; window.__keepScroll = window.scrollY; render(); },
     selsection: (el) => { (V.sectionIds[el.dataset.key] || []).forEach((id) => V.SEL.add(id)); window.__keepScroll = window.scrollY; render(); },
-    comeback: (el) => { S.bulkSet([el.dataset.id], { Due_Date: L.todayISO() }, 'Brought back to To follow up'); toast('Moved back to To follow up'); },
+    toggletl: (el) => { const id = el.dataset.id; V.WF_OPEN.has(id) ? V.WF_OPEN.delete(id) : V.WF_OPEN.add(id); window.__keepScroll = window.scrollY; render(); },
     reviewed: (el) => { S.markReviewed([el.dataset.id], plusDays(st.settings.defaultCheckDays)); toast(`Reviewed – next check in ${st.settings.defaultCheckDays} days`); },
     chase: (el) => {
       const ids = V.currentIds();
