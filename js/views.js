@@ -22,6 +22,11 @@ window.NCR = window.NCR || {};
     return `${i.aging}d${i.band ? ` <span class="chip ${i.band.cls}">${i.band.label}</span>` : ''}`;
   }
   const nextText = (n, i) => (n.Next_Action ? esc(n.Next_Action) : i.closed || i.ready ? '–' : '<span class="bad">⚠️ Required</span>');
+  function remarkText(n, i) {
+    if (i.closed) return n.Buyer_Remark ? `<span title="${esc(n.Buyer_Remark)}">${esc(n.Buyer_Remark)}</span>` : '–';
+    if (i.noUpdate) return '<span class="chip age-escalation">📭 No buyer update</span>';
+    return `<span title="${esc(n.Buyer_Remark)}">${esc(n.Buyer_Remark)}</span>${n.Buyer_Remark_Date ? `<div class="sub">${L.fmtDate(n.Buyer_Remark_Date)}</div>` : ''}`;
+  }
   const countText = (n, i) => `${i.count}${i.escalate ? ' <span class="chip age-escalation" title="Escalation Recommended">⚠️ Escalate</span>' : ''}`;
 
   // ---------- shared tables ----------
@@ -32,13 +37,13 @@ window.NCR = window.NCR || {};
       return `<tr class="row-${i.state}" data-href="#/ncr/${esc(n.NCR_ID)}">
         <td class="nowrap"><b>${esc(n.NCR_No)}</b></td><td>${esc(n.Item_No)}</td><td>${esc(n.Batch_No)}</td><td>${esc(n.Buyer)}</td>
         <td class="nowrap">${L.fmtDate(n.NCR_Date)}</td><td class="defect" title="${esc(n.Defect)}">${esc(n.Defect)}</td><td>${esc(n.Quantity)}</td>
-        <td>${esc(n.Disposition) || '–'}</td><td>${nextText(n, i)}</td><td>${esc(n.Owner) || '–'}</td><td>${esc(n.Waiting_For) || '–'}</td>
+        <td>${esc(n.Disposition) || '–'}</td><td>${nextText(n, i)}</td><td class="remark">${remarkText(n, i)}</td><td>${esc(n.Owner) || '–'}</td><td>${esc(n.Waiting_For) || '–'}</td>
         <td class="nowrap">${dueText(n, i)}</td><td class="nowrap">${agingText(i)}</td>
         <td class="nowrap">${stateBadge(i)}<div class="sub">${esc(n.Status)}</div></td>
         <td class="nowrap">${n.Last_Followup ? L.fmtDate(n.Last_Followup) : '–'}</td><td>${countText(n, i)}</td></tr>`;
     }).join('');
     return `<div class="table-wrap"><table class="grid"><thead><tr><th>NCR No.</th><th>Item No.</th><th>Batch No.</th><th>Buyer</th><th>NCR Date</th><th>Defect</th><th>Qty</th>
-      <th>Disposition</th><th>Next Action</th><th>Owner</th><th>Waiting For</th><th>Due Date</th><th>Aging</th><th>Status</th><th>Last Follow-up</th><th>F/U #</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      <th>Disposition</th><th>Next Action</th><th>Buyer Remark</th><th>Owner</th><th>Waiting For</th><th>Due Date</th><th>Aging</th><th>Status</th><th>Last Follow-up</th><th>F/U #</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
   function compactTable(list, emptyMsg) {
@@ -46,11 +51,11 @@ window.NCR = window.NCR || {};
     const rows = list.map((n) => {
       const i = inf(n);
       return `<tr data-href="#/ncr/${esc(n.NCR_ID)}"><td class="nowrap"><b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)}</div></td>
-        <td>${nextText(n, i)}<div class="sub">${esc(n.Defect)}</div></td><td>${esc(n.Owner) || '–'}</td><td>${esc(n.Waiting_For) || '–'}</td>
+        <td>${nextText(n, i)}<div class="sub">${esc(n.Defect)}</div></td><td class="remark">${remarkText(n, i)}</td><td>${esc(n.Owner) || '–'}</td><td>${esc(n.Waiting_For) || '–'}</td>
         <td class="nowrap">${dueText(n, i)}</td><td class="nowrap">${countText(n, i)}<div class="sub">${n.Last_Followup ? 'last ' + L.fmtDate(n.Last_Followup) : 'no follow-up'}</div></td>
         <td class="right"><button class="btn sm" data-action="followup" data-id="${esc(n.NCR_ID)}">Follow-up</button></td></tr>`;
     }).join('');
-    return `<div class="table-wrap"><table class="grid compact"><thead><tr><th>NCR</th><th>Next Action</th><th>Owner</th><th>Waiting For</th><th>Due</th><th>Follow-ups</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    return `<div class="table-wrap"><table class="grid compact"><thead><tr><th>NCR</th><th>Next Action</th><th>Buyer Remark</th><th>Owner</th><th>Waiting For</th><th>Due</th><th>Follow-ups</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
   const byDue = (a, b) => (a.Due_Date || '9999') < (b.Due_Date || '9999') ? -1 : (a.Due_Date || '9999') > (b.Due_Date || '9999') ? 1 : 0;
@@ -65,6 +70,7 @@ window.NCR = window.NCR || {};
       soon: pick((x) => x.i.dueSoon).sort(byDue),
       ready: pick((x) => x.i.ready),
       missing: pick((x) => x.i.missingNext),
+      noUpdate: pick((x) => x.i.noUpdate).sort(byDue),
       action: pick((x) => x.i.actionRequired).sort((a, b) => {
         const rank = (n) => { const i = inf(n); return i.overdue ? 0 : i.dueToday ? 1 : i.ready ? 2 : 3; };
         return rank(a) - rank(b) || byDue(a, b);
@@ -93,8 +99,9 @@ window.NCR = window.NCR || {};
         ${card('Closed This Month', closedMonth, 'c-closed', { status: 'Closed' })}
       </div>
       ${b.missing.length ? `<div class="alert warn">⚠️ ${b.missing.length} open NCR${b.missing.length > 1 ? 's have' : ' has'} no Next Action: ${b.missing.slice(0, 6).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(', ')}${b.missing.length > 6 ? '…' : ''}</div>` : ''}
+      ${b.noUpdate.length ? `<div class="alert warn">📭 ${b.noUpdate.length} open NCR${b.noUpdate.length > 1 ? 's have' : ' has'} no buyer update in Remarks — QA must follow up. <a href="#/list" data-filter='${esc(JSON.stringify({ status: 'active', buyerUpdate: 'none' }))}'>View list</a></div>` : ''}
       <div class="grid2">
-        <section class="card"><h2>Action Required <span class="count">${b.action.length}</span></h2><p class="hint">Overdue, due today, ready to close, or missing a Next Action.</p>${compactTable(b.action.slice(0, 10), 'Nothing needs action today.')}${b.action.length > 10 ? '<a href="#/today">See all on Today →</a>' : ''}</section>
+        <section class="card"><h2>Action Required <span class="count">${b.action.length}</span></h2><p class="hint">Overdue, due today, ready to close, missing a Next Action, or no buyer update.</p>${compactTable(b.action.slice(0, 10), 'Nothing needs action today.')}${b.action.length > 10 ? '<a href="#/today">See all on Today →</a>' : ''}</section>
         <section class="card"><h2>Waiting For</h2><p class="hint">Where open NCRs are blocked.</p><div class="waiting">${wf || '<div class="empty">No open NCRs.</div>'}</div></section>
       </div>
       <section class="card"><h2>🔴 Overdue NCRs <span class="count">${b.overdue.length}</span></h2>${compactTable(b.overdue, 'No overdue NCRs.')}</section>
@@ -109,12 +116,13 @@ window.NCR = window.NCR || {};
       ${sec('🔴 Overdue', b.overdue, 'No overdue NCRs.')}${sec('🟡 Due Today', b.today, 'Nothing due today.')}
       ${sec('🟠 Due Soon', b.soon, 'Nothing due in the next ' + st.settings.dueSoonDays + ' days.')}
       ${sec('🔵 Ready to Close', b.ready, 'Nothing waiting for QA verification.')}
+      ${sec('📭 No Buyer Update (Remarks empty) – QA follows up', b.noUpdate, 'Every open NCR has a buyer update.')}
       ${b.missing.length ? sec('⚠️ Missing Next Action', b.missing) : ''}` };
   }
 
   // ---------- list ----------
-  const LF = { q: '', buyer: '', status: 'active', owner: '', waiting: '', disposition: '', due: '', overdueOnly: false, sort: 'due', dir: 'asc' };
-  function setFilter(f) { Object.assign(LF, { q: '', buyer: '', status: 'active', owner: '', waiting: '', disposition: '', due: '', overdueOnly: false, sort: 'due', dir: 'asc' }, f); }
+  const LF = { q: '', buyer: '', status: 'active', owner: '', waiting: '', disposition: '', due: '', overdueOnly: false, buyerUpdate: '', sort: 'due', dir: 'asc' };
+  function setFilter(f) { Object.assign(LF, { q: '', buyer: '', status: 'active', owner: '', waiting: '', disposition: '', due: '', overdueOnly: false, buyerUpdate: '', sort: 'due', dir: 'asc' }, f); }
 
   function filtered() {
     const q = LF.q.trim().toLowerCase();
@@ -127,6 +135,8 @@ window.NCR = window.NCR || {};
       if (LF.waiting && (LF.waiting === '__none' ? n.Waiting_For : n.Waiting_For !== LF.waiting)) return false;
       if (LF.disposition && n.Disposition !== LF.disposition) return false;
       if (LF.overdueOnly && !i.overdue) return false;
+      if (LF.buyerUpdate === 'none' && !(String(n.Buyer_Remark || '').trim() === '')) return false;
+      if (LF.buyerUpdate === 'has' && String(n.Buyer_Remark || '').trim() === '') return false;
       if (LF.due === 'overdue' && !i.overdue) return false;
       if (LF.due === 'today' && !i.dueToday) return false;
       if (LF.due === 'soon' && !i.dueSoon) return false;
@@ -159,6 +169,7 @@ window.NCR = window.NCR || {};
         ${sel('f-waiting', 'Waiting For', `<option value="">All</option><option value="__none"${LF.waiting === '__none' ? ' selected' : ''}>Not set</option>${options(s.waitingFor, LF.waiting)}`)}
         ${sel('f-disposition', 'Disposition', options(s.dispositions, LF.disposition, 'All'))}
         ${sel('f-due', 'Due Date', [['', 'Any'], ['overdue', 'Overdue'], ['today', 'Today'], ['soon', 'Due soon'], ['week', 'Next 7 days'], ['none', 'No due date']].map(([v, l]) => `<option value="${v}"${LF.due === v ? ' selected' : ''}>${l}</option>`).join(''))}
+        ${sel('f-bu', 'Buyer Update', [['', 'Any'], ['none', 'No update'], ['has', 'Has update']].map(([v, l]) => `<option value="${v}"${LF.buyerUpdate === v ? ' selected' : ''}>${l}</option>`).join(''))}
         ${sel('f-sort', 'Sort by', [['due', 'Due Date'], ['aging', 'Aging'], ['date', 'NCR Date']].map(([v, l]) => `<option value="${v}"${LF.sort === v ? ' selected' : ''}>${l}</option>`).join(''))}
         <button class="btn" id="f-dir" title="Toggle direction">${LF.dir === 'asc' ? '↑ Asc' : '↓ Desc'}</button>
         <label class="check"><input type="checkbox" id="f-over"${LF.overdueOnly ? ' checked' : ''}> Overdue only</label>
@@ -168,7 +179,7 @@ window.NCR = window.NCR || {};
       <div id="list-body">${listBody()}</div>`,
     bind(root) {
       const refresh = () => { root.querySelector('#list-body').innerHTML = listBody(); };
-      const map = { 'f-q': 'q', 'f-status': 'status', 'f-buyer': 'buyer', 'f-owner': 'owner', 'f-waiting': 'waiting', 'f-disposition': 'disposition', 'f-due': 'due', 'f-sort': 'sort' };
+      const map = { 'f-q': 'q', 'f-status': 'status', 'f-buyer': 'buyer', 'f-owner': 'owner', 'f-waiting': 'waiting', 'f-disposition': 'disposition', 'f-due': 'due', 'f-bu': 'buyerUpdate', 'f-sort': 'sort' };
       const statusSel = root.querySelector('#f-status'); statusSel.value = LF.status;
       Object.keys(map).forEach((id) => root.querySelector('#' + id).addEventListener('input', (e) => { LF[map[id]] = e.target.value; refresh(); }));
       root.querySelector('#f-over').addEventListener('change', (e) => { LF.overdueOnly = e.target.checked; refresh(); });
@@ -198,6 +209,7 @@ window.NCR = window.NCR || {};
           <button class="btn" data-action="edit" data-id="${esc(id)}">Edit NCR</button>
         </div></div>
       ${i.missingNext ? '<div class="alert bad">⚠️ Next Action is required for this NCR.</div>' : ''}
+      ${i.noUpdate ? '<div class="alert warn">📭 Buyer has not written any progress in Remarks — QA must follow up with the Buyer.</div>' : ''}
       ${i.escalate ? `<div class="alert warn">⚠️ Escalation Recommended — ${i.count} follow-ups so far (threshold ${s.escalationThreshold}).</div>` : ''}
       ${i.ready ? '<div class="alert info">🔵 Required action is complete. QA to verify evidence and close.</div>' : ''}
       <div class="grid2">
@@ -206,7 +218,8 @@ window.NCR = window.NCR || {};
           ${info('Buyer', n.Buyer)}${info('Supplier', n.Supplier)}${info('Quantity', n.Quantity)}
           ${info('Aging', i.aging === null ? '' : i.aging + ' days' + (i.band ? ' – ' + i.band.label : ''))}
           ${i.closed ? info('Closed Date', L.fmtDate(n.Closed_Date)) : ''}</div>
-          <div class="kv block"><span>Defect Description</span><b>${esc(n.Defect) || '–'}</b></div></section>
+          <div class="kv block"><span>Defect Description</span><b>${esc(n.Defect) || '–'}</b></div>
+          <div class="kv block"><span>Buyer Remark (from Excel)${n.Buyer_Remark_Date ? ' · updated ' + L.fmtDate(n.Buyer_Remark_Date) : ''}</span><b>${n.Buyer_Remark ? esc(n.Buyer_Remark) : '<span class="bad">No buyer update yet</span>'}</b></div></section>
         <section class="card"><h2>Follow-up Control</h2>
           <form id="ctl" class="form">
             <label>Disposition<select name="Disposition">${options(withCurrent(s.dispositions, n.Disposition), n.Disposition, '— select —')}</select></label>

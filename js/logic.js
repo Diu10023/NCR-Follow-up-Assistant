@@ -61,6 +61,7 @@ window.NCR = window.NCR || {};
     const dueToday = !closed && dueDiff === 0;
     const dueSoon = !closed && dueDiff !== null && dueDiff >= 1 && dueDiff <= s.dueSoonDays;
     const missingNext = !closed && !ready && !n.Next_Action;
+    const noUpdate = !closed && !String(n.Buyer_Remark || '').trim(); // buyer has not written progress in Remarks
     const count = Number(n.Followup_Count) || 0;
     const escalate = !closed && count >= s.escalationThreshold;
     let state = 'ontrack';
@@ -69,8 +70,8 @@ window.NCR = window.NCR || {};
     else if (ready) state = 'ready';
     else if (dueToday || dueSoon) state = 'soon';
     const band = agingBand(aging, s);
-    const actionRequired = !closed && (overdue || dueToday || ready || missingNext);
-    return { closed, aging, dueDiff, ready, overdue, dueToday, dueSoon, missingNext, count, escalate, state, band, actionRequired };
+    const actionRequired = !closed && (overdue || dueToday || ready || missingNext || noUpdate);
+    return { closed, aging, dueDiff, ready, overdue, dueToday, dueSoon, missingNext, noUpdate, count, escalate, state, band, actionRequired };
   }
 
   const STATE_META = {
@@ -104,6 +105,8 @@ window.NCR = window.NCR || {};
     lines.push(`Due Date: ${n.Due_Date ? fmtDate(n.Due_Date) : 'Not set'}`);
     if (n.Waiting_For) lines.push(`Waiting For: ${n.Waiting_For}`);
     lines.push(`Follow-up #${count}`);
+    if (n.Buyer_Remark) lines.push(`Latest Remarks: ${n.Buyer_Remark}`);
+    else lines.push('Remarks: no progress update recorded yet');
     lines.push('');
     lines.push('"Could you please confirm the current status and next action for this NCR?"');
     return lines.join('\n');

@@ -4,7 +4,7 @@ window.NCR = window.NCR || {};
   const L = NCR.logic;
   const NCR_FIELDS = ['NCR_ID', 'NCR_No', 'Item_No', 'Batch_No', 'Supplier', 'Buyer', 'NCR_Date', 'Defect', 'Quantity',
     'Disposition', 'Next_Action', 'Owner', 'Waiting_For', 'Due_Date', 'Last_Followup', 'Followup_Count', 'Status',
-    'Closed_Date', 'Aging', 'Remark', 'Created_At', 'Updated_At'];
+    'Closed_Date', 'Aging', 'Remark', 'Created_At', 'Updated_At', 'Buyer_Remark', 'Buyer_Remark_Date'];
   const HIST_FIELDS = ['History_ID', 'NCR_ID', 'NCR_No', 'Date', 'Followup_No', 'Action', 'Waiting_For', 'Remark', 'Created_By', 'Created_At'];
   const TRACKED = [['Status', 'Status'], ['Disposition', 'Disposition'], ['Next_Action', 'Next Action'],
     ['Owner', 'Owner'], ['Waiting_For', 'Waiting For'], ['Due_Date', 'Due Date']];
@@ -191,9 +191,9 @@ window.NCR = window.NCR || {};
     const t = L.todayISO(), d = (n) => L.addDays(t, n);
     const mk = (i, o) => Object.assign({ NCR_ID: 'NCR-DEMO' + i, NCR_No: 'NCR-2503' + i, Followup_Count: 0, Status: 'Open', Created_At: L.nowStamp(), Updated_At: L.nowStamp() }, o);
     const rows = [
-      mk(1, { Item_No: '8535', Batch_No: 'B2409-11', Supplier: 'Alpha Plastics', Buyer: 'Somchai', NCR_Date: d(-20), Defect: 'Burr on mounting face', Quantity: '1,200 pcs', Disposition: 'Scrap', Next_Action: 'Scrap', Owner: 'Buyer – Somchai', Waiting_For: 'Purchasing', Due_Date: d(-2), Followup_Count: 3, Last_Followup: d(-4), Status: 'Pending' }),
-      mk(2, { Item_No: '7120', Batch_No: 'L-0932', Supplier: 'Beta Metals', Buyer: 'Malee', NCR_Date: d(-9), Defect: 'Out of tolerance (Ø 12.4)', Quantity: '300 pcs', Disposition: 'Return to Supplier', Next_Action: 'Supplier Replacement', Owner: 'Buyer – Malee', Waiting_For: 'Supplier', Due_Date: d(0), Followup_Count: 1, Last_Followup: d(-3), Status: 'Pending' }),
-      mk(3, { Item_No: '4410', Batch_No: 'X77', Supplier: 'Gamma Coatings', Buyer: 'Somchai', NCR_Date: d(-5), Defect: 'Paint peeling', Quantity: '80 pcs', Disposition: 'Rework', Next_Action: 'Rework', Owner: 'QA', Waiting_For: 'Production', Due_Date: d(2), Last_Followup: d(-1), Followup_Count: 1, Status: 'Open' }),
+      mk(1, { Buyer_Remark: 'Waiting scrap approval from PD', Buyer_Remark_Date: d(-9), Item_No: '8535', Batch_No: 'B2409-11', Supplier: 'Alpha Plastics', Buyer: 'Somchai', NCR_Date: d(-20), Defect: 'Burr on mounting face', Quantity: '1,200 pcs', Disposition: 'Scrap', Next_Action: 'Scrap', Owner: 'Buyer – Somchai', Waiting_For: 'Purchasing', Due_Date: d(-2), Followup_Count: 3, Last_Followup: d(-4), Status: 'Pending' }),
+      mk(2, { Buyer_Remark: 'Supplier will send replacement next week', Buyer_Remark_Date: d(-3), Item_No: '7120', Batch_No: 'L-0932', Supplier: 'Beta Metals', Buyer: 'Malee', NCR_Date: d(-9), Defect: 'Out of tolerance (Ø 12.4)', Quantity: '300 pcs', Disposition: 'Return to Supplier', Next_Action: 'Supplier Replacement', Owner: 'Buyer – Malee', Waiting_For: 'Supplier', Due_Date: d(0), Followup_Count: 1, Last_Followup: d(-3), Status: 'Pending' }),
+      mk(3, { Buyer_Remark: 'Rework in progress at supplier', Buyer_Remark_Date: d(-1), Item_No: '4410', Batch_No: 'X77', Supplier: 'Gamma Coatings', Buyer: 'Somchai', NCR_Date: d(-5), Defect: 'Paint peeling', Quantity: '80 pcs', Disposition: 'Rework', Next_Action: 'Rework', Owner: 'QA', Waiting_For: 'Production', Due_Date: d(2), Last_Followup: d(-1), Followup_Count: 1, Status: 'Open' }),
       mk(4, { Item_No: '9001', Batch_No: 'K-12', Supplier: 'Delta Rubber', Buyer: 'Malee', NCR_Date: d(-14), Defect: 'Wrong colour', Quantity: '2,000 pcs', Disposition: 'Use As Is', Next_Action: 'Waiting Customer Decision', Owner: 'QA', Waiting_For: 'Customer', Due_Date: d(6), Followup_Count: 2, Last_Followup: d(-2), Status: 'Pending' }),
       mk(5, { Item_No: '3302', Batch_No: 'Z-5', Supplier: 'Alpha Plastics', Buyer: 'Somchai', NCR_Date: d(-12), Defect: 'Short shot', Quantity: '450 pcs', Disposition: 'Sorting', Next_Action: 'Close NCR', Owner: 'QA', Waiting_For: 'QA', Due_Date: d(-1), Followup_Count: 2, Last_Followup: d(-1), Status: 'Ready to Close' }),
       mk(6, { Item_No: '5150', Batch_No: 'M-808', Supplier: 'Beta Metals', Buyer: 'Malee', NCR_Date: d(-1), Defect: 'Rust spots', Quantity: '60 pcs', Status: 'Not Started' }),

@@ -13,7 +13,7 @@ window.NCR = window.NCR || {};
     { key: 'Quantity', label: 'Quantity', aliases: ['quantity', 'qty', 'ncrqty', 'defectqty', 'defectquantity'] },
     { key: 'Supplier', label: 'Supplier', aliases: ['supplier', 'suppliername', 'vendor', 'vendorname'] },
     { key: 'Disposition', label: 'Disposition (fills blanks only)', aliases: ['disposition'] },
-    { key: 'Remark', label: 'Remarks (fills blanks only)', aliases: ['remarks', 'remark', 'note', 'notes', 'comment', 'comments'] },
+    { key: 'Buyer_Remark', label: 'Remarks (Buyer progress)', aliases: ['remarks', 'remark', 'note', 'notes', 'comment', 'comments'] },
     { key: 'Closed', label: 'Closed (Yes/No or date)', aliases: ['closed', 'isclosed', 'closeddate', 'status'] },
   ];
   const norm = (s) => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9฀-๿]/g, '');
@@ -90,7 +90,7 @@ window.NCR = window.NCR || {};
       const no = String(get('NCR_No')).trim();
       if (!no) { if (r.some((c) => String(c).trim())) bad.push({ row: table.headerRow + 1 + i, reason: 'No NCR No.' }); return; }
       const rec = { NCR_No: no };
-      ['Item_No', 'Batch_No', 'Supplier', 'Buyer', 'Defect', 'Quantity', 'Disposition', 'Remark'].forEach((k) => { rec[k] = String(get(k)).trim(); });
+      ['Item_No', 'Batch_No', 'Supplier', 'Buyer', 'Defect', 'Quantity', 'Disposition', 'Buyer_Remark'].forEach((k) => { rec[k] = String(get(k)).trim(); });
       rec.Closed = isClosedValue(get('Closed'));
       rec.NCR_Date = parseDate(get('NCR_Date'));
       if (get('NCR_Date') !== '' && !rec.NCR_Date) bad.push({ row: table.headerRow + 1 + i, reason: 'Unreadable date "' + get('NCR_Date') + '" (NCR ' + no + ')' });
@@ -99,7 +99,7 @@ window.NCR = window.NCR || {};
     return { records: out, bad };
   }
 
-  const UPDATABLE = ['Item_No', 'Batch_No', 'Supplier', 'Buyer', 'NCR_Date', 'Defect', 'Quantity'];
+  const UPDATABLE = ['Item_No', 'Batch_No', 'Supplier', 'Buyer', 'NCR_Date', 'Defect', 'Quantity', 'Buyer_Remark'];
 
   // Compare against existing NCRs (key = NCR No., case-insensitive). Follow-up fields are never touched.
   function plan(records, existing) {
@@ -113,7 +113,7 @@ window.NCR = window.NCR || {};
       if (r.Closed && old.Status !== 'Closed') closedInFile.push(old);
       const changes = [];
       UPDATABLE.forEach((f) => { if (r[f] && String(r[f]) !== String(old[f] || '')) changes.push({ field: f, from: old[f] || '', to: r[f] }); });
-      ['Disposition', 'Remark'].forEach((f) => { if (r[f] && !old[f]) changes.push({ field: f, from: '', to: r[f] }); });
+      ['Disposition'].forEach((f) => { if (r[f] && !old[f]) changes.push({ field: f, from: '', to: r[f] }); });
       if (changes.length) updated.push({ rec: r, old, changes }); else unchanged.push(old);
     });
     const missing = existing.filter((n) => n.Status !== 'Closed' && !seen.has(String(n.NCR_No).trim().toLowerCase()));
@@ -129,6 +129,7 @@ window.NCR = window.NCR || {};
       const n = {}; NCR.store.NCR_FIELDS.forEach((f) => { n[f] = ''; });
       Object.assign(n, r, { NCR_ID: L.uid('NCR'), Status: 'Not Started', Followup_Count: 0, Created_At: now, Updated_At: now });
       n.Aging = L.daysBetween(n.NCR_Date, today);
+      if (n.Buyer_Remark) n.Buyer_Remark_Date = today;
       delete n.Closed; ncrs.push(n); H(n, 'NCR imported from Excel');
     });
     p.updated.forEach(({ rec, old, changes }) => {
@@ -136,7 +137,10 @@ window.NCR = window.NCR || {};
       changes.forEach((c) => { n[c.field] = c.to; });
       n.Aging = L.daysBetween(n.NCR_Date, n.Status === 'Closed' ? n.Closed_Date || today : today);
       n.Updated_At = now;
-      ncrs.push(n); H(n, 'Updated from Excel: ' + changes.map((c) => c.field.replace('_', ' ')).join(', '));
+      const br = changes.find((c) => c.field === 'Buyer_Remark'), others = changes.filter((c) => c.field !== 'Buyer_Remark');
+      if (br) { n.Buyer_Remark_Date = today; H(n, 'Buyer update (Remarks): ' + br.to); }
+      if (others.length) H(n, 'Updated from Excel: ' + others.map((c) => c.field.replace('_', ' ')).join(', '));
+      ncrs.push(n);
     });
     const ready = (list, why) => list.forEach((o) => {
       const cur = ncrs.find((x) => x.NCR_ID === o.NCR_ID), n = Object.assign({}, cur || o);
