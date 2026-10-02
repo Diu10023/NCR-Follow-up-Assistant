@@ -195,6 +195,8 @@ window.NCR = window.NCR || {};
       const o = getNcr(id); if (!o) return;
       const n = Object.assign({}, o, fields);
       if (n.Status === 'Ready to Close' && !n.Next_Action) n.Next_Action = 'Close NCR';
+      if (n.Status === 'Closed' && !n.Closed_Date) n.Closed_Date = L.todayISO();
+      if (n.Status !== 'Closed') n.Closed_Date = '';
       stamp(n);
       state.ncrs[state.ncrs.findIndex((x) => x.NCR_ID === id)] = n;
       ncrs.push(n);

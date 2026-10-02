@@ -7,18 +7,18 @@
 
   function route() {
     const [page, arg] = location.hash.replace(/^#\//, '').split('/');
-    return { page: page || 'today', arg: arg && decodeURIComponent(arg) };
+    return { page: page || 'home', arg: arg && decodeURIComponent(arg) };
   }
 
   function render() {
     if (!st.loaded) { main.innerHTML = `<div class="empty">${st.error ? esc(st.error) : 'Loading…'}</div>`; return; }
     const { page, arg } = route();
-    const views = { overview: V.today, dashboard: V.today, closed: V.closedPage, today: V.today, list: V.list, ncr: () => V.detail(arg), import: V.importPage, settings: V.settings };
-    current = (views[page] || V.today)();
+    const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, today: V.today, list: V.list, ncr: () => V.detail(arg), import: V.importPage, settings: V.settings };
+    current = (views[page] || V.home)();
     current.closed = page === 'ncr' && (S.getNcr(arg) || {}).Status === 'Closed';
     main.innerHTML = current.html;
     if (current.bind) current.bind(main);
-    document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'ncr' ? (current.closed ? 'closed' : 'list') : page === 'overview' || page === 'dashboard' ? 'today' : page)));
+    document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'ncr' ? (current.closed ? 'closed' : 'list') : page === 'overview' || page === 'dashboard' ? 'home' : page)));
     updateBulkBar();
     window.scrollTo(0, window.__keepScroll || 0); window.__keepScroll = 0;
   }
@@ -181,7 +181,7 @@
   function updateBulkBar() {
     const bar = $('#bulkbar'), n = V.SEL.size;
     bar.hidden = !n;
-    if (n) bar.innerHTML = `<b>${n} selected</b><button class="btn primary" data-action="bulk-followup">📨 Follow-up</button><button class="btn" data-action="bulk-set">Set next check / owner / status</button><button class="btn" data-action="bulk-clear">Clear</button>`;
+    if (n) bar.innerHTML = `<b>${n} selected</b><button class="btn primary" data-action="bulk-followup">📨 Follow-up</button><button class="btn" data-action="bulk-close">Verify &amp; close</button><button class="btn" data-action="bulk-set">Set next check / owner / status</button><button class="btn" data-action="bulk-clear">Clear</button>`;
   }
   document.addEventListener('change', (e) => {
     const cb = e.target;
@@ -192,17 +192,17 @@
     }
   });
 
-  function closeModal(id) {
-    const n = S.getNcr(id);
-    openModal(`<form id="cf" class="form modal-form"><h2>Verify &amp; close ${esc(n.NCR_No)}</h2>
-      <p class="full">Confirm QA has verified the required action and evidence. The NCR will be closed as of today.</p>
+  function closeModal(ids) {
+    const list = ids.map(S.getNcr).filter(Boolean);
+    openModal(`<form id="cf" class="form modal-form"><h2>Verify &amp; close ${list.length === 1 ? esc(list[0].NCR_No) : list.length + ' NCRs'}</h2>
+      <p class="full">Confirm QA has verified the required action and evidence. ${list.length === 1 ? 'The NCR' : 'These NCRs'} will move to the Closed page.</p>
       <label class="full">Verification note<input name="note" value="QA verified and closed"></label>
-      <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn ok" type="submit">Close NCR</button></div></form>`, (m) => {
+      <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn ok" type="submit">Close ${list.length === 1 ? 'NCR' : list.length + ' NCRs'}</button></div></form>`, (m) => {
       m.querySelector('#cf').addEventListener('submit', (e) => {
         e.preventDefault();
-        S.saveNcr(Object.assign({}, n, { Status: 'Closed', Closed_Date: L.todayISO() }));
-        S.addHistory(id, { action: new FormData(e.target).get('note') || 'QA verified and closed', by: 'QA' });
-        modal.close(); toast('NCR closed');
+        S.bulkSet(ids, { Status: 'Closed' }, new FormData(e.target).get('note') || 'QA verified and closed');
+        V.SEL.clear(); modal.close(); toast(list.length === 1 ? 'NCR closed' : list.length + ' NCRs closed');
+        if (list.length === 1 && route().page === 'ncr') location.hash = '#/closed';
       });
     });
   }
@@ -222,7 +222,9 @@
       const ids = V.open().filter((n) => V.buyerOf(n) === el.dataset.buyer && V.inf(n).actionRequired).map((n) => n.NCR_ID);
       if (ids.length) followupModal(ids);
     },
-    close: (el) => closeModal(el.dataset.id),
+    close: (el) => closeModal([el.dataset.id]),
+    'bulk-close': () => closeModal([...V.SEL]),
+    togglebuyer: (el) => { const b = el.dataset.buyer; V.HOME_OPEN.has(b) ? V.HOME_OPEN.delete(b) : V.HOME_OPEN.add(b); window.__keepScroll = window.scrollY; render(); },
     ready: (el) => {
       const n = S.getNcr(el.dataset.id);
       S.saveNcr(Object.assign({}, n, { Status: 'Ready to Close', Next_Action: n.Next_Action || 'Close NCR' }));
@@ -239,6 +241,8 @@
     const act = e.target.closest('[data-action]');
     if (act) { e.preventDefault(); e.stopPropagation(); if (!act.disabled) actions[act.dataset.action](act); return; }
     if (e.target.closest('.cb')) return;
+    const cl = e.target.closest('[data-closed]');
+    if (cl) { V.CF.q = ''; V.CF.buyer = cl.dataset.closed; }
     const f = e.target.closest('[data-filter]');
     if (f) V.setFilter(JSON.parse(f.dataset.filter));
     const row = e.target.closest('tr[data-href]');

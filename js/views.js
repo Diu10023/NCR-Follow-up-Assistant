@@ -34,7 +34,8 @@ window.NCR = window.NCR || {};
     if (!n.Buyer_Remark) return i.closed ? '–' : '<span class="chip age-escalation">📭 No buyer update</span>';
     return `<div class="rtext" title="${esc(n.Buyer_Remark)}">${esc(n.Buyer_Remark)}</div>${n.Buyer_Remark_Date ? `<div class="sub">${L.fmtDate(n.Buyer_Remark_Date)}</div>` : ''}${i.stale ? `<div><span class="chip age-attention" title="Remarks unchanged for ${i.staleDays} days">⏳ No change ${i.staleDays}d</span></div>` : ''}`;
   }
-  const whyText = (i) => (i.reasons.length ? i.reasons.map((r) => `<div class="why">${esc(r)}</div>`).join('') : '<span class="muted">Waiting</span>');
+  const whyText = (i) => (i.reasons.length ? i.reasons.map((r) => `<div class="why">${esc(r)}</div>`).join('') : '<span class="muted">Waiting</span>')
+    + (i.remarkGroup === 'hold' ? '<div class="sub">⏳ Hold / scrap – cannot close yet</div>' : i.remarkGroup === 'none' ? '<div class="sub">📭 no buyer update</div>' : '');
   const newChip = (i) => (i.isNew ? ' <span class="chip new">NEW</span>' : '');
 
   // Full list table. `full` shows every column from the spec; otherwise a compact set.
@@ -83,16 +84,45 @@ window.NCR = window.NCR || {};
 
   const emptyState = () => `<div class="card empty-state"><h2>No NCRs yet</h2><p>All data comes from your Excel export. Upload the file to get started — upload the same export again every week and only new or changed NCRs are applied.</p><a class="btn primary" href="#/import">Import Excel</a></div>`;
 
+  // ---------- Home (summary by buyer) ----------
+  const HOME_OPEN = new Set();
+  function home() {
+    if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Summary</h1></div>' + emptyState() };
+    const by = {};
+    const row = (name) => (by[name] = by[name] || { name, total: 0, open: 0, closed: 0, none: 0, progress: 0, hold: 0, jira: 0, noneIds: [] });
+    st.ncrs.forEach((n) => {
+      const r = row(buyerOf(n)), i = inf(n);
+      r.total++;
+      if (i.closed) { r.closed++; return; }
+      r.open++; r[i.remarkGroup]++;
+      if (i.remarkGroup === 'none') r.noneIds.push(n);
+    });
+    const rows = Object.values(by).sort((a, b) => b.none - a.none || b.open - a.open);
+    const tot = rows.reduce((t, r) => { Object.keys(r).forEach((k) => { if (typeof r[k] === 'number') t[k] = (t[k] || 0) + r[k]; }); return t; }, {});
+    const link = (buyer, group, n, cls) => (n ? `<a href="#/list" data-filter='${esc(JSON.stringify({ buyer: buyer === NO_BUYER ? '__none' : buyer, show: 'open', buyerUpdate: group }))}' class="${cls || ''}">${n}</a>` : '<span class="muted">0</span>');
+    const body = rows.map((r) => `<tr><td><button class="link tog" data-action="togglebuyer" data-buyer="${esc(r.name)}">${HOME_OPEN.has(r.name) ? '▾' : '▸'}</button> <b>${esc(r.name)}</b></td>
+        <td>${r.total}</td><td>${r.open ? link(r.name, '', r.open) : 0}</td><td>${r.closed ? `<a href="#/closed" data-closed="${esc(r.name)}">${r.closed}</a>` : '<span class="muted">0</span>'}</td>
+        <td>${link(r.name, 'none', r.none, 'bad strong')}</td><td>${link(r.name, 'progress', r.progress)}</td><td>${link(r.name, 'hold', r.hold)}</td><td>${link(r.name, 'jira', r.jira)}</td></tr>
+      ${HOME_OPEN.has(r.name) ? `<tr class="sub-row"><td colspan="8"><div class="sub">No buyer update (${r.none}):</div><div class="nolist">${r.noneIds.length ? r.noneIds.slice().sort(byOldest).slice(0, 60).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(' ') + (r.noneIds.length > 60 ? ' …' : '') : '<span class="muted">none</span>'}</div></td></tr>` : ''}`).join('');
+    const big = (v, l, f, href) => `<a class="big" href="${href}" data-filter='${esc(JSON.stringify(f))}'><b>${v}</b><span>${l}</span></a>`;
+    return { html: `<div class="page-head"><h1>Summary</h1><span class="muted">${L.fmtDate(L.todayISO())}</span></div>
+      <div class="bigs">${big(tot.total, 'Total', { show: 'open' }, '#/list')}${big(tot.open, 'Open', { show: 'open' }, '#/list')}${big(tot.closed, 'Closed', {}, '#/closed')}</div>
+      <section class="block"><h2>By buyer</h2><p class="hint">Open = No update + In progress + Hold / scrap + Closed in Jira. Click a number to see those NCRs; ▸ lists the NCRs with no update.</p>
+        <div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th>Total</th><th>Open</th><th>Closed</th><th>No update</th><th>In progress</th><th>Hold / scrap</th><th>Closed in Jira</th></tr></thead>
+        <tbody>${body}<tr class="total"><td><b>Total</b></td><td>${tot.total}</td><td>${tot.open}</td><td>${tot.closed}</td><td>${tot.none}</td><td>${tot.progress}</td><td>${tot.hold}</td><td>${tot.jira}</td></tr></tbody></table></div>
+        <p class="hint">Hold / scrap = Remarks contain “${esc(st.settings.holdKeywords.join('”, “'))}”. Closed in Jira = Remarks contain “${esc(st.settings.jiraKeywords.join('”, “'))}”. Change the keywords in Settings.</p></section>` };
+  }
+
   // ---------- Today ----------
   const TF = { buyer: '' };
   function today() {
     if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Today</h1></div>' + emptyState() };
     const mine = open();
     const all = mine.filter((n) => !TF.buyer || buyerOf(n) === TF.buyer);
-    const sec = { overdue: [], today: [], review: [], new: [], ready: [], soon: [] };
+    const sec = { jira: [], overdue: [], today: [], review: [], new: [], ready: [], soon: [] };
     all.forEach((n) => { const k = inf(n).section; if (k) sec[k].push(n); });
     sec.overdue.sort(byDue); sec.today.sort(byOldest); sec.new.sort(byOldest); sec.review.sort(byOldest); sec.soon.sort(byDue);
-    const need = sec.overdue.length + sec.today.length + sec.review.length + sec.new.length + sec.ready.length;
+    const need = sec.jira.length + sec.overdue.length + sec.today.length + sec.review.length + sec.new.length + sec.ready.length;
     const waiting = all.length - need - sec.soon.length;
     // buyer chips: how many each buyer still owes an action on
     const per = {}; mine.forEach((n) => { const b = buyerOf(n); per[b] = per[b] || { a: 0, t: 0 }; per[b].t++; if (inf(n).actionRequired) per[b].a++; });
@@ -100,7 +130,7 @@ window.NCR = window.NCR || {};
     const chips = [`<button class="pill${TF.buyer ? '' : ' on'}" data-buyer="">All <b>${mine.filter((n) => inf(n).actionRequired).length}</b></button>`]
       .concat(names.map((b) => `<button class="pill${TF.buyer === b ? ' on' : ''}" data-buyer="${esc(b)}">${esc(b)} <b>${per[b].a}</b></button>`)).join('');
     const block = (key, title, hint) => (!sec[key].length ? '' : `<section class="block"><h2>${title} <span class="count">${sec[key].length}</span></h2><p class="hint">${hint}</p>${workTable(sec[key], '', key, 10)}</section>`);
-    const body = [block('overdue', 'Overdue', 'Next check date has passed.'), block('today', 'Due today', ''),
+    const body = [block('jira', 'Closed in Jira', 'Remarks say Jira is closed. Tick the rows and press Verify &amp; close.'), block('overdue', 'Overdue', 'Next check date has passed.'), block('today', 'Due today', ''),
       block('review', 'Buyer updated', 'Remarks changed since your last review — read, then ✓ Reviewed.'),
       block('new', 'New', 'Not started. Oldest first. Follow up and set a next check date.'),
       block('ready', 'Ready to close', 'Verify the evidence, then close.'), block('soon', 'Coming up', 'Next check within ' + st.settings.dueSoonDays + ' days.')].join('');
@@ -166,8 +196,7 @@ window.NCR = window.NCR || {};
       if (LF.due === 'soon' && !i.dueSoon) return false;
       if (LF.due === 'week' && !(!i.closed && i.dueDiff !== null && i.dueDiff >= 0 && i.dueDiff <= 7)) return false;
       if (LF.due === 'none' && n.Due_Date) return false;
-      if (LF.buyerUpdate === 'none' && String(n.Buyer_Remark || '').trim() !== '') return false;
-      if (LF.buyerUpdate === 'has' && String(n.Buyer_Remark || '').trim() === '') return false;
+      if (LF.buyerUpdate && LF.buyerUpdate !== 'stale' && i.remarkGroup !== LF.buyerUpdate) return false;
       if (LF.buyerUpdate === 'stale' && !i.stale) return false;
       if (LF.fu === 'never' && Number(n.Followup_Count) > 0) return false;
       if (LF.fu === 'escalate' && !i.escalate) return false;
@@ -197,7 +226,7 @@ window.NCR = window.NCR || {};
         <label class="grow">Search<input id="f-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(LF.q)}"></label>
         ${sel('f-buyer', 'Buyer', `<option value="">All</option>${buyers.length < st.ncrs.filter((n) => !n.Buyer).length + buyers.length ? '<option value="__none"' + (LF.buyer === '__none' ? ' selected' : '') + '>(No buyer)</option>' : ''}${options(buyers, LF.buyer)}`)}
         ${sel('f-show', 'Show', o([['open', 'All open'], ['action', 'Needs my action'], ['waiting', 'Waiting (not due)'], ['ready', 'Ready to Close']], LF.show))}
-        ${sel('f-bu', 'Buyer update', o([['', 'Any'], ['none', 'No remarks'], ['has', 'Has remarks'], ['stale', 'Stale']], LF.buyerUpdate))}
+        ${sel('f-bu', 'Buyer update', o([['', 'Any'], ['none', 'No update'], ['progress', 'In progress'], ['hold', 'Hold / scrap'], ['jira', 'Closed in Jira'], ['stale', 'Stale']], LF.buyerUpdate))}
         <label class="check"><input type="checkbox" id="f-full"${LF.full ? ' checked' : ''}> All columns</label>
         <button class="btn" id="f-clear">Clear</button>
         <details class="full-row"><summary>More filters &amp; sorting</summary><div class="filters inner">
@@ -367,6 +396,8 @@ window.NCR = window.NCR || {};
           ${st.mode === 'demo' ? '<button class="btn danger" type="button" id="reset-demo">Clear all data in this browser</button>' : ''}</div></form></section>
       <form id="cfg" class="card"><h2>Dropdowns &amp; thresholds</h2><p class="hint">One option per line.</p>
         <div class="form cols3">${ta('dispositions', 'Disposition')}${ta('nextActions', 'Next Action')}${ta('waitingFor', 'Waiting For')}${ta('owners', 'Owners (suggestions)')}</div>
+        <div class="form cols3"><label>Hold / scrap keywords (Remarks)<textarea name="holdKeywords" rows="3">${esc((s.holdKeywords || []).join('\n'))}</textarea></label>
+          <label>Closed-in-Jira keywords (Remarks)<textarea name="jiraKeywords" rows="3">${esc((s.jiraKeywords || []).join('\n'))}</textarea></label></div>
         <div class="form cols3"><label>Due Soon window (days)<input type="number" min="1" name="dueSoonDays" value="${s.dueSoonDays}"></label>
           <label>Escalate at follow-up count ≥<input type="number" min="1" name="escalationThreshold" value="${s.escalationThreshold}"></label>
           <label>Default next check after follow-up (days)<input type="number" min="1" name="defaultCheckDays" value="${s.defaultCheckDays}"></label>
@@ -389,7 +420,7 @@ window.NCR = window.NCR || {};
         const num = (k, d) => Math.max(1, parseInt(f.get(k), 10) || d);
         const b0 = num('b0', 7), b1 = Math.max(b0 + 1, num('b1', 14)), b2 = Math.max(b1 + 1, num('b2', 30));
         const B = L.DEFAULT_SETTINGS.agingBands;
-        S.saveSettings({ dispositions: lines('dispositions'), nextActions: lines('nextActions'), waitingFor: lines('waitingFor'), owners: lines('owners'),
+        S.saveSettings({ holdKeywords: lines('holdKeywords'), jiraKeywords: lines('jiraKeywords'), dispositions: lines('dispositions'), nextActions: lines('nextActions'), waitingFor: lines('waitingFor'), owners: lines('owners'),
           dueSoonDays: num('dueSoonDays', 2), escalationThreshold: num('escalationThreshold', 3), buyerStaleDays: num('buyerStaleDays', 7), defaultCheckDays: num('defaultCheckDays', 7),
           agingBands: [Object.assign({}, B[0], { max: b0 }), Object.assign({}, B[1], { max: b1 }), Object.assign({}, B[2], { max: b2 }), B[3]] });
         NCR.app.toast('Settings saved');
@@ -397,5 +428,5 @@ window.NCR = window.NCR || {};
     } };
   }
 
-  NCR.views = { esc, options, withCurrent, closedPage, today, list, detail, importPage, settings, setFilter, inf, SEL, showAll, sectionIds, buyerOf, open, NO_BUYER, filtered };
+  NCR.views = { esc, options, withCurrent, home, closedPage, today, list, CF, detail, importPage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, buyerOf, open, NO_BUYER, filtered };
 })(window.NCR);
