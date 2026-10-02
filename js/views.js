@@ -65,6 +65,10 @@ window.NCR = window.NCR || {};
   const SEG = [
     { k: 'none', label: 'No update', color: 'var(--c-none)', ink: 'var(--i-none)' },
     { k: 'progress', label: 'In progress', color: 'var(--c-progress)', ink: 'var(--i-progress)' },
+    { k: 'followed', label: 'Followed up', color: 'var(--c-fu)', ink: 'var(--i-fu)' },
+    { k: 'hold', label: 'Hold for scrap', color: 'var(--c-hold)', ink: 'var(--i-hold)' },
+    { k: 'jira', label: 'Jira closed', color: 'var(--c-jira)', ink: 'var(--i-jira)' },
+    { k: 'closed', label: 'Closed', color: 'var(--c-closed)', ink: 'var(--i-closed)' },
   ];
   const niceStep = (max) => { const raw = Math.max(1, max) / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
   // bar with only its right (data) end rounded; the baseline end stays square
@@ -72,10 +76,10 @@ window.NCR = window.NCR || {};
   const tipAttrs = (a, b, v, color) => `data-ta="${esc(a)}" data-tb="${esc(b)}" data-tv="${esc(v)}" data-tc="${color}" tabindex="0"`;
 
   function buyerChart(rows) {
-    const list = rows.filter((r) => r.todo).sort((a, b) => b.todo - a.todo);
-    if (!list.length) return '<div class="empty">Nothing left to follow up.</div>';
+    const list = rows.filter((r) => r.total).sort((a, b) => b.total - a.total);
+    if (!list.length) return '<div class="empty">No NCRs yet.</div>';
     const labelW = 150, right = 46, W = 600, rowH = 36, top = 8, axisH = 26;
-    const max = Math.max(...list.map((r) => r.todo)), step = niceStep(max), top_ = Math.ceil(max / step) * step;
+    const max = Math.max(...list.map((r) => r.total)), step = niceStep(max), top_ = Math.ceil(max / step) * step;
     const plotW = W - labelW - right, sc = (v) => (v / top_) * plotW, H = top + list.length * rowH + axisH;
     let g = '', bars = '';
     for (let t = 0; t <= top_; t += step) g += `<line x1="${labelW + sc(t)}" x2="${labelW + sc(t)}" y1="${top}" y2="${H - axisH}" class="grid-l"/><text class="ax" x="${labelW + sc(t)}" y="${H - 8}" text-anchor="middle" font-size="12">${t}</text>`;
@@ -86,14 +90,14 @@ window.NCR = window.NCR || {};
       let x = labelW; const parts = SEG.filter((sg) => r[sg.k] > 0);
       parts.forEach((sg, j) => {
         const w = sc(r[sg.k]), last = j === parts.length - 1, dw = Math.max(1, w - (last ? 0 : 2)); // 2px surface gap between segments
-        bars += `<path class="seg" d="${barPath(x, y, dw, 22, last ? 4 : 0)}" style="fill:${sg.color}" ${tipAttrs(r.name, sg.label, r[sg.k] + ' of ' + r.todo + ' to follow up', sg.color)}/>`;
+        bars += `<path class="seg" d="${barPath(x, y, dw, 22, last ? 4 : 0)}" style="fill:${sg.color}" ${tipAttrs(r.name, sg.label, r[sg.k] + ' of ' + r.total + ' NCRs', sg.color)}/>`;
         if (w >= 26) bars += `<text x="${x + w / 2 - (last ? 0 : 1)}" y="${y + 16}" text-anchor="middle" font-size="12.5" font-weight="700" style="fill:${sg.ink}" pointer-events="none">${r[sg.k]}</text>`;
         x += w;
       });
-      bars += `<text x="${x + 8}" y="${y + 16}" font-size="14" font-weight="800">${r.todo}</text>`;
+      bars += `<text x="${x + 8}" y="${y + 16}" font-size="14" font-weight="800">${r.total}</text>`;
     });
     const legend = SEG.map((sg) => `<span class="lg"><i style="background:${sg.color}"></i>${sg.label}</span>`).join('');
-    return `<div class="legend-row">${legend}</div><svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="NCRs to follow up per buyer, split by buyer update status. Values are in the table below.">${g}${bars}</svg>`;
+    return `<div class="legend-row">${legend}</div><svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="All NCRs per buyer, split by status. Values are in the table below.">${g}${bars}</svg>`;
   }
 
   function agingChart(open_) {
@@ -145,13 +149,13 @@ window.NCR = window.NCR || {};
     return { html: `<div class="page-head"><h1>Home</h1><span class="muted">${L.fmtDate(L.todayISO())}</span></div>
       <div class="bigs">${big(tot.total, 'Total', '#/home')}${big(tot.todo, 'To follow up', '#/list', `data-filter='${esc(JSON.stringify({ tab: 'none' }))}'`)}${big(tot.followed, 'Followed up', '#/followed', `data-wfilter='{}'`)}${big(tot.hold, 'Hold for scrap', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'hold' }))}'`)}${big(tot.jira, 'Jira closed', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'jira' }))}'`)}${big(tot.closed, 'Closed', '#/closed', 'data-closed=""')}</div>
       <div class="charts">
-        <section class="block"><h2>To follow up, by buyer</h2><p class="hint">Each bar is one buyer's NCRs still to follow up, split by what their Remarks say. Exact numbers are in the table below.</p>${buyerChart(rows)}</section>
+        <section class="block"><h2>Overview by buyer</h2><p class="hint">Each bar is all of one buyer's NCRs, split by status: still to follow up (no remark / in progress), followed up, hold for scrap, Jira closed and closed. Hover a segment for the exact count.</p>${buyerChart(rows)}</section>
         <section class="block"><h2>How long they have been open</h2><p class="hint">All open NCRs grouped by days since the NCR date.</p>${agingChart(open())}</section>
       </div>
-      <section class="block"><h2>By buyer</h2><p class="hint">To follow up = No remark + In progress. <b>Followed up</b> are waiting for their next check date. Click a number to see those NCRs; ▸ lists the NCRs with no remark.</p>
+      <section class="block"><details><summary>Show the table (click a number to open those NCRs)</summary><p class="hint">To follow up = No remark + In progress. <b>Followed up</b> are waiting for their next check date. Click a number to see those NCRs; ▸ lists the NCRs with no remark.</p>
         <div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th>Total</th><th>To follow up</th><th>No remark</th><th>In progress</th><th>Followed up</th><th>Hold for scrap</th><th>Jira closed</th><th>Closed</th></tr></thead>
         <tbody>${body}<tr class="total"><td><b>Total</b></td><td>${tot.total}</td><td>${tot.todo}</td><td>${tot.none}</td><td>${tot.progress}</td><td>${tot.followed}</td><td>${tot.hold}</td><td>${tot.jira}</td><td>${tot.closed}</td></tr></tbody></table></div>
-        <p class="hint">Hold for scrap = Remarks contain “${esc(st.settings.holdKeywords.join('”, “'))}”. Jira closed = Remarks contain “${esc(st.settings.jiraKeywords.join('”, “'))}”; those NCRs are closed when the file is imported. Any letter case. Change the keywords in Settings.</p></section>` };
+        <p class="hint">Hold for scrap = Remarks contain “${esc(st.settings.holdKeywords.join('”, “'))}”. Jira closed = Remarks contain “${esc(st.settings.jiraKeywords.join('”, “'))}”; those NCRs are closed when the file is imported. Any letter case. Change the keywords in Settings.</p></details></section>` };
   }
 
   // ---------- Closed archive ----------

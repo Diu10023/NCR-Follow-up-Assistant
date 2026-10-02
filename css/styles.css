@@ -16,7 +16,7 @@
   --ease:300ms ease-out;
   --on-acc:#fff;--hdr-bg:rgb(224 229 236 / .88);--hdr-sh:0 8px 14px rgb(163 177 198 / .35);
   --line-s:rgb(163 177 198 / .55);--line-w:rgb(163 177 198 / .3);--row-h:rgb(255 255 255 / .38);--row-sub:rgb(255 255 255 / .3);
-  --c-none:#333333;--c-progress:#007AC8;--c-hold:#666666;--c-jira:#A0C8EC;--i-none:#fff;--i-progress:#fff;--i-hold:#fff;--i-jira:#000;
+  --c-none:#333333;--c-progress:#007AC8;--c-hold:#666666;--c-jira:#A0C8EC;--i-none:#fff;--i-progress:#fff;--i-hold:#fff;--i-jira:#000;--c-fu:#48A7E0;--i-fu:#000;--c-closed:#CBD2DB;--i-closed:#000;
   color-scheme:light;
 }
 /* dark: same surface idea, shadows swap roles (deep dark below-right, faint light above-left) */
@@ -26,7 +26,7 @@
     --sh-d:rgb(0 0 0 / .55);--sh-dh:rgb(0 0 0 / .65);--sh-l:rgb(255 255 255 / .05);--sh-lh:rgb(255 255 255 / .07);
     --on-acc:#0B1520;--hdr-bg:rgb(43 48 57 / .88);--hdr-sh:0 8px 14px rgb(0 0 0 / .35);
     --line-s:rgb(255 255 255 / .14);--line-w:rgb(255 255 255 / .07);--row-h:rgb(255 255 255 / .05);--row-sub:rgb(255 255 255 / .04);
-    --c-none:#D5DBE3;--c-progress:#4DA8E8;--c-hold:#8E99A8;--c-jira:#A0C8EC;--i-none:#12151B;--i-progress:#0B1520;--i-hold:#0B1520;--i-jira:#0B1520;
+    --c-none:#D5DBE3;--c-progress:#4DA8E8;--c-hold:#8E99A8;--c-jira:#A0C8EC;--i-none:#12151B;--i-progress:#0B1520;--i-hold:#0B1520;--i-jira:#0B1520;--c-fu:#2B6FA8;--i-fu:#fff;--c-closed:#4A5463;--i-closed:#fff;
     color-scheme:dark;
   }
 }
@@ -35,7 +35,7 @@
   --sh-d:rgb(0 0 0 / .55);--sh-dh:rgb(0 0 0 / .65);--sh-l:rgb(255 255 255 / .05);--sh-lh:rgb(255 255 255 / .07);
   --on-acc:#0B1520;--hdr-bg:rgb(43 48 57 / .88);--hdr-sh:0 8px 14px rgb(0 0 0 / .35);
   --line-s:rgb(255 255 255 / .14);--line-w:rgb(255 255 255 / .07);--row-h:rgb(255 255 255 / .05);--row-sub:rgb(255 255 255 / .04);
-  --c-none:#D5DBE3;--c-progress:#4DA8E8;--c-hold:#8E99A8;--c-jira:#A0C8EC;--i-none:#12151B;--i-progress:#0B1520;--i-hold:#0B1520;--i-jira:#0B1520;
+  --c-none:#D5DBE3;--c-progress:#4DA8E8;--c-hold:#8E99A8;--c-jira:#A0C8EC;--i-none:#12151B;--i-progress:#0B1520;--i-hold:#0B1520;--i-jira:#0B1520;--c-fu:#2B6FA8;--i-fu:#fff;--c-closed:#4A5463;--i-closed:#fff;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
