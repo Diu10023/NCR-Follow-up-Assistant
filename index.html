@@ -10,9 +10,9 @@
   <header class="topbar">
     <div class="brand">NCR Follow-up Control <span id="mode" class="chip demo" hidden title="Data is stored only in this browser. Connect Google Sheets in Settings.">Demo mode</span></div>
     <nav>
-      <a href="#/dashboard">Dashboard</a>
       <a href="#/today">Today <span id="today-badge" class="nbadge"></span></a>
-      <a href="#/list">NCR List</a>
+      <a href="#/overview">Overview</a>
+      <a href="#/list">All NCRs</a>
       <a href="#/import">Import Excel</a>
       <a href="#/settings">Settings</a>
     </nav>
@@ -21,6 +21,7 @@
   <div id="sync" class="sync"></div>
   <main id="main" class="wrap"><div class="empty">Loading…</div></main>
   <dialog id="modal"></dialog>
+  <div id="bulkbar" hidden></div>
   <div id="toast"></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="js/logic.js"></script>

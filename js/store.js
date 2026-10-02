@@ -4,7 +4,7 @@ window.NCR = window.NCR || {};
   const L = NCR.logic;
   const NCR_FIELDS = ['NCR_ID', 'NCR_No', 'Item_No', 'Batch_No', 'Supplier', 'Buyer', 'NCR_Date', 'Defect', 'Quantity',
     'Disposition', 'Next_Action', 'Owner', 'Waiting_For', 'Due_Date', 'Last_Followup', 'Followup_Count', 'Status',
-    'Closed_Date', 'Aging', 'Remark', 'Created_At', 'Updated_At', 'Buyer_Remark', 'Buyer_Remark_Date'];
+    'Closed_Date', 'Aging', 'Remark', 'Created_At', 'Updated_At', 'Buyer_Remark', 'Buyer_Remark_Date', 'Last_Review'];
   const HIST_FIELDS = ['History_ID', 'NCR_ID', 'NCR_No', 'Date', 'Followup_No', 'Action', 'Waiting_For', 'Remark', 'Created_By', 'Created_At'];
   const TRACKED = [['Status', 'Status'], ['Disposition', 'Disposition'], ['Next_Action', 'Next Action'],
     ['Owner', 'Owner'], ['Waiting_For', 'Waiting For'], ['Due_Date', 'Due Date']];
@@ -153,6 +153,7 @@ window.NCR = window.NCR || {};
     const date = p.date || L.todayISO();
     let no = '';
     if (p.countAsFollowup) { n.Followup_Count = (Number(n.Followup_Count) || 0) + 1; no = n.Followup_Count; n.Last_Followup = date; }
+    n.Last_Review = L.nowStamp();
     if (p.waiting) n.Waiting_For = p.waiting;
     stamp(n);
     const h = histRow(n, Object.assign({}, p, { date, followupNo: no }));
@@ -160,6 +161,58 @@ window.NCR = window.NCR || {};
     state.history.push(h);
     commit([n], [h]);
     emit();
+  }
+
+  // Record one follow-up on each NCR (single or bulk). p.nextDate becomes the next check (Due_Date).
+  function recordFollowups(ids, p) {
+    const date = p.date || L.todayISO(), ncrs = [], hist = [];
+    ids.forEach((id) => {
+      const o = getNcr(id); if (!o) return;
+      const n = Object.assign({}, o);
+      n.Followup_Count = (Number(n.Followup_Count) || 0) + 1; n.Last_Followup = date; n.Last_Review = L.nowStamp();
+      if (p.waiting) n.Waiting_For = p.waiting;
+      if (p.nextDate) n.Due_Date = p.nextDate;
+      if (p.setPending && (n.Status === 'Not Started' || n.Status === 'Open')) n.Status = 'Pending';
+      stamp(n);
+      state.ncrs[state.ncrs.findIndex((x) => x.NCR_ID === id)] = n;
+      ncrs.push(n);
+      hist.push(histRow(n, { date, followupNo: n.Followup_Count, action: p.action, waiting: p.waiting || n.Waiting_For, remark: p.remark, by: p.by }));
+    });
+    state.history.push(...hist);
+    commit(ncrs, hist); emit();
+  }
+
+  // Set the same fields on many NCRs at once (next check date, owner, waiting for, status).
+  function bulkSet(ids, fields, note) {
+    const ncrs = [], hist = [];
+    ids.forEach((id) => {
+      const o = getNcr(id); if (!o) return;
+      const n = Object.assign({}, o, fields);
+      if (n.Status === 'Ready to Close' && !n.Next_Action) n.Next_Action = 'Close NCR';
+      stamp(n);
+      state.ncrs[state.ncrs.findIndex((x) => x.NCR_ID === id)] = n;
+      ncrs.push(n);
+      const ch = TRACKED.filter(([f]) => (o[f] || '') !== (n[f] || '')).map(([f, label]) => `${label}: ${o[f] || '–'} → ${n[f] || '–'}`);
+      if (ch.length || note) hist.push(histRow(n, { action: note || ('Updated: ' + ch.join('; ')), remark: note && ch.length ? ch.join('; ') : '', by: 'QA' }));
+    });
+    state.history.push(...hist);
+    commit(ncrs, hist); emit();
+  }
+
+  // QA read the buyer's latest Remarks: clear the "review" flag and schedule the next check.
+  function markReviewed(ids, nextDate) {
+    const ncrs = [], hist = [], today = L.todayISO();
+    ids.forEach((id) => {
+      const o = getNcr(id); if (!o) return;
+      const n = Object.assign({}, o, { Last_Review: L.nowStamp() });
+      if (nextDate) n.Due_Date = nextDate;
+      stamp(n);
+      state.ncrs[state.ncrs.findIndex((x) => x.NCR_ID === id)] = n;
+      ncrs.push(n);
+      hist.push(histRow(n, { action: 'Reviewed buyer update' + (nextDate ? ' – next check ' + L.fmtDate(nextDate) : ''), by: 'QA' }));
+    });
+    state.history.push(...hist);
+    commit(ncrs, hist); emit();
   }
 
   function removeNcr(id) {
@@ -213,5 +266,5 @@ window.NCR = window.NCR || {};
   }
 
   NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
-    saveNcr, addHistory, removeNcr, saveMany, saveSettings, getApiConfig, setApiConfig, resetDemo };
+    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, removeNcr, saveMany, saveSettings, getApiConfig, setApiConfig, resetDemo };
 })(window.NCR);

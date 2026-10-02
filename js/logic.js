@@ -13,6 +13,7 @@ window.NCR = window.NCR || {};
     dueSoonDays: 2,
     escalationThreshold: 3,
     buyerStaleDays: 7,
+    defaultCheckDays: 7,
     agingBands: [
       { max: 7, label: 'Normal', cls: 'age-normal' },
       { max: 14, label: 'Follow-up', cls: 'age-followup' },
@@ -67,20 +68,37 @@ window.NCR = window.NCR || {};
     const stale = staleDays !== null && staleDays >= s.buyerStaleDays;
     const count = Number(n.Followup_Count) || 0;
     const escalate = !closed && count >= s.escalationThreshold;
+    const notStarted = !closed && n.Status === 'Not Started';
+    // Buyer wrote/changed Remarks after QA last reviewed this NCR.
+    const needsReview = !closed && !ready && !notStarted && !!n.Buyer_Remark && !!n.Buyer_Remark_Date && String(n.Buyer_Remark_Date) > String(n.Last_Review || '');
+    const isNew = !closed && aging !== null && aging <= 7;
+    const reasons = [];
+    if (!closed) {
+      if (overdue) reasons.push(`Overdue ${-dueDiff}d`); else if (dueToday) reasons.push('Due today');
+      if (ready) reasons.push('Ready to close – verify');
+      if (notStarted) reasons.push('New – triage');
+      if (needsReview) reasons.push('Buyer updated – review');
+    }
+    const actionRequired = reasons.length > 0;
     let state = 'ontrack';
     if (closed) state = 'closed';
     else if (overdue) state = 'overdue';
     else if (ready) state = 'ready';
+    else if (notStarted) state = 'new';
+    else if (needsReview) state = 'review';
     else if (dueToday || dueSoon) state = 'soon';
+    // primary section on the Today page (each NCR appears once)
+    const section = closed ? null : overdue ? 'overdue' : dueToday ? 'today' : ready ? 'ready' : notStarted ? 'new' : needsReview ? 'review' : dueSoon ? 'soon' : null;
     const band = agingBand(aging, s);
-    const actionRequired = !closed && (overdue || dueToday || ready || missingNext || noUpdate || stale);
-    return { closed, aging, dueDiff, ready, overdue, dueToday, dueSoon, missingNext, noUpdate, stale, staleDays, count, escalate, state, band, actionRequired };
+    return { notStarted, needsReview, isNew, reasons, section, closed, aging, dueDiff, ready, overdue, dueToday, dueSoon, missingNext, noUpdate, stale, staleDays, count, escalate, state, band, actionRequired };
   }
 
   const STATE_META = {
     overdue: { icon: '🔴', label: 'Overdue', cls: 'b-overdue' },
+    new: { icon: '🆕', label: 'New – triage', cls: 'b-new' },
+    review: { icon: '💬', label: 'Buyer updated', cls: 'b-review' },
     soon: { icon: '🟡', label: 'Due Soon', cls: 'b-soon' },
-    ontrack: { icon: '🟢', label: 'On Track', cls: 'b-ok' },
+    ontrack: { icon: '🟢', label: 'Waiting / On Track', cls: 'b-ok' },
     ready: { icon: '🔵', label: 'Ready to Close', cls: 'b-ready' },
     closed: { icon: '⚫', label: 'Closed', cls: 'b-closed' },
   };
@@ -101,7 +119,7 @@ window.NCR = window.NCR || {};
   function followupMessage(n, settings) {
     const count = (Number(n.Followup_Count) || 0) + 1;
     const lines = [];
-    lines.push(`NCR-${String(n.NCR_No).replace(/^NCR-?/i, '')} / Item ${n.Item_No || '-'}` + (n.Batch_No ? ` / Batch ${n.Batch_No}` : ''));
+    lines.push(`${n.NCR_No} / Item ${n.Item_No || '-'}` + (n.Batch_No ? ` / Batch ${n.Batch_No}` : ''));
     if (n.Defect) lines.push(`Defect: ${n.Defect}`);
     lines.push('');
     lines.push(`Current Action: ${n.Next_Action || n.Disposition || 'To be confirmed'}`);
@@ -115,6 +133,19 @@ window.NCR = window.NCR || {};
     return lines.join('\n');
   }
 
-  NCR.logic = { STATUSES, DEFAULT_SETTINGS, STATE_META, toISO, todayISO, nowStamp, dayNum, daysBetween, addDays, fmtDate, uid,
+  // One message per buyer listing every NCR QA wants an update on.
+  function buyerMessage(buyer, list, today) {
+    today = today || todayISO();
+    const lines = [`Hi ${buyer || 'all'},`, '', 'Could you please update the status / Remarks for the NCRs below?', ''];
+    list.forEach((n, i) => {
+      const age = daysBetween(n.NCR_Date, today);
+      lines.push(`${i + 1}. ${n.NCR_No} / Item ${n.Item_No || '-'}${n.Defect ? ' / ' + n.Defect : ''} – open ${age === null ? '?' : age}d` +
+        (n.Buyer_Remark ? ` – last Remarks: ${String(n.Buyer_Remark).replace(/\s+/g, ' ').slice(0, 80)}` : ' – no Remarks yet'));
+    });
+    lines.push('', 'Thank you.');
+    return lines.join('\n');
+  }
+
+  NCR.logic = { buyerMessage, STATUSES, DEFAULT_SETTINGS, STATE_META, toISO, todayISO, nowStamp, dayNum, daysBetween, addDays, fmtDate, uid,
     info, agingBand, followupLabel, followupMessage };
 })(window.NCR);

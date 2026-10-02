@@ -130,11 +130,10 @@ window.NCR = window.NCR || {};
     const H = (n, action, remark, by) => history.push({ History_ID: L.uid('H'), NCR_ID: n.NCR_ID, NCR_No: n.NCR_No, Date: today, Followup_No: '', Action: action, Waiting_For: '', Remark: remark || '', Created_By: by || 'Import', Created_At: now });
     p.added.forEach((r) => {
       const n = {}; NCR.store.NCR_FIELDS.forEach((f) => { n[f] = ''; });
-      Object.assign(n, r, { NCR_ID: L.uid('NCR'), Status: 'Not Started', Followup_Count: 0, Created_At: now, Updated_At: now });
+      Object.assign(n, r, { Owner: r.Buyer, NCR_ID: L.uid('NCR'), Status: 'Not Started', Followup_Count: 0, Created_At: now, Updated_At: now });
       n.Aging = L.daysBetween(n.NCR_Date, today);
-      if (n.Buyer_Remark) n.Buyer_Remark_Date = today;
       delete n.RemarkMapped; delete n.Closed; ncrs.push(n); H(n, 'NCR imported from Excel');
-      if (n.Buyer_Remark) H(n, 'Buyer update (Remarks): ' + n.Buyer_Remark, '', 'Buyer (Excel)');
+      if (n.Buyer_Remark) H(n, 'Buyer Remarks at import: ' + n.Buyer_Remark, '', 'Buyer (Excel)');
     });
     p.updated.forEach(({ rec, old, changes }) => {
       const n = Object.assign({}, old);
@@ -143,7 +142,7 @@ window.NCR = window.NCR || {};
       n.Updated_At = now;
       const br = changes.find((c) => c.field === 'Buyer_Remark'), others = changes.filter((c) => c.field !== 'Buyer_Remark');
       if (br) {
-        n.Buyer_Remark_Date = today;
+        n.Buyer_Remark_Date = now;
         H(n, br.to ? 'Buyer update (Remarks): ' + br.to : 'Buyer cleared Remarks', br.from ? 'Previous: ' + br.from : '', 'Buyer (Excel)');
       }
       if (others.length) H(n, 'Updated from Excel: ' + others.map((c) => c.field.replace('_', ' ')).join(', '));

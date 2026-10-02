@@ -24,6 +24,13 @@ Sheets `NCR_Master`, `Followup_History` and `Settings` are created automatically
 - **Remarks = buyer's progress.** It is stored as *Buyer Remark* (separate from QA's own Remark) and refreshed on every import; each change — including the buyer clearing Remarks (old text kept in the history entry) — is logged in history as a "Buyer update". A buyer update unchanged for N days (Settings, default 7) is flagged **⏳ stale**. Open NCRs whose Remarks are empty are flagged **📭 No buyer update** (Dashboard alert, Today section, list filter, Action Required) so QA knows to chase the buyer.
 - Optional: mark open NCRs missing from the file as *Ready to Close* (QA still verifies and closes).
 
+## Daily / weekly routine
+1. **Import Excel** weekly. New NCRs appear as *New – triage* (Owner = Buyer); NCRs gone from the export are marked *Ready to Close*; changed buyer Remarks appear as *Buyer updated – review*.
+2. **Today** is the only worklist. Sections: Overdue → Due Today → Buyer updated → New (oldest first) → Ready to Close → Coming up.
+3. Chase: tick rows (or *Select all*, or **Chase** per buyer on Overview) → **Follow-up** → copy the generated message (one per buyer) → pick the **next check date** → record.
+4. Followed up but can't close yet? The NCR leaves Today until its next check date, then returns automatically — nothing is forgotten, and the Overview "Not forgotten?" panel shows follow-up coverage.
+5. When the work is done: **Mark Ready to Close**, verify, **Verify & Close** (QA always closes explicitly).
+
 ## Pages
 Dashboard · Today · NCR List (search/filter/sort) · NCR Detail (follow-up control, history timeline, quick Follow-up message) · Add/Edit NCR · Import Excel · Settings (dropdowns, due-soon window, escalation threshold, aging bands).
 
