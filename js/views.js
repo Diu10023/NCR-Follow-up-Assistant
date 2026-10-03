@@ -155,7 +155,7 @@ window.NCR = window.NCR || {};
         <td>${r.closed ? `<a href="#/closed" data-closed="${esc(r.name)}">${r.closed}</a>` : '<span class="muted">0</span>'}</td></tr>
       ${HOME_OPEN.has(r.name) ? `<tr class="sub-row"><td colspan="10"><div class="sub">No remark, still to follow up (${r.none}):</div><div class="nolist">${r.noneIds.length ? r.noneIds.slice().sort(byOldest).slice(0, 60).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(' ') + (r.noneIds.length > 60 ? ' …' : '') : '<span class="muted">none</span>'}</div></td></tr>` : ''}`).join('');
     const big = (v, l, href, attr) => `<a class="big" href="${href}" ${attr || ''}><b>${v}</b><span>${l}</span></a>`;
-    return { html: `<div class="page-head"><h1>Home</h1><span class="inline"><a class="btn" href="#/help">❓ How to use</a><a class="btn" href="#/response">📊 Buyer response</a><span class="muted">${L.fmtDate(L.todayISO())}</span></span></div>
+    return { html: `<div class="page-head"><h1>Home</h1><span class="inline"><button class="btn" data-action="export-all" title="One Excel file: every status on its own sheet, plus summary, timeline and uploads">⬇ Export all to Excel</button><a class="btn" href="#/help">❓ How to use</a><a class="btn" href="#/response">📊 Buyer response</a><span class="muted">${L.fmtDate(L.todayISO())}</span></span></div>
       <div class="bigs">${big(tot.total, 'Total', '#/home')}${big(tot.todo, 'To follow up', '#/list', `data-filter='${esc(JSON.stringify({ tab: 'none' }))}'`)}${big(tot.followed, 'Followed up', '#/followed', `data-wfilter='{}'`)}${big(tot.hold, 'Hold for scrap', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'hold' }))}'`)}${big(tot.jira, 'Jira closed', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'jira' }))}'`)}${big(tot.closed, 'Closed', '#/closed', 'data-closed=""')}</div>
       <div class="charts">
         <section class="block"><h2>Overview by buyer</h2><p class="hint">Each bar is all of one buyer's NCRs, split by status: still to follow up (no remark / in progress), followed up, hold for scrap, Jira closed and closed. Hover a segment for the exact count.</p>${buyerChart(rows)}</section>
@@ -425,6 +425,32 @@ window.NCR = window.NCR || {};
       return { 'NCR No.': n.NCR_No, 'Item No.': n.Item_No, 'Batch No.': n.Batch_No, Buyer: n.Buyer || '', Defect: n.Defect, Created: n.NCR_Date ? L.fmtDate(n.NCR_Date) : '',
         'Days open': i.aging === null ? '' : i.aging, 'Buyer remark': n.Buyer_Remark || '', 'Follow-ups': i.count, 'Last follow-up': n.Last_Followup ? L.fmtDate(n.Last_Followup) : '', 'Next check': n.Due_Date ? L.fmtDate(n.Due_Date) : '' };
     });
+  }
+
+  // Whole workbook: every bucket on its own sheet, plus summary, timeline and upload log
+  function exportBook() {
+    const BK = { todo: [], followed: [], hold: [], jira: [], closed: [] };
+    st.ncrs.forEach((n) => { const b = inf(n).bucket; if (BK[b]) BK[b].push(n); });
+    const line = (n, k) => {
+      const i = inf(n), at = i.bucket === 'followed' ? attention(n) : null;
+      return Object.assign(k ? { '#': k } : {}, { 'NCR No.': n.NCR_No, 'Item No.': n.Item_No, 'Batch No.': n.Batch_No, Buyer: n.Buyer || '', Defect: n.Defect, Created: n.NCR_Date ? L.fmtDate(n.NCR_Date) : '',
+        'Days open': i.aging === null ? '' : i.aging, 'Buyer remark': n.Buyer_Remark || '', 'Remark updated': n.Buyer_Remark_Date ? L.fmtDate(n.Buyer_Remark_Date) : '',
+        Group: i.remarkGroup === 'none' ? '1 No remark' : '2 Has remark', 'Follow-ups': i.count, 'Last follow-up': n.Last_Followup ? L.fmtDate(n.Last_Followup) : '',
+        Rounds: roundsOf(n), Flag: at ? at.label : '', 'Closed date': n.Closed_Date ? L.fmtDate(n.Closed_Date) : '' });
+    };
+    const ordered = (arr) => arr.slice().sort(priSort).map((n, k) => line(n, k + 1));
+    const byBuyer = {}, cell = (b) => (byBuyer[b] = byBuyer[b] || { Buyer: b, Total: 0, 'To follow up: no remark': 0, 'To follow up: has remark': 0, 'Followed up': 0, 'Hold for scrap': 0, 'Jira closed': 0, Closed: 0 });
+    Object.entries(BK).forEach(([k, arr]) => arr.forEach((n) => {
+      const c = cell(buyerOf(n)); c.Total++;
+      if (k === 'todo') c[inf(n).remarkGroup === 'none' ? 'To follow up: no remark' : 'To follow up: has remark']++;
+      else c[{ followed: 'Followed up', hold: 'Hold for scrap', jira: 'Jira closed', closed: 'Closed' }[k]]++;
+    }));
+    const sumRows = Object.values(byBuyer).sort((a, b) => b.Total - a.Total);
+    const tot = { Buyer: 'Total' }; sumRows.forEach((r) => Object.keys(r).forEach((k) => { if (k !== 'Buyer') tot[k] = (tot[k] || 0) + r[k]; })); sumRows.push(tot);
+    const idNo = {}; st.ncrs.forEach((n) => { idNo[n.NCR_ID] = n; });
+    const tl = st.history.slice().sort((a, b) => String(b.Date).localeCompare(String(a.Date)) || String(b.Created_At).localeCompare(String(a.Created_At))).map((h) => ({ Date: L.fmtDate(h.Date), 'NCR No.': h.NCR_No, Buyer: (idNo[h.NCR_ID] || {}).Buyer || '', Action: h.Action, Detail: h.Remark || '', 'Follow-up #': h.Followup_No || '', By: h.Created_By || '' }));
+    const ups = S.getImports().slice().reverse().map((x) => ({ 'File date': L.fmtDate(x.fileDate || x.at), File: x.file || '', 'New NCRs': x.added || 0, 'Remark changed': x.remarkChanged === undefined ? '' : x.remarkChanged, Closed: x.closed || 0, 'Rows in file': x.total === undefined ? '' : x.total }));
+    return [['Summary', sumRows], ['To follow up', ordered(BK.todo)], ['Followed up', ordered(BK.followed)], ['Hold for scrap', ordered(BK.hold)], ['Jira closed', ordered(BK.jira)], ['Closed', ordered(BK.closed)], ['Timeline', tl], ['Uploads', ups]];
   }
 
   // ---------- Hold for scrap / Jira closed (kept out of the follow-up flow) ----------
@@ -822,5 +848,5 @@ window.NCR = window.NCR || {};
     } };
   }
 
-  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, helpPage, changesPage, changeBanner, responsePage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
+  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, exportBook, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, helpPage, changesPage, changeBanner, responsePage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
 })(window.NCR);

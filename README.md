@@ -63,3 +63,6 @@ The **How to use** menu explains the weekly routine step by step, what each word
 The **What changed** menu item is always there. It opens the latest upload and lets you step back through older ones (Older / Newer or the dropdown). A badge on the menu shows how many NCRs the newest upload touched until you open it.
 
 **Reviewed**: when a buyer changes a remark the NCR shows *Buyer updated*. After you read it, press ✓ Reviewed to clear the flag. Pressed by mistake? Open the NCR and press ↩ Undo next to the newest “Reviewed buyer update” entry in its history.
+
+## Export all to Excel
+Home → **Export all to Excel** downloads one workbook: Summary (per buyer), To follow up, Followed up, Hold for scrap, Jira closed, Closed, Timeline (every history entry) and Uploads. Each status sheet is in work order with a # column.

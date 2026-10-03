@@ -245,14 +245,31 @@
     });
     const who = Object.keys(by).length === 1 ? '_' + Object.keys(by)[0].replace(/[^\w\-]+/g, '_') : '';
     const filename = `NCR_${label}${who}_${L.todayISO()}.xlsx`;
+    await saveBook(wb, filename);
+  }
+  async function saveBook(wb, filename) {
     try {
       const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
       if (dl) { await dl.save({ filename, data: XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) }); toast('Excel file ready'); }
       else { XLSX.writeFile(wb, filename); toast('Excel file downloaded'); }
     } catch (e) { if (!e || e.code !== 'declined') toast('Could not save the file' + (e && e.message ? ': ' + e.message : ''), true); }
   }
+  // Everything, split by status: one sheet per status plus summary, timeline and upload log
+  async function exportAll() {
+    if (!st.ncrs.length) { toast('Nothing to export', true); return; }
+    if (typeof XLSX === 'undefined') { toast('Excel library not loaded (check internet connection)', true); return; }
+    const wb = XLSX.utils.book_new();
+    V.exportBook().forEach(([name, rows]) => {
+      const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ Info: 'Nothing here' }]);
+      const keys = Object.keys(rows[0] || { Info: 1 });
+      ws['!cols'] = keys.map((k) => ({ wch: /remark|Action|Detail|Defect/i.test(k) ? 50 : /Buyer|NCR No|Batch|Flag|Group/.test(k) ? 18 : 13 }));
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    });
+    await saveBook(wb, `NCR_all_${L.todayISO()}.xlsx`);
+  }
 
   const actions = {
+    'export-all': () => exportAll(),
     'dismiss-changes': () => { const l = S.getImports().filter((x) => x.changes).pop(); if (l) S.setSeen(l.at); render(); },
     back: () => {
       if (history.length > 1) { history.back(); return; }
