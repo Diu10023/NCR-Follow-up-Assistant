@@ -29,6 +29,8 @@
     $('#today-badge').textContent = by.todo;      // still to follow up
     $('#fu-badge').textContent = by.followed;     // followed up, not closed yet
     $('#hold-badge').textContent = by.hold + by.jira;
+    const lg = S.getImports().filter((x) => x.changes).pop();   // unseen upload: show how many NCRs it touched
+    $('#chg-badge').textContent = lg && S.getSeen() !== lg.at ? new Set(lg.changes.filter((c) => ['new', 'update', 'cleared'].includes(c.t)).map((c) => c.no)).size || '' : '';
     const el = $('#sync');
     el.className = 'sync' + (st.error ? ' err' : '');
     el.textContent = st.error ? '⚠️ ' + st.error : st.saving ? 'Saving…' : st.mode === 'sheets' ? '✓ Synced with Google Sheets' : '';
@@ -323,6 +325,6 @@
   });
 
 
-  NCR.app = { render, toast, confirmModal };
+  NCR.app = { render, toast, confirmModal, status };
   S.init().then(() => { status(); render(); });
 })();

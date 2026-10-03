@@ -59,3 +59,5 @@ After each upload a 🔔 banner appears on Home, To follow up and Followed up un
 
 ## How to use page
 The **How to use** menu explains the weekly routine step by step, what each word means (To follow up, Followed up, No remark, Hold for scrap, Rounds, Carried over…) and what the colours mean. Menu items also show a short tooltip.
+
+The **What changed** menu item is always there. It opens the latest upload and lets you step back through older ones (Older / Newer or the dropdown). A badge on the menu shows how many NCRs the newest upload touched until you open it.

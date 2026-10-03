@@ -704,22 +704,25 @@ window.NCR = window.NCR || {};
   function changesPage(at) {
     const logs = S.getImports().filter((x) => x.changes), l = logs.find((x) => x.at === at) || logs[logs.length - 1];
     if (!l) return { html: '<div class="page-head"><h1>What changed</h1></div><div class="empty">No change details yet. They are recorded for each upload from now on. <a href="#/import">Import a file</a>.</div>' };
-    S.setSeen(l.at);
-    const prev = logs[logs.indexOf(l) - 1];
+    if (l === logs[logs.length - 1]) { S.setSeen(l.at); NCR.app.status && NCR.app.status(); } // looking at an older upload does not count as seeing the newest
+    const prev = logs[logs.indexOf(l) - 1], k = logs.indexOf(l);
+    const nav = `<div class="chg-nav"><a class="btn sm${k > 0 ? '' : ' disabled'}" ${k > 0 ? `href="#/changes/${encodeURIComponent(logs[k - 1].at)}"` : ''}>‹ Older</a>
+      <select id="chg-pick" aria-label="Choose an upload">${logs.slice().reverse().map((x) => `<option value="${esc(x.at)}"${x.at === l.at ? ' selected' : ''}>${L.fmtDate(x.fileDate || x.at)} · ${esc(x.file || 'file')}</option>`).join('')}</select>
+      <a class="btn sm${k < logs.length - 1 ? '' : ' disabled'}" ${k < logs.length - 1 ? `href="#/changes/${encodeURIComponent(logs[k + 1].at)}"` : ''}>Newer ›</a></div>`;
     const link = (no) => { const n = st.ncrs.find((x) => x.NCR_No === no); return n ? `<a href="#/ncr/${esc(n.NCR_ID)}"><b>${esc(no)}</b></a>` : `<b>${esc(no)}</b>`; };
     const sec = (t, title, hint, cols, row) => {
       const items = l.changes.filter((c) => c.t === t); if (!items.length) return '';
       return `<section class="block"><h2>${title} <span class="count">${items.length}</span></h2><p class="hint">${hint}</p><div class="table-wrap"><table class="grid compact"><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${items.sort((a, b) => a.buyer.localeCompare(b.buyer)).map((c) => `<tr>${row(c)}</tr>`).join('')}</tbody></table></div></section>`;
     };
     const rem = (x) => (x ? `<div class="rtext" title="${esc(x)}">${esc(x)}</div>` : '<span class="muted">(empty)</span>');
-    const html = `<div class="page-head"><div><h1>What changed</h1><div class="muted">${esc(l.file || 'file')} · file date ${L.fmtDate(l.fileDate || l.at)}${prev ? ` · compared with ${esc(prev.file || 'the previous file')} (${L.fmtDate(prev.fileDate || prev.at)})` : ''}</div></div></div>
+    const html = `<div class="page-head"><div><h1>What changed</h1>${nav}<div class="muted">${esc(l.file || 'file')} · file date ${L.fmtDate(l.fileDate || l.at)}${prev ? ` · compared with ${esc(prev.file || 'the previous file')} (${L.fmtDate(prev.fileDate || prev.at)})` : ''}</div></div></div>
       ${sec('update', '🔔 Buyer updated Remarks', 'Existing NCRs whose Remarks changed since the previous upload. Read them, then follow up if needed.', ['NCR', 'Buyer', 'Before', 'Now'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td><td class="remark">${rem(c.from)}</td><td class="remark">${rem(c.to)}</td>`)}
       ${sec('new', '🆕 New NCRs to chase', 'These NCRs were not in the previous upload.', ['NCR', 'Buyer', 'Remark in file'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td><td class="remark">${rem(c.to)}</td>`)}
       ${sec('cleared', '📭 Buyer cleared the Remarks', 'The Remarks were removed in this file. Worth asking why.', ['NCR', 'Buyer', 'Previous remark'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td><td class="remark">${rem(c.from)}</td>`)}
       ${sec('buyer', '🔀 Buyer changed', 'The Buyer column differs from the previous upload.', ['NCR', 'From', 'To'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.from)}</td><td>${esc(c.to)}</td>`)}
       ${sec('closed', '✅ Closed by this file', 'Moved to Closed (Closed = Yes, or a Jira remark).', ['NCR', 'Buyer', 'Reason'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td><td>${esc(c.why || '')}</td>`)}
       ${l.changes.length ? '' : '<div class="empty">Nothing changed in this upload.</div>'}${l.changes.length >= 600 ? '<p class="hint">Showing the first 600 changes.</p>' : ''}`;
-    return { html };
+    return { html, bind(root) { const pick = root.querySelector('#chg-pick'); if (pick) pick.addEventListener('change', () => { location.hash = '#/changes/' + encodeURIComponent(pick.value); }); } };
   }
 
   // ---------- import history: list + month calendar ----------

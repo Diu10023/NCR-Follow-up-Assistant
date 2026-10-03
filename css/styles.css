@@ -295,3 +295,7 @@ tr.rp-none td.rank{color:var(--h1)}tr.rp-long td.rank{color:var(--h2)}tr.rp-has 
 .steps2 .muted{margin-top:2px}
 
 details.datefilter{margin-top:6px}details.datefilter>summary{font-size:15px}
+
+.chg-nav{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:8px 0 6px}
+.chg-nav select{font-family:var(--body);font-size:15px;color:var(--fg);background:var(--bg);border:0;border-radius:14px;padding:9px 12px;box-shadow:var(--ins-s);max-width:60vw}
+.btn.disabled{opacity:.4;pointer-events:none}
