@@ -71,4 +71,4 @@ Home → **Export all to Excel** downloads one workbook: Summary (per buyer), To
 Home → **Trends**. Every import saves a snapshot (open, no remark, followed up, hold, Jira closed, closed, open over 90 days). The page draws the backlog lines and new vs closed bars, with the numbers underneath. **Monthly summary (Excel)** gives start vs end of a month, uploads, a per-buyer sheet and the NCRs open over 90 days; **Chart (PNG)** saves the charts as an image. Trends start from the first import made after this feature was added.
 
 ## Menu
-Home · To follow up · Followed up · **Uploads** (Import with its history and calendar, What changed, Buyers, Trends) · Help · Settings. Hold & Jira and Closed have no menu entry: open them from the big cards on Home.
+Home · To follow up · Followed up · Hold & Jira · Closed · **Uploads** (Import with its history and calendar, What changed, Buyers, Trends) · Help · Settings.

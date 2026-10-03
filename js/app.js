@@ -18,7 +18,7 @@
     current.closed = page === 'ncr' && (S.getNcr(arg) || {}).Status === 'Closed';
     main.innerHTML = (['home', 'overview', 'dashboard', 'list', 'today', 'followed', 'hold', 'closed', 'import', 'imports', 'changes', 'response', 'trends', 'help', 'settings'].includes(page) ? V.groupTabs(page) : '<div class="backbar"><button class="btn sm" data-action="back">← Back</button></div>') + (['home', 'overview', 'dashboard', 'list', 'today', 'followed'].includes(page) ? V.changeBanner() : '') + current.html;
     if (current.bind) current.bind(main);
-    document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'today' ? 'list' : page === 'ncr' ? (current.closed ? 'home' : 'list') : page === 'overview' || page === 'dashboard' ? 'home' : ['imports', 'changes', 'response', 'trends'].includes(page) ? 'import' : ['hold', 'closed'].includes(page) ? 'home' : page)));
+    document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'today' ? 'list' : page === 'ncr' ? (current.closed ? 'closed' : 'list') : page === 'overview' || page === 'dashboard' ? 'home' : ['imports', 'changes', 'response', 'trends'].includes(page) ? 'import' : page)));
     updateBulkBar();
     window.scrollTo({ top: window.__keepScroll || 0, behavior: 'instant' }); window.__keepScroll = 0;
   }
@@ -28,6 +28,7 @@
     st.ncrs.forEach((n) => { const k = V.inf(n).bucket; if (k in by) by[k]++; });
     $('#today-badge').textContent = by.todo;      // still to follow up
     $('#fu-badge').textContent = by.followed;     // followed up, not closed yet
+    $('#hold-badge').textContent = by.hold + by.jira;
     const lg = S.getImports().filter((x) => x.changes).pop();   // unseen upload: show how many NCRs it touched
     $('#chg-badge').textContent = lg && S.getSeen() !== lg.at ? new Set(lg.changes.filter((c) => ['new', 'update', 'cleared'].includes(c.t)).map((c) => c.no)).size || '' : '';
     const el = $('#sync');

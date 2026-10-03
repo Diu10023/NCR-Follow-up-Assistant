@@ -745,10 +745,6 @@ window.NCR = window.NCR || {};
       const lg = latestLog(), unseen = lg && S.getSeen() !== lg.at ? new Set(lg.changes.filter((c) => ['new', 'update', 'cleared'].includes(c.t)).map((c) => c.no)).size : 0;
       return `<div class="gtabs">${tab('#/import', 'Import', page === 'import' || page === 'imports')}${tab('#/changes', 'What changed', page === 'changes', unseen ? ` <span class="nbadge">${unseen}</span>` : '')}${tab('#/response', 'Buyers', page === 'response')}${tab('#/trends', 'Trends', page === 'trends')}</div>`;
     }
-    if (['hold', 'closed'].includes(page)) {
-      const n = st.ncrs.filter((x) => inf(x).bucket === 'hold').length + st.ncrs.filter((x) => inf(x).bucket === 'jira').length, c = st.ncrs.filter((x) => inf(x).bucket === 'closed').length;
-      return `<div class="gtabs">${tab('#/hold', 'Hold &amp; Jira', page === 'hold', ` <span class="nbadge">${n}</span>`)}${tab('#/closed', 'Closed', page === 'closed', ` <span class="nbadge">${c}</span>`)}</div>`;
-    }
     return '';
   }
 
@@ -777,7 +773,6 @@ window.NCR = window.NCR || {};
         ${row('Carried over', 'Open NCRs that did not change in the latest file. They are the old ones you keep chasing.')}
         ${row('Buyers (Uploads)', 'Per buyer for the latest upload: new, updated, still waiting. Appears after your first import; the last column needs at least two imports.')}
         ${row('Trends (Uploads)', 'Backlog over time. One point is saved per import, so lines appear after two imports made with this version; the monthly Excel summary needs one month with data.')}
-        ${row('Hold, Jira, Closed', 'No menu entry: open them from the big cards on Home. The two tabs at the top of those pages switch between them.')}
         ${row('File date', 'The day the Excel export was taken. Leave it as today unless you upload late.')}
       </table></div></section>
       <section class="block"><h2>What the colours mean</h2><div class="table-wrap"><table class="grid">
