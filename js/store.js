@@ -275,8 +275,9 @@ window.NCR = window.NCR || {};
     const prev = {}, addedIds = [];
     result.ncrs.forEach((n) => { const o = getNcr(n.NCR_ID); if (o) prev[n.NCR_ID] = o; else addedIds.push(n.NCR_ID); });
     const at = L.nowStamp() + '.' + String(Date.now() % 1000).padStart(3, '0'); // unique even for uploads in the same second
-    setStack(getStack().concat([Object.assign({ at, prev, addedIds, historyIds: result.history.map((h) => h.History_ID) }, meta)]));
-    setImports(getImports().concat([Object.assign({ at }, meta)]));
+    const { changes, ...undoMeta } = meta || {}; // the change list only goes to the log, not the (larger) undo stack
+    setStack(getStack().concat([Object.assign({ at, prev, addedIds, historyIds: result.history.map((h) => h.History_ID) }, undoMeta)]));
+    setImports(getImports().concat([Object.assign({ at }, undoMeta, changes ? { changes } : {})]));
     return saveMany(result.ncrs, result.history);
   }
   // Remove what the last import added and restore what it changed.
@@ -304,5 +305,5 @@ window.NCR = window.NCR || {};
   function demoData() { return { ncrs: [], history: [], settings: {} }; }
 
   NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
-    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, removeNcr, saveMany, applyImport, undoImport, getImports, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
+    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, removeNcr, saveMany, applyImport, undoImport, getImports, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
 })(window.NCR);

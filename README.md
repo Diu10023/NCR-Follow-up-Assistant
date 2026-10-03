@@ -53,3 +53,6 @@ On the Import page, set the **File date** (default today) to the day the export 
 Home → **Buyer response**: a weekly heatmap of how many NCRs each buyer updated in Remarks (hatched weeks = no file uploaded) and a table with QA follow-ups, remark updates, % answered within 7 days, average days to answer, no-reply count and closed this month. Timing uses the file dates of your uploads.
 
 In **Import history**, every upload has a Delete button. Uploads are removed newest first: deleting an older one also removes the ones built on top of it. The File date can be any date, including future ones, which is handy when you simulate weekly uploads with test files.
+
+## What changed notification
+After each upload a 🔔 banner appears on Home, To follow up and Followed up until you open **What changed** (or dismiss it). The page lists, for that upload: buyer remark updates (before → now), new NCRs, cleared remarks, buyer changes and NCRs closed by the file. Every row in Import history has a **Changes** button to reopen it.

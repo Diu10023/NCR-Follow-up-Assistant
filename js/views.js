@@ -580,7 +580,16 @@ window.NCR = window.NCR || {};
         const { records } = I2.buildRecords(imp.table, imp.mapping, st.settings.jiraKeywords);
         const p = I2.plan(records, st.ncrs), r = I2.apply(p, Object.assign({}, imp.opts, { date: imp.opts.date || L.todayISO() }));
         const nClosed = p.added.filter((x) => x.CloseReason).length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0);
-        S.applyImport(r, { file: imp.name, fileDate: imp.opts.date || L.todayISO(), added: p.added.length, updated: p.updated.length, remarkChanged: p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark')).length, closed: nClosed, total: records.length, byBuyer: (() => {
+        S.applyImport(r, { file: imp.name, fileDate: imp.opts.date || L.todayISO(), added: p.added.length, updated: p.updated.length, remarkChanged: p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark')).length, closed: nClosed, total: records.length, changes: (() => {
+          const out = [], cut = (t) => String(t || '').slice(0, 220), B = (x) => x || NO_BUYER;
+          p.added.forEach((r) => out.push({ t: r.CloseReason ? 'closed' : 'new', no: r.NCR_No, buyer: B(r.Buyer), to: cut(r.Buyer_Remark), why: r.CloseReason }));
+          p.updated.forEach((u) => u.changes.forEach((c) => {
+            if (c.field === 'Buyer_Remark') out.push({ t: c.to ? 'update' : 'cleared', no: u.old.NCR_No, buyer: B(u.old.Buyer), from: cut(c.from), to: cut(c.to) });
+            else if (c.field === 'Buyer') out.push({ t: 'buyer', no: u.old.NCR_No, buyer: B(c.to), from: B(c.from), to: B(c.to) });
+          }));
+          p.closeNow.forEach((c) => out.push({ t: 'closed', no: c.old.NCR_No, buyer: B(c.old.Buyer), why: c.reason }));
+          return out.slice(0, 600);
+        })(), byBuyer: (() => {
           const m = {}, b = (n) => (m[n || NO_BUYER] = m[n || NO_BUYER] || { added: 0, updated: 0, closed: 0 });
           p.added.forEach((r) => { b(r.Buyer).added++; if (r.CloseReason) b(r.Buyer).closed++; });
           p.updated.forEach((u) => { if (u.changes.some((c) => c.field === 'Buyer_Remark')) b(u.old.Buyer).updated++; });
@@ -590,7 +599,7 @@ window.NCR = window.NCR || {};
         imp.opts.date = '';
         const back = p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark' && c.to) && isFollowed(S.getNcr(u.old.NCR_ID))).length; // followed-up NCRs with a new buyer remark
         S.saveSettings({ importMapping: Object.assign({}, imp.mapping) });
-        imp.done = `${back ? `${back} followed-up NCR${back === 1 ? ' has' : 's have'} a new buyer remark: see <a href="#/followed" data-wfilter='{}'>Followed up</a>. ` : ''}${p.added.length} added${p.added.length ? ' (' + Object.entries(p.added.reduce((m, r) => { const b = r.Buyer || '(No buyer)'; m[b] = (m[b] || 0) + 1; return m; }, {})).map(([b, c]) => b + ' ' + c).join(', ') + ')' : ''}, ${p.updated.length} updated, ${p.added.filter((r) => r.CloseReason).length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0)} closed (see <a href="#/closed" data-closed="">Closed</a>).`;
+        imp.done = `${back ? `${back} followed-up NCR${back === 1 ? ' has' : 's have'} a new buyer remark: see <a href="#/followed" data-wfilter='{}'>Followed up</a>. ` : ''}${p.added.length} added${p.added.length ? ' (' + Object.entries(p.added.reduce((m, r) => { const b = r.Buyer || '(No buyer)'; m[b] = (m[b] || 0) + 1; return m; }, {})).map(([b, c]) => b + ' ' + c).join(', ') + ')' : ''}, ${p.updated.length} updated, ${p.added.filter((r) => r.CloseReason).length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0)} closed (see <a href="#/closed" data-closed="">Closed</a>). <a class="btn sm primary" href="#/changes">🔔 See what changed</a>`;
         imp.table = null; imp.wb = null; NCR.app.render();
       });
     } };
@@ -656,6 +665,34 @@ window.NCR = window.NCR || {};
         <div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th>Open</th><th title="Follow-ups recorded by QA">QA follow-ups</th><th title="Times the buyer changed the Remarks">Remark updates</th><th title="Weeks (with an upload) in which the buyer updated at least one Remark">Weeks with an update</th><th>Closed this month</th></tr></thead><tbody>${tbody}</tbody></table></div></section>` };
   }
 
+  // ---------- What changed in an upload (notification) ----------
+  const latestLog = () => S.getImports().filter((x) => x.changes).pop();
+  function changeBanner() {
+    const l = latestLog(); if (!l || S.getSeen() === l.at) return '';
+    const n = (t) => l.changes.filter((c) => c.t === t).length;
+    return `<div class="alert ok banner">🔔 <b>New upload: ${esc(l.file || 'file')}</b> — ${n('update')} buyer update${n('update') === 1 ? '' : 's'} · ${n('new')} new NCR${n('new') === 1 ? '' : 's'} · ${n('closed')} closed${n('cleared') ? ` · ${n('cleared')} remark cleared` : ''}. <a href="#/changes/${encodeURIComponent(l.at)}">See what changed</a> <button class="btn sm" data-action="dismiss-changes" type="button">Dismiss</button></div>`;
+  }
+  function changesPage(at) {
+    const logs = S.getImports().filter((x) => x.changes), l = logs.find((x) => x.at === at) || logs[logs.length - 1];
+    if (!l) return { html: '<div class="page-head"><h1>What changed</h1></div><div class="empty">No change details yet. They are recorded for each upload from now on. <a href="#/import">Import a file</a>.</div>' };
+    S.setSeen(l.at);
+    const prev = logs[logs.indexOf(l) - 1];
+    const link = (no) => { const n = st.ncrs.find((x) => x.NCR_No === no); return n ? `<a href="#/ncr/${esc(n.NCR_ID)}"><b>${esc(no)}</b></a>` : `<b>${esc(no)}</b>`; };
+    const sec = (t, title, hint, cols, row) => {
+      const items = l.changes.filter((c) => c.t === t); if (!items.length) return '';
+      return `<section class="block"><h2>${title} <span class="count">${items.length}</span></h2><p class="hint">${hint}</p><div class="table-wrap"><table class="grid compact"><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${items.sort((a, b) => a.buyer.localeCompare(b.buyer)).map((c) => `<tr>${row(c)}</tr>`).join('')}</tbody></table></div></section>`;
+    };
+    const rem = (x) => (x ? `<div class="rtext" title="${esc(x)}">${esc(x)}</div>` : '<span class="muted">(empty)</span>');
+    const html = `<div class="page-head"><div><h1>What changed</h1><div class="muted">${esc(l.file || 'file')} · file date ${L.fmtDate(l.fileDate || l.at)}${prev ? ` · compared with ${esc(prev.file || 'the previous file')} (${L.fmtDate(prev.fileDate || prev.at)})` : ''}</div></div></div>
+      ${sec('update', '🔔 Buyer updated Remarks', 'Existing NCRs whose Remarks changed since the previous upload. Read them, then follow up if needed.', ['NCR', 'Buyer', 'Before', 'Now'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td><td class="remark">${rem(c.from)}</td><td class="remark">${rem(c.to)}</td>`)}
+      ${sec('new', '🆕 New NCRs to chase', 'These NCRs were not in the previous upload.', ['NCR', 'Buyer', 'Remark in file'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td><td class="remark">${rem(c.to)}</td>`)}
+      ${sec('cleared', '📭 Buyer cleared the Remarks', 'The Remarks were removed in this file. Worth asking why.', ['NCR', 'Buyer', 'Previous remark'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td><td class="remark">${rem(c.from)}</td>`)}
+      ${sec('buyer', '🔀 Buyer changed', 'The Buyer column differs from the previous upload.', ['NCR', 'From', 'To'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.from)}</td><td>${esc(c.to)}</td>`)}
+      ${sec('closed', '✅ Closed by this file', 'Moved to Closed (Closed = Yes, or a Jira remark).', ['NCR', 'Buyer', 'Reason'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td><td>${esc(c.why || '')}</td>`)}
+      ${l.changes.length ? '' : '<div class="empty">Nothing changed in this upload.</div>'}${l.changes.length >= 600 ? '<p class="hint">Showing the first 600 changes.</p>' : ''}`;
+    return { html };
+  }
+
   // ---------- import history: list + month calendar ----------
   const IM = { month: '' };
   const monthName = (ym) => new Date(ym + '-01T00:00:00Z').toLocaleString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
@@ -678,7 +715,7 @@ window.NCR = window.NCR || {};
     if (logs.length) for (let w = monday(logs[logs.length - 1].fd); w < monday(today); w = L.addDays(w, 7)) if (!weeksWith.has(w)) skipped.push(w);
     const wk = (w) => `${L.fmtDate(w)} – ${L.fmtDate(L.addDays(w, 6))}`;
     const stackAts = new Set(S.getImportStack());
-    const rows = logs.map((x) => `<tr><td class="nowrap"><b>${L.fmtDate(x.fd)}</b>${x.fd !== String(x.at).slice(0, 10) ? `<div class="sub">uploaded ${L.fmtDate(x.at)}</div>` : ''}</td><td>${esc(x.file || 'file')}</td><td>${x.added || 0}</td><td>${x.remarkChanged === undefined ? '–' : x.remarkChanged}</td><td>${x.closed || 0}</td><td>${x.total === undefined ? '–' : x.total}</td><td class="right">${stackAts.has(x.at) ? `<button class="btn sm danger" data-del="${esc(x.at)}" data-newer="${logs.filter((y) => String(y.at) > String(x.at) && stackAts.has(y.at)).length}">Delete</button>` : '<span class="sub" title="This upload was made before undo was saved for every upload. Use Settings → Clear all NCR data to start over.">no undo data</span>'}</td></tr>`).join('');
+    const rows = logs.map((x) => `<tr><td class="nowrap"><b>${L.fmtDate(x.fd)}</b>${x.fd !== String(x.at).slice(0, 10) ? `<div class="sub">uploaded ${L.fmtDate(x.at)}</div>` : ''}</td><td>${esc(x.file || 'file')}</td><td>${x.added || 0}</td><td>${x.remarkChanged === undefined ? '–' : x.remarkChanged}</td><td>${x.closed || 0}</td><td>${x.total === undefined ? '–' : x.total}</td><td class="right">${x.changes ? `<a class="btn sm" href="#/changes/${encodeURIComponent(x.at)}">Changes</a> ` : ''}${stackAts.has(x.at) ? `<button class="btn sm danger" data-del="${esc(x.at)}" data-newer="${logs.filter((y) => String(y.at) > String(x.at) && stackAts.has(y.at)).length}">Delete</button>` : '<span class="sub" title="This upload was made before undo was saved for every upload. Use Settings → Clear all NCR data to start over.">no undo data</span>'}</td></tr>`).join('');
     return { html: `<div class="page-head"><div><h1>Import history</h1><div class="muted">${logs.length} upload${logs.length === 1 ? '' : 's'} · <a href="#/import">Import a new file</a></div></div></div>
       ${logs.length ? `<div class="charts"><section class="block"><div class="cal-nav"><button class="btn sm" data-im="${shiftMonth(ym, -1)}">‹</button><h2>${monthName(ym)}</h2><button class="btn sm" data-im="${shiftMonth(ym, 1)}">›</button></div>
           <div class="cal">${cells}</div><p class="hint">● = a file dated that day was imported. Hover for the file name.</p></section>
@@ -738,5 +775,5 @@ window.NCR = window.NCR || {};
     } };
   }
 
-  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, responsePage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
+  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, changesPage, changeBanner, responsePage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
 })(window.NCR);
