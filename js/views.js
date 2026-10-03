@@ -340,7 +340,7 @@ window.NCR = window.NCR || {};
       root.querySelector('#f-clear').addEventListener('click', () => { setFilter({}); NCR.app.render(); });
       main.addEventListener('click', (e) => { // pills and tabs live inside the refreshed area
         const b = e.target.closest('[data-buyer].pill'), t = e.target.closest('[data-tab]');
-        if (e.target.closest('[data-chg]')) { LF.changed = !LF.changed; refresh(); } else if (b) { LF.buyer = b.dataset.buyer; refresh(); } else if (t) { LF.tab = t.dataset.tab; refresh(); }
+        if (e.target.closest('[data-chg]')) { LF.changed = !LF.changed; LF.tab = LF.changed ? 'all' : 'none'; refresh(); } else if (b) { LF.buyer = b.dataset.buyer; refresh(); } else if (t) { LF.tab = t.dataset.tab; refresh(); }
       });
     },
     refresh: () => { const el = document.querySelector('#open-main'); if (el) el.innerHTML = openMain(); } };
@@ -414,7 +414,7 @@ window.NCR = window.NCR || {};
       bindFilterBar(root, 'w', WF, refresh);
       root.querySelector('#w-clear').addEventListener('click', () => { setWaitFilter({}); NCR.app.render(); });
       root.querySelector('#w-q').addEventListener('input', (e) => { WF.q = e.target.value; refresh(); });
-      main.addEventListener('click', (e) => { const b = e.target.closest('[data-wbuyer]'), t = e.target.closest('[data-wtab]'); if (e.target.closest('[data-wchg]')) { WF.changed = !WF.changed; refresh(); } else if (b) { WF.buyer = b.dataset.wbuyer; refresh(); } else if (t) { WF.tab = t.dataset.wtab; refresh(); } });
+      main.addEventListener('click', (e) => { const b = e.target.closest('[data-wbuyer]'), t = e.target.closest('[data-wtab]'); if (e.target.closest('[data-wchg]')) { WF.changed = !WF.changed; WF.tab = WF.changed ? 'all' : 'none'; refresh(); } else if (b) { WF.buyer = b.dataset.wbuyer; refresh(); } else if (t) { WF.tab = t.dataset.wtab; refresh(); } });
     } };
   }
 
