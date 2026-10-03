@@ -253,8 +253,16 @@ window.NCR = window.NCR || {};
 
   // ---- undo a wrong import / clear everything ----
   const LAST_KEY = 'ncr.lastImport';
-  function getLastImport() { try { return JSON.parse(localStorage.getItem(LAST_KEY)); } catch (e) { return null; } }
-  function setLastImport(v) { try { v ? localStorage.setItem(LAST_KEY, JSON.stringify(v)) : localStorage.removeItem(LAST_KEY); } catch (e) { /* storage unavailable */ } }
+  // Every import keeps how to take it back, so uploads can be removed newest-first (a stack).
+  const STACK_KEY = 'ncr.importStack', STACK_MAX = 15;
+  function getStack() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STACK_KEY)) || [], old = JSON.parse(localStorage.getItem(LAST_KEY));
+      return old && !s.some((x) => x.at === old.at) ? s.concat([old]) : s; // an import saved before the stack existed
+    } catch (e) { return []; }
+  }
+  function setStack(v) { try { localStorage.removeItem(LAST_KEY); v && v.length ? localStorage.setItem(STACK_KEY, JSON.stringify(v.slice(-STACK_MAX))) : localStorage.removeItem(STACK_KEY); } catch (e) { /* storage unavailable */ } }
+  function getLastImport() { const s = getStack(); return s[s.length - 1] || null; }
 
   // Import log (one entry per upload) for the Import history page. Kept in this browser.
   const LOG_KEY = 'ncr.imports';
@@ -266,24 +274,27 @@ window.NCR = window.NCR || {};
   function applyImport(result, meta) {
     const prev = {}, addedIds = [];
     result.ncrs.forEach((n) => { const o = getNcr(n.NCR_ID); if (o) prev[n.NCR_ID] = o; else addedIds.push(n.NCR_ID); });
-    const at = L.nowStamp();
-    setLastImport(Object.assign({ at, prev, addedIds, historyIds: result.history.map((h) => h.History_ID) }, meta));
+    const at = L.nowStamp() + '.' + String(Date.now() % 1000).padStart(3, '0'); // unique even for uploads in the same second
+    setStack(getStack().concat([Object.assign({ at, prev, addedIds, historyIds: result.history.map((h) => h.History_ID) }, meta)]));
     setImports(getImports().concat([Object.assign({ at }, meta)]));
     return saveMany(result.ncrs, result.history);
   }
   // Remove what the last import added and restore what it changed.
-  function undoImport() {
-    const rec = getLastImport(); if (!rec) return false;
+  // Remove one upload; with `at` it removes that upload and every newer one (newer ones were built on top of it).
+  function undoImport(at) {
+    const stack = getStack(); if (!stack.length) return false;
+    if (at) { const k = stack.findIndex((x) => x.at === at); if (k < 0) return false; const n = stack.length - k; for (let i = 0; i < n; i++) undoImport(); return n; }
+    const rec = stack[stack.length - 1];
     const added = new Set(rec.addedIds), dropH = new Set(rec.historyIds), restored = Object.values(rec.prev);
     state.ncrs = state.ncrs.filter((n) => !added.has(n.NCR_ID)).map((n) => rec.prev[n.NCR_ID] || n);
     state.history = state.history.filter((h) => !added.has(h.NCR_ID) && !dropH.has(h.History_ID));
     commit(restored, [], { deleteIds: rec.addedIds, deleteHistoryIds: rec.historyIds });
     setImports(getImports().filter((x) => x.at !== rec.at));
-    setLastImport(null); emit();
-    return true;
+    setStack(stack.slice(0, -1)); emit();
+    return 1;
   }
   function clearAll() {
-    state.ncrs = []; state.history = []; setLastImport(null); setImports([]);
+    state.ncrs = []; state.history = []; setStack([]); setImports([]);
     persist(() => adapter.clear());
     emit();
   }
@@ -293,5 +304,5 @@ window.NCR = window.NCR || {};
   function demoData() { return { ncrs: [], history: [], settings: {} }; }
 
   NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
-    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, removeNcr, saveMany, applyImport, undoImport, getImports, getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
+    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, removeNcr, saveMany, applyImport, undoImport, getImports, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
 })(window.NCR);

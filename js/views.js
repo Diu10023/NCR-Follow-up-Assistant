@@ -530,8 +530,8 @@ window.NCR = window.NCR || {};
           <div class="card stat ${toClose ? 'c-ready' : ''}"><div class="num">${toClose}</div><div class="lbl">Will be closed</div></div></div>
           <p class="hint">New NCRs start as <b>Not Started</b> with the Buyer as Owner. Existing follow-up data (Next Action, Owner, Due Date, Status, history…) is never overwritten. Only raw fields (item, batch, supplier, buyer, date, defect, quantity) are refreshed.</p>
           ${bad.length ? `<details class="alert warn"><summary>${bad.length} row(s) with issues</summary>${bad.slice(0, 20).map((b) => `<div>Row ${b.row}: ${esc(b.reason)}</div>`).join('')}</details>` : ''}
-          <div class="alert ${fdWarn ? 'warn' : 'ok'}"><label class="inline">📅 <b>File date</b> <input type="date" id="imp-date" value="${esc(fd)}" max="${L.todayISO()}"></label>
-            <span class="hint"> The date this export was taken. Every timeline entry from this import (buyer updates, closed date) gets this date. Default is today; change it if you are uploading late.</span>${fdWarn ? `<div>⚠️ ${fdWarn}</div>` : ''}</div>
+          <div class="alert ${fdWarn ? 'warn' : 'ok'}"><label class="inline">📅 <b>File date</b> <input type="date" id="imp-date" value="${esc(fd)}" ></label>
+            <span class="hint"> The date this export was taken (any date, also a future one when you simulate weekly uploads). Every timeline entry from this import (buyer updates, closed date) gets this date. Default is today; change it if you are uploading late.</span>${fdWarn ? `<div>⚠️ ${fdWarn}</div>` : ''}</div>
           ${p.added.length ? `<h3>New</h3><div class="table-wrap"><table class="grid compact"><thead><tr><th>NCR</th><th>Item</th><th>Batch</th><th>Date</th><th>Buyer</th><th>Defect</th></tr></thead><tbody>${sample(p.added, (r) => `<tr><td>${esc(r.NCR_No)}</td><td>${esc(r.Item_No)}</td><td>${esc(r.Batch_No)}</td><td>${L.fmtDate(r.NCR_Date)}</td><td>${esc(r.Buyer)}</td><td>${esc(r.Defect)}</td></tr>`)}</tbody></table></div>${p.added.length > 8 ? `<div class="muted small">…and ${p.added.length - 8} more</div>` : ''}` : ''}
           ${p.updated.length ? `<h3>Updated</h3>${sample(p.updated, (u) => `<div class="small"><b>${esc(u.rec.NCR_No)}</b>: ${u.changes.map((c) => `${esc(c.field.replace('_', ' '))} "${esc(c.from)}" → "${esc(c.to)}"`).join('; ')}</div>`)}${p.updated.length > 8 ? `<div class="muted small">…and ${p.updated.length - 8} more</div>` : ''}` : ''}
           ${Object.keys(reasons).length ? `<div class="alert ok"><b>Closed by this file</b> (they move to the Closed page, nothing to close by hand): ${Object.entries(reasons).map(([k, v]) => `${v} × ${esc(k)}`).join(' · ')}. The closed date is today, because the file has no close date.</div>` : ''}
@@ -668,15 +668,21 @@ window.NCR = window.NCR || {};
     const weeksWith = new Set(logs.map((x) => monday(x.fd))), skipped = [];
     if (logs.length) for (let w = monday(logs[logs.length - 1].fd); w < monday(today); w = L.addDays(w, 7)) if (!weeksWith.has(w)) skipped.push(w);
     const wk = (w) => `${L.fmtDate(w)} – ${L.fmtDate(L.addDays(w, 6))}`;
-    const rows = logs.map((x) => `<tr><td class="nowrap"><b>${L.fmtDate(x.fd)}</b>${x.fd !== String(x.at).slice(0, 10) ? `<div class="sub">uploaded ${L.fmtDate(x.at)}</div>` : ''}</td><td>${esc(x.file || 'file')}</td><td>${x.added || 0}</td><td>${x.remarkChanged === undefined ? '–' : x.remarkChanged}</td><td>${x.closed || 0}</td><td>${x.total === undefined ? '–' : x.total}</td></tr>`).join('');
+    const stackAts = new Set(S.getImportStack());
+    const rows = logs.map((x) => `<tr><td class="nowrap"><b>${L.fmtDate(x.fd)}</b>${x.fd !== String(x.at).slice(0, 10) ? `<div class="sub">uploaded ${L.fmtDate(x.at)}</div>` : ''}</td><td>${esc(x.file || 'file')}</td><td>${x.added || 0}</td><td>${x.remarkChanged === undefined ? '–' : x.remarkChanged}</td><td>${x.closed || 0}</td><td>${x.total === undefined ? '–' : x.total}</td><td class="right">${stackAts.has(x.at) ? `<button class="btn sm danger" data-del="${esc(x.at)}" data-newer="${logs.filter((y) => String(y.at) > String(x.at) && stackAts.has(y.at)).length}">Delete</button>` : ''}</td></tr>`).join('');
     return { html: `<div class="page-head"><div><h1>Import history</h1><div class="muted">${logs.length} upload${logs.length === 1 ? '' : 's'} · <a href="#/import">Import a new file</a></div></div></div>
       ${logs.length ? `<div class="charts"><section class="block"><div class="cal-nav"><button class="btn sm" data-im="${shiftMonth(ym, -1)}">‹</button><h2>${monthName(ym)}</h2><button class="btn sm" data-im="${shiftMonth(ym, 1)}">›</button></div>
           <div class="cal">${cells}</div><p class="hint">● = a file dated that day was imported. Hover for the file name.</p></section>
         <section class="block"><h2>Weeks without an upload</h2>${skipped.length ? `<p class="hint">No file is dated in these weeks (Mon–Sun). Upload them in order if you still have the files.</p><div class="skips">${skipped.slice(-12).reverse().map((w) => `<span class="chip age-attention">${wk(w)}</span>`).join(' ')}</div>${skipped.length > 12 ? `<p class="hint">…and ${skipped.length - 12} older weeks</p>` : ''}` : '<p class="hint">✅ Every week since the first upload has a file.</p>'}</section></div>
-        <section class="block"><h2>All uploads</h2><div class="table-wrap"><table class="grid compact"><thead><tr><th>File date</th><th>File</th><th>New NCRs</th><th>Remark changed</th><th>Closed</th><th>Rows in file</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <section class="block"><h2>All uploads</h2><div class="table-wrap"><table class="grid compact"><thead><tr><th>File date</th><th>File</th><th>New NCRs</th><th>Remark changed</th><th>Closed</th><th>Rows in file</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
           <p class="hint">Stored in this browser. “Remark changed” counts existing NCRs whose buyer remark differs from the previous upload.</p></section>`
       : '<div class="empty">No uploads recorded yet. <a href="#/import">Import your first file</a>.</div>'}`,
-    bind(root) { root.querySelectorAll('[data-im]').forEach((b) => b.addEventListener('click', () => { IM.month = b.dataset.im; NCR.app.render(); })); } };
+    bind(root) {
+      root.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => {
+        const newer = +b.dataset.newer;
+        NCR.app.confirmModal({ title: newer ? `Delete this upload and ${newer} newer one${newer === 1 ? '' : 's'}?` : 'Delete this upload?', text: (newer ? 'Newer uploads were built on top of it, so they are removed too, newest first. ' : '') + 'NCRs they added are removed and changed NCRs are put back as they were. Follow-ups you recorded on those NCRs since then are lost.', ok: 'Delete', onOk: () => { S.undoImport(b.dataset.del); NCR.app.toast('Upload deleted'); NCR.app.render(); } });
+      }));
+      root.querySelectorAll('[data-im]').forEach((b) => b.addEventListener('click', () => { IM.month = b.dataset.im; NCR.app.render(); })); } };
   }
 
   // ---------- settings ----------
