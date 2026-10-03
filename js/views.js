@@ -655,7 +655,7 @@ window.NCR = window.NCR || {};
         const delta = pd ? d.updated - pd.updated : null;
         return { nm, d, carried, delta, open: r.open };
       }).sort((a, b) => b.d.added - a.d.added || b.carried - a.carried);
-      weekly = `<section class="block"><h2>Latest upload: what changed</h2><p class="hint">File <b>${esc(lastL.file || '')}</b> (${L.fmtDate(lastL.fileDate || lastL.at)})${prevL ? ` compared with the one before (${L.fmtDate(prevL.fileDate || prevL.at)})` : ''}. Your Monday check: new NCRs to chase, buyers who updated, and the older ones still waiting.</p>
+      weekly = `<section class="block"><h2>Latest upload: what changed</h2><p class="hint">File <b>${esc(lastL.file || '')}</b> (${L.fmtDate(lastL.fileDate || lastL.at)})${prevL ? ` compared with the one before (${L.fmtDate(prevL.fileDate || prevL.at)})` : ''}. Your weekly check: new NCRs to chase, buyers who updated, and the older ones still waiting.</p>
         <div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th title="New NCRs in this file">New to chase</th><th title="Existing NCRs whose Remarks changed">Buyer updated</th><th title="Updated count vs the previous upload">vs previous</th><th title="Still open and no change in this file">Carried over</th><th>Closed by file</th></tr></thead><tbody>${line.map((x) => `<tr><td><b>${esc(x.nm)}</b></td><td>${x.d.added ? `<b class="bad">${x.d.added}</b>` : '<span class="muted">0</span>'}</td><td>${x.d.updated}</td><td>${x.delta === null ? '<span class="muted">–</span>' : x.delta > 0 ? `<span class="rate good">+${x.delta}</span>` : x.delta < 0 ? `<span class="rate low">${x.delta}</span>` : '<span class="muted">0</span>'}</td><td>${x.carried}</td><td>${x.d.closed}</td></tr>`).join('')}</tbody></table></div></section>`;
     }
     const thin = uploadWeeks.size < 3;
@@ -672,7 +672,7 @@ window.NCR = window.NCR || {};
     const row = (t, d) => `<tr><td class="nowrap"><b>${t}</b></td><td>${d}</td></tr>`;
     const step = (n, t, d) => `<li><span class="stepn">${n}</span><div><b>${t}</b><div class="muted">${d}</div></div></li>`;
     return { html: `<div class="page-head"><div><h1>How to use</h1><div class="muted">A 5-minute guide. Everything in this app comes from your weekly Excel file, so there is nothing to type in by hand.</div></div></div>
-      <section class="block"><h2>Your weekly routine (e.g. Monday morning)</h2>
+      <section class="block"><h2>Your weekly routine (any day you upload)</h2>
         <ol class="steps2">
           ${step(1, 'Upload this week’s Excel', '<a href="#/import">Import Excel</a> → choose the file → check the preview → Import. The app compares it with last week’s file.')}
           ${step(2, 'Read what changed', 'A 🔔 banner appears. <a href="#/changes">What changed</a> lists buyer updates, new NCRs and closed ones. <a href="#/response">Buyer response</a> (on Home) shows who updates every week.')}
