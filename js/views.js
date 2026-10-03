@@ -702,8 +702,6 @@ window.NCR = window.NCR || {};
           <label>Close at import when Remarks contain<textarea name="jiraKeywords" rows="3">${esc((s.jiraKeywords || []).join('\n'))}</textarea></label></div>
         <div class="form cols3"><label>Default next check after a follow-up (days)<input type="number" min="1" name="defaultCheckDays" value="${s.defaultCheckDays}"></label>
           <label>Flag a buyer remark that has not changed for (days)<input type="number" min="1" name="buyerStaleDays" value="${s.buyerStaleDays}"></label></div>
-        <h2>Dropdown lists</h2><p class="hint">Used when you edit an NCR. One option per line.</p>
-        <div class="form cols3">${ta('dispositions', 'Disposition')}${ta('nextActions', 'Next Action')}${ta('waitingFor', 'Waiting For')}${ta('owners', 'Owners (suggestions)')}</div>
         <div class="actions"><button class="btn primary" type="submit">Save settings</button></div></form>`,
     bind(root) {
       root.querySelector('#api').addEventListener('submit', async (e) => {
@@ -718,7 +716,7 @@ window.NCR = window.NCR || {};
         e.preventDefault(); const f = new FormData(e.target);
         const lines = (k) => String(f.get(k)).split('\n').map((x) => x.trim()).filter(Boolean);
         const num = (k, d) => Math.max(1, parseInt(f.get(k), 10) || d);
-        S.saveSettings({ holdKeywords: lines('holdKeywords'), jiraKeywords: lines('jiraKeywords'), dispositions: lines('dispositions'), nextActions: lines('nextActions'), waitingFor: lines('waitingFor'), owners: lines('owners'),
+        S.saveSettings({ holdKeywords: lines('holdKeywords'), jiraKeywords: lines('jiraKeywords'),
           buyerStaleDays: num('buyerStaleDays', 7), defaultCheckDays: num('defaultCheckDays', 7) });
         NCR.app.toast('Settings saved');
       });
