@@ -18,8 +18,13 @@ var CHUNK = 40000; // a Sheets cell holds at most 50,000 characters
 
 // ---------- web app ----------
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('NCR Follow-up Control')
+  var out = HtmlService.createHtmlOutputFromFile('Index'), html = out.getContent();
+  // The Index file is large; if it was only partly pasted the page would be blank. Say so instead.
+  if (html.indexOf('NCR-APP-END') < 0) {
+    return HtmlService.createHtmlOutput('<div style="font-family:Arial,sans-serif;padding:28px;max-width:640px"><h2>The file "Index" is incomplete</h2>' +
+      '<p>It has only ' + Math.round(html.length / 1024) + ' KB and was cut off while pasting. Open the file Index.html in this Apps Script project, delete everything, and paste the whole Index.html again (download it to your computer and open it with Notepad, then Ctrl+A and Ctrl+C). The last line must be <code>&lt;/html&gt;</code>. Save, then Deploy a new version.</p></div>');
+  }
+  return out.setTitle('NCR Follow-up Control')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }

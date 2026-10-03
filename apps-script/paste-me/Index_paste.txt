@@ -2390,4 +2390,5 @@ window.NCR = window.NCR || {};
 })();
 
 </script>
+<!-- NCR-APP-END -->
 </body></html>

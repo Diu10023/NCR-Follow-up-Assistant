@@ -20,7 +20,8 @@ out = f'''<!DOCTYPE html>
 <body>
 {body}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-{js}</body></html>
+{js}<!-- NCR-APP-END -->
+</body></html>
 '''
 (root / 'apps-script' / 'Index.html').write_text(out, encoding='utf-8')
 print('wrote apps-script/Index.html', len(out) // 1024, 'KB')
