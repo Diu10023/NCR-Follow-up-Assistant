@@ -55,7 +55,7 @@ window.NCR = window.NCR || {};
     const rows = shown.map((n) => {
       const i = inf(n), rd = roundsOf(n), idx = list.indexOf(n) + 1;
       return `<tr class="${i.remarkGroup === 'none' ? 'rp-none' : longRunning(n) ? 'rp-long' : 'rp-has'}" data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}<td class="rank">${idx}</td>
-        <td class="nowrap"><b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div></td>
+        <td class="nowrap"><b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div>${recentChips(n) ? `<div>${recentChips(n)}</div>` : ''}</td>
         <td class="wide">${esc(buyerOf(n))}<div class="sub clip" title="${esc(n.Buyer_Remark || n.Defect)}">${esc(n.Defect)}${!withRemark && n.Buyer_Remark ? ' · “' + esc(n.Buyer_Remark) + '”' : ''}</div></td>
         ${withRemark ? `<td class="remark">${remarkText(n, i)}</td>` : ''}<td>${whyText(i)}${longRunning(n) ? `<div><span class="chip age-attention">🔁 ${rd} rounds, still open</span></div>` : ''}</td>
         <td class="nowrap">${dueText(n, i)}<div class="sub">${i.count ? i.count + ' follow-up' + (i.count > 1 ? 's' : '') : 'not followed up'}</div></td>
@@ -197,13 +197,23 @@ window.NCR = window.NCR || {};
   }
 
   // ---------- Open NCRs (one worklist: no remark first, then has remark) ----------
-  const LF0 = { q: '', buyer: '', tab: 'none', show: 'open', status: '', owner: '', waiting: '', disposition: '', due: '', buyerUpdate: '', fu: '', age: '', sort: 'due', dir: 'asc', from: '', to: '', defect: '', year: '', month: '' };
+  const LF0 = { q: '', buyer: '', tab: 'none', show: 'open', status: '', owner: '', waiting: '', disposition: '', due: '', buyerUpdate: '', fu: '', age: '', sort: 'due', dir: 'asc', from: '', to: '', defect: '', year: '', month: '', changed: false };
   const LF = Object.assign({}, LF0);
   // links from Home pass buyerUpdate; map them onto the two priority tabs
   function setFilter(f) { Object.keys(LF).forEach((k) => delete LF[k]); Object.assign(LF, LF0, f); }
 
   // Created-date range and defect type, shared by To follow up and Followed up
-  const inDates = (n, F) => !((F.from && (n.NCR_Date || '') < F.from) || (F.to && (n.NCR_Date || '') > F.to) || (F.defect && n.Defect !== F.defect) || (F.year && String(n.NCR_Date || '').slice(0, 4) !== F.year) || (F.month && String(n.NCR_Date || '').slice(5, 7) !== F.month));
+  const inDates = (n, F) => !((F.from && (n.NCR_Date || '') < F.from) || (F.to && (n.NCR_Date || '') > F.to) || (F.defect && n.Defect !== F.defect) || (F.year && String(n.NCR_Date || '').slice(0, 4) !== F.year) || (F.month && String(n.NCR_Date || '').slice(5, 7) !== F.month) || (F.changed && !(recentOf(n) || []).some((c) => ['new', 'update', 'cleared'].includes(c.t))));
+  // what the latest upload changed, by NCR No. (drives the NEW / updated markers and the "only changed" filter)
+  let recentKey = null, recentMap = {};
+  function recentOf(n) {
+    const l = S.getImports().filter((x) => x.changes).pop();
+    if (!l) return null;
+    if (recentKey !== l.at) { recentKey = l.at; recentMap = {}; l.changes.forEach((c) => { (recentMap[c.no] = recentMap[c.no] || []).push(c); }); }
+    return recentMap[n.NCR_No] || null;
+  }
+  const recentChips = (n) => { const r = recentOf(n); if (!r) return ''; return r.map((c) => c.t === 'new' ? '<span class="chip new" title="New in the latest upload">🆕 New</span>' : c.t === 'update' ? '<span class="chip new" title="Remarks changed in the latest upload">🔔 Updated</span>' : c.t === 'cleared' ? '<span class="chip age-escalation" title="Buyer cleared the Remarks in the latest upload">📭 Cleared</span>' : '').join(' '); };
+  const recentCount = () => { const l = S.getImports().filter((x) => x.changes).pop(); return l ? new Set(l.changes.filter((c) => ['new', 'update', 'cleared'].includes(c.t)).map((c) => c.no)).size : 0; };
   const filterBar = (idp, F) => {
     const defects = [...new Set(st.ncrs.map((n) => n.Defect).filter(Boolean))].sort();
     const years = [...new Set(st.ncrs.map((n) => String(n.NCR_Date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
@@ -211,9 +221,11 @@ window.NCR = window.NCR || {};
     return `<div class="datebar"><label>Year<select id="${idp}-year">${options(years, F.year, 'All')}</select></label>
       <label>Month<select id="${idp}-month"><option value="">All</option>${MN.map((m, k) => { const v = String(k + 1).padStart(2, '0'); return `<option value="${v}"${F.month === v ? ' selected' : ''}>${m}</option>`; }).join('')}</select></label>
       <label>Created from<input type="date" id="${idp}-from" value="${esc(F.from)}"></label><label>to<input type="date" id="${idp}-to" value="${esc(F.to)}"></label>
-      <label>Defect<select id="${idp}-defect">${options(defects, F.defect, 'All')}</select></label></div>`;
+      <label>Defect<select id="${idp}-defect">${options(defects, F.defect, 'All')}</select></label>
+      ${recentCount() ? `<label class="check chg"><input type="checkbox" id="${idp}-changed"${F.changed ? ' checked' : ''}> 🔔 Only what changed in the latest upload (${recentCount()})</label>` : ''}</div>`;
   };
   function bindFilterBar(root, idp, F, refresh) {
+    const ch = root.querySelector(`#${idp}-changed`); if (ch) ch.addEventListener('change', () => { F.changed = ch.checked; NCR.app.render(); });
     ['year', 'month', 'from', 'to', 'defect'].forEach((k) => root.querySelector(`#${idp}-${k}`).addEventListener('change', (e) => { F[k] = e.target.value; NCR.app.render(); }));
   }
 
@@ -329,9 +341,9 @@ window.NCR = window.NCR || {};
   }
 
   // ---------- Followed up (stays until the NCR is closed; shows the timeline) ----------
-  const WF = { q: '', buyer: '', tab: 'none', from: '', to: '', defect: '', year: '', month: '' };
+  const WF = { q: '', buyer: '', tab: 'none', from: '', to: '', defect: '', year: '', month: '', changed: false };
   const WF_OPEN = new Set(); // rows whose timeline is expanded
-  function setWaitFilter(f) { Object.assign(WF, { q: '', buyer: '', tab: 'none', from: '', to: '', defect: '', year: '', month: '' }, f); }
+  function setWaitFilter(f) { Object.assign(WF, { q: '', buyer: '', tab: 'none', from: '', to: '', defect: '', year: '', month: '', changed: false }, f); }
   // what, if anything, needs QA's attention on a followed-up NCR
   // Followed up several times and the buyer's remark has not changed since the first follow-up
   function noReplyAfter(n) {
@@ -371,9 +383,9 @@ window.NCR = window.NCR || {};
       const i = inf(n), at = attention(n), open_ = WF_OPEN.has(n.NCR_ID);
       const changes = S.historyFor(n.NCR_ID).filter((x) => /^Buyer update|^Buyer cleared/.test(x.Action)).length;
       return `<tr class="${i.remarkGroup === 'none' ? 'rp-none' : longRunning(n) ? 'rp-long' : 'rp-has'}" data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}<td class="rank">${list.indexOf(n) + 1}</td>
-        <td class="nowrap"><button class="link tog" data-action="toggletl" data-id="${esc(n.NCR_ID)}" title="Show timeline">${open_ ? '▾' : '▸'}</button> <b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div></td>
+        <td class="nowrap"><button class="link tog" data-action="toggletl" data-id="${esc(n.NCR_ID)}" title="Show timeline">${open_ ? '▾' : '▸'}</button> <b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div>${recentChips(n) ? `<div>${recentChips(n)}</div>` : ''}</td>
         <td class="wide">${esc(buyerOf(n))}<div class="sub clip">${esc(n.Defect)}</div></td>
-        <td class="remark">${remarkText(n, i)}</td>
+        <td class="remark">${remarkText(n, i)}${(recentOf(n) || []).filter((c) => c.t === 'update' && c.from).map((c) => `<div class="sub" title="${esc(c.from)}">Before: ${esc(c.from.length > 90 ? c.from.slice(0, 90) + '…' : c.from)}</div>`).join('')}</td>
         <td class="nowrap">${n.Last_Followup ? L.fmtDate(n.Last_Followup) : '–'}<div class="sub">${i.count} follow-up${i.count === 1 ? '' : 's'}${changes ? ` · ${changes} buyer update${changes === 1 ? '' : 's'}` : ''}</div></td>
         <td class="nowrap">${n.Due_Date ? L.fmtDate(n.Due_Date) : '<span class="muted">Not set</span>'}${i.dueDiff !== null ? `<div class="sub">${i.dueDiff < 0 ? -i.dueDiff + 'd late' : i.dueDiff === 0 ? 'today' : 'in ' + i.dueDiff + 'd'}</div>` : ''}</td>
         <td>${at ? `<span class="badge ${at.cls}">${at.label}</span>` : '<span class="sub">Waiting</span>'}</td>
