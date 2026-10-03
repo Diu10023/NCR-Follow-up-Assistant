@@ -1,0 +1,104 @@
+<!doctype html><html><head><meta charset="utf-8"><title>NCR Follow-up Control: flow</title>
+<style>
+body{margin:0;background:#fff;color:#3D4852;font-family:"DejaVu Sans",Arial,sans-serif}
+figure{margin:0;padding:28px 32px 24px}
+h1{font-size:22px;margin:0 0 4px}
+.sub{font-size:14px;color:#6B7280;margin:0 0 14px}
+svg{display:block;width:100%;height:auto}
+figcaption{font-size:14px;line-height:1.5;color:#4b5563;margin-top:12px;max-width:1300px}
+text{font-family:"DejaVu Sans",Arial,sans-serif;fill:currentColor;stroke:none}
+.t{font-size:15px;font-weight:700}.s{font-size:12.5px;fill:#5b6572}.l{font-size:12.5px;font-weight:700;paint-order:stroke;stroke:#fff;stroke-width:5px}
+.box{fill:#fff;stroke:currentColor;stroke-width:1.6}
+</style></head><body>
+<figure>
+<h1>NCR Follow-up Control: how it works</h1>
+<p class="sub">One weekly Excel file decides everything. QA only chases buyers and marks updates as read.</p>
+<svg viewBox="0 0 1440 810" role="img" aria-label="Flow: the weekly Excel upload sorts each NCR into To follow up, Followed up, Closed, Jira closed or Hold for scrap; QA presses Follow-up to move NCRs to Followed up, buyers answer in Remarks, and the next file brings their answers back.">
+<defs>
+ <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+ <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#007AC8"/></marker>
+</defs>
+<g color="#3D4852" fill="none" stroke="currentColor" stroke-width="1.8">
+ <!-- top row -->
+ <rect class="box" x="190" y="50" width="260" height="90" rx="14"/>
+ <text class="t" x="320" y="82" text-anchor="middle">Weekly Excel export</text>
+ <text class="s" x="320" y="102" text-anchor="middle">NCR No., Item, Batch, Defect,</text>
+ <text class="s" x="320" y="120" text-anchor="middle">Closed, Remarks, Buyer</text>
+ <line x1="450" y1="95" x2="588" y2="95" marker-end="url(#a)"/>
+ <text class="l" x="519" y="84" text-anchor="middle">upload</text>
+ <rect class="box" x="590" y="50" width="260" height="90" rx="14" stroke="#007AC8" stroke-width="2.4"/>
+ <text class="t" x="720" y="82" text-anchor="middle">Import</text>
+ <text class="s" x="720" y="102" text-anchor="middle">pick File date, check preview</text>
+ <text class="s" x="720" y="120" text-anchor="middle">match old NCRs by NCR No.</text>
+ <line x1="850" y1="95" x2="988" y2="95" stroke-dasharray="6 5" marker-end="url(#a)"/>
+ <text class="l" x="919" y="84" text-anchor="middle">records</text>
+ <rect class="box" x="990" y="50" width="260" height="90" rx="14" stroke-dasharray="6 5"/>
+ <text class="t" x="1120" y="82" text-anchor="middle">After each upload</text>
+ <text class="s" x="1120" y="102" text-anchor="middle">What changed · Buyer response</text>
+ <text class="s" x="1120" y="120" text-anchor="middle">Import history · Undo / Delete</text>
+ <!-- bus -->
+ <line x1="720" y1="140" x2="720" y2="230"/>
+ <polyline points="160,330 160,230 1280,230 1280,330"/>
+ <line x1="440" y1="230" x2="440" y2="328" marker-end="url(#a)"/>
+ <line x1="720" y1="230" x2="720" y2="328" marker-end="url(#a)"/>
+ <line x1="1000" y1="230" x2="1000" y2="328" marker-end="url(#a)"/>
+ <line x1="160" y1="300" x2="160" y2="328" marker-end="url(#a)"/>
+ <line x1="1280" y1="300" x2="1280" y2="328" marker-end="url(#a)"/>
+ <text class="l" x="170" y="285" text-anchor="start">new NCR</text>
+ <text class="l" x="450" y="285" text-anchor="start">buyer changed Remarks</text>
+ <text class="l" x="730" y="285" text-anchor="start">Closed = Yes</text>
+ <text class="l" x="1010" y="285" text-anchor="start">Remarks: Jira</text>
+ <text class="l" x="1270" y="285" text-anchor="end">Remarks: hold/scrap</text>
+ <!-- states -->
+ <rect class="box" x="40" y="330" width="240" height="130" rx="16" stroke="#D6322B" stroke-width="2.6"/>
+ <text class="t" x="160" y="362" text-anchor="middle" style="fill:#D6322B">To follow up</text>
+ <text class="s" x="160" y="386" text-anchor="middle">1 No remark: chase first</text>
+ <text class="s" x="160" y="404" text-anchor="middle">2 Has remark: check progress</text>
+ <text class="s" x="160" y="428" text-anchor="middle">numbered in work order</text>
+ <rect class="box" x="320" y="330" width="240" height="130" rx="16" stroke="#E8650C" stroke-width="2.6"/>
+ <text class="t" x="440" y="362" text-anchor="middle" style="fill:#E8650C">Followed up</text>
+ <text class="s" x="440" y="386" text-anchor="middle">stays until a file closes it</text>
+ <text class="s" x="440" y="404" text-anchor="middle">replies join the timeline</text>
+ <text class="s" x="440" y="428" text-anchor="middle">red = no reply after 3 chases</text>
+ <rect class="box" x="600" y="330" width="240" height="130" rx="16"/>
+ <text class="t" x="720" y="362" text-anchor="middle">Closed</text>
+ <text class="s" x="720" y="386" text-anchor="middle">only the file closes NCRs</text>
+ <text class="s" x="720" y="404" text-anchor="middle">no Close / Reopen buttons</text>
+ <rect class="box" x="880" y="330" width="240" height="130" rx="16"/>
+ <text class="t" x="1000" y="362" text-anchor="middle">Jira closed</text>
+ <text class="s" x="1000" y="386" text-anchor="middle">closed at import</text>
+ <text class="s" x="1000" y="404" text-anchor="middle">listed on Hold &amp; Jira</text>
+ <rect class="box" x="1160" y="330" width="240" height="130" rx="16"/>
+ <text class="t" x="1280" y="362" text-anchor="middle">Hold for scrap</text>
+ <text class="s" x="1280" y="386" text-anchor="middle">kept out of the follow-up</text>
+ <text class="s" x="1280" y="404" text-anchor="middle">lists, on Hold &amp; Jira</text>
+ <!-- QA lane -->
+ <g stroke="#007AC8">
+  <path d="M160 460 V520 H440 V462" marker-end="url(#ab)"/>
+  <path d="M500 462 V492 H540 V462" marker-end="url(#ab)"/>
+ </g>
+ <text class="l" x="300" y="548" text-anchor="middle" style="fill:#007AC8">1  QA presses Follow-up (one message per buyer)</text>
+ <text class="l" x="548" y="508" text-anchor="start" style="fill:#007AC8">2  Reviewed, after reading an update</text>
+ <rect class="box" x="640" y="530" width="330" height="82" rx="14" stroke="#007AC8" stroke-width="2"/>
+ <text class="t" x="805" y="560" text-anchor="middle" style="fill:#007AC8">3  Export to Excel, per buyer</text>
+ <text class="s" x="805" y="580" text-anchor="middle">from To follow up or Followed up</text>
+ <text class="s" x="805" y="597" text-anchor="middle">attach to the email</text>
+ <line x1="970" y1="571" x2="1088" y2="571" stroke="#007AC8" marker-end="url(#ab)"/>
+ <rect class="box" x="1090" y="530" width="310" height="82" rx="14"/>
+ <text class="t" x="1245" y="560" text-anchor="middle">Buyers</text>
+ <text class="s" x="1245" y="580" text-anchor="middle">write progress in the Remarks</text>
+ <text class="s" x="1245" y="597" text-anchor="middle">column of their own system</text>
+ <!-- loop back -->
+ <path d="M1400 571 H1428 V785 H20 V95 H188" marker-end="url(#a)"/>
+ <text class="l" x="700" y="776" text-anchor="middle">next Monday: their answers arrive in the new Excel export</text>
+ <!-- gaps -->
+ <g stroke="#E8650C" stroke-dasharray="6 5" stroke-width="1.8">
+  <rect x="120" y="650" width="400" height="56" rx="12"/><rect x="540" y="650" width="400" height="56" rx="12"/><rect x="960" y="650" width="400" height="56" rx="12"/>
+ </g>
+ <text class="s" x="320" y="674" text-anchor="middle" style="fill:#B4500A;font-weight:700">Gap A</text><text class="s" x="320" y="693" text-anchor="middle" style="fill:#B4500A">NCR missing from a new file is not flagged</text>
+ <text class="s" x="740" y="674" text-anchor="middle" style="fill:#B4500A;font-weight:700">Gap B</text><text class="s" x="740" y="693" text-anchor="middle" style="fill:#B4500A">Hold for scrap has no age or reminder</text>
+ <text class="s" x="1160" y="674" text-anchor="middle" style="fill:#B4500A;font-weight:700">Gap C</text><text class="s" x="1160" y="693" text-anchor="middle" style="fill:#B4500A">data lives in one browser: no team use yet</text>
+</g>
+</svg>
+<figcaption>Black arrows: the Excel file decides where each NCR goes. Blue arrows: the only things QA does by hand. Dashed orange boxes are what the app does not cover yet.</figcaption>
+</figure></body></html>
