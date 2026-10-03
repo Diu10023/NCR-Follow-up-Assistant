@@ -313,3 +313,8 @@ details.datefilter{margin-top:6px}details.datefilter>summary{font-size:15px}
 .wk.now{outline:2px solid var(--acc);outline-offset:2px}
 .hist-sep{margin-top:28px}
 h2.sect{font-size:26px;margin:0}
+
+a.cal-d.up{text-decoration:none}
+.cal-d.up i{font-size:10.5px}
+.upcard{padding:12px 4px;border-bottom:1px solid var(--line-s);display:flex;flex-direction:column;gap:6px}
+.upchips{display:flex;flex-wrap:wrap;gap:6px}

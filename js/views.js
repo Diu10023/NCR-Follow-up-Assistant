@@ -743,31 +743,29 @@ window.NCR = window.NCR || {};
     // calendar grid, Monday first
     const first = ym + '-01', lead = (new Date(first + 'T00:00:00Z').getUTCDay() + 6) % 7, days = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate();
     let cells = '<div class="cal-h">Mon</div><div class="cal-h">Tue</div><div class="cal-h">Wed</div><div class="cal-h">Thu</div><div class="cal-h">Fri</div><div class="cal-h">Sat</div><div class="cal-h">Sun</div>' + '<div></div>'.repeat(lead);
+    const monthLogs = logs.filter((x) => x.fd.slice(0, 7) === ym).sort((p, q) => p.fd.localeCompare(q.fd));
+    const sum = (x) => `${x.file || 'file'}: ${x.added || 0} new · ${x.remarkChanged || 0} updated · ${x.closed || 0} closed`;
     for (let d = 1; d <= days; d++) {
       const iso = ym + '-' + String(d).padStart(2, '0'), hit = byDay[iso];
-      cells += `<div class="cal-d${hit ? ' up' : ''}${iso === today ? ' today' : ''}"${hit ? ` title="${esc(hit.map((x) => x.file).join(', '))}"` : ''}>${d}${hit ? `<i>${hit.length > 1 ? hit.length + '×' : '●'}</i>` : ''}</div>`;
+      if (hit) {
+        const k = hit.reduce((t, x) => t + (x.added || 0) + (x.remarkChanged || 0) + (x.closed || 0), 0), target = hit.find((x) => x.changes) || hit[0];
+        cells += `<a class="cal-d up${iso === today ? ' today' : ''}" href="#/changes/${encodeURIComponent(target.at)}" title="${esc(hit.map(sum).join('\n'))}">${d}<i>${k} chg</i></a>`;
+      } else cells += `<div class="cal-d${iso === today ? ' today' : ''}">${d}</div>`;
     }
     // weeks (Mon–Sun) with no upload, from the first upload until this week
     const monday = (iso) => L.addDays(iso, -((new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7));
     const weeksWith = new Set(logs.map((x) => monday(x.fd))), skipped = [];
     if (logs.length) for (let w = monday(logs[logs.length - 1].fd); w < monday(today); w = L.addDays(w, 7)) if (!weeksWith.has(w)) skipped.push(w);
     const wk = (w) => `${L.fmtDate(w)} – ${L.fmtDate(L.addDays(w, 6))}`;
-    // weekly timeline: one block per week, filled = uploaded, hatched = no file that week
-    const perWeek = {}; logs.forEach((x) => { const m = monday(x.fd); perWeek[m] = (perWeek[m] || 0) + 1; });
-    let tl = '';
-    if (logs.length) {
-      const lastUp = monday(logs[0].fd), thisWk = lastUp > monday(today) ? lastUp : monday(today), firstWk = monday(logs[logs.length - 1].fd), capWk = L.addDays(thisWk, -7 * 15), startWk = firstWk > capWk ? firstWk : capWk;
-      for (let w = startWk; w <= thisWk; w = L.addDays(w, 7)) {
-        const c = perWeek[w] || 0, parts = L.fmtDate(w).split('-');
-        tl += `<div class="wk ${c ? 'up' : 'gap'}${w === monday(today) ? ' now' : ''}" title="Week ${wk(w)}: ${c ? c + ' upload' + (c === 1 ? '' : 's') : 'no file'}"><span class="wd">${parts[0]} ${parts[1]}</span><i>${c ? '✓' : ''}</i><span class="wn">${c ? c + '×' : 'no file'}</span></div>`;
-      }
-    }
     const stackAts = new Set(S.getImportStack());
     const rows = logs.map((x) => `<tr><td class="nowrap"><b>${L.fmtDate(x.fd)}</b>${x.fd !== String(x.at).slice(0, 10) ? `<div class="sub">uploaded ${L.fmtDate(x.at)}</div>` : ''}</td><td>${esc(x.file || 'file')}</td><td>${x.added || 0}</td><td>${x.remarkChanged === undefined ? '–' : x.remarkChanged}</td><td>${x.closed || 0}</td><td>${x.total === undefined ? '–' : x.total}</td><td class="right">${x.changes ? `<a class="btn sm" href="#/changes/${encodeURIComponent(x.at)}">Changes</a> ` : ''}${stackAts.has(x.at) ? `<button class="btn sm danger" data-del="${esc(x.at)}" data-newer="${logs.filter((y) => String(y.at) > String(x.at) && stackAts.has(y.at)).length}">Delete</button>` : '<span class="sub" title="This upload was made before undo was saved for every upload. Use Settings → Clear all NCR data to start over.">no undo data</span>'}</td></tr>`).join('');
     return { html: `${standalone ? `<div class="page-head"><div><h1>Import history</h1><div class="muted">${logs.length} upload${logs.length === 1 ? '' : 's'} · <a href="#/import">Import a new file</a></div></div></div>` : `<div class="page-head"><div><h2 class="sect">Upload history</h2><div class="muted">${logs.length} upload${logs.length === 1 ? '' : 's'} so far. Each week should have one file.</div></div></div>`}
-      ${logs.length ? `<section class="block"><h2>Weekly timeline</h2><div class="wkline">${tl}</div><p class="hint">One block per week (Mon–Sun), oldest on the left. ✓ = a file dated in that week was uploaded; hatched = no file that week; outlined = this week.</p>${skipped.length ? `<div class="skips">⚠️ No file for: ${skipped.slice(-12).reverse().map((w) => `<span class="chip age-attention">${wk(w)}</span>`).join(' ')}${skipped.length > 12 ? ` …and ${skipped.length - 12} older weeks` : ''}</div>` : ''}</section>
-        <section class="block"><details><summary>📅 Month calendar</summary><div><div class="cal-nav"><button class="btn sm" data-im="${shiftMonth(ym, -1)}">‹</button><h2>${monthName(ym)}</h2><button class="btn sm" data-im="${shiftMonth(ym, 1)}">›</button></div>
-          <div class="cal">${cells}</div><p class="hint">● = a file dated that day was imported. Hover for the file name.</p></div></details></section>
+      ${logs.length ? `${skipped.length ? `<div class="alert warn">⚠️ No file for these weeks: ${skipped.slice(-12).reverse().map((w) => `<span class="chip age-attention">${wk(w)}</span>`).join(' ')}${skipped.length > 12 ? ` …and ${skipped.length - 12} older weeks` : ''}</div>` : ''}
+        <div class="charts"><section class="block"><div class="cal-nav"><button class="btn sm" data-im="${shiftMonth(ym, -1)}">‹</button><h2>${monthName(ym)}</h2><button class="btn sm" data-im="${shiftMonth(ym, 1)}">›</button></div>
+          <div class="cal">${cells}</div><p class="hint">Blue days have an upload. The number shows how many NCRs changed in it (new + remark updated + closed). Click a day to see exactly what changed.</p></section>
+        <section class="block"><h2>Uploads in ${monthName(ym)}</h2>${monthLogs.length ? monthLogs.map((x) => `<div class="upcard"><div class="row-between"><b>${L.fmtDate(x.fd)}</b><span class="sub">${esc(x.file || 'file')}</span></div>
+            <div class="upchips"><span class="chip new">🆕 ${x.added || 0} new</span> <span class="chip new">🔔 ${x.remarkChanged || 0} updated</span> <span class="chip">✅ ${x.closed || 0} closed</span></div>
+            ${x.changes ? `<a href="#/changes/${encodeURIComponent(x.at)}">See what changed →</a>` : '<span class="sub">No change details for this older upload</span>'}</div>`).join('') : '<p class="hint">No upload in this month.</p>'}</section></div>
         <section class="block"><h2>All uploads</h2><div class="table-wrap"><table class="grid compact"><thead><tr><th>File date</th><th>File</th><th>New NCRs</th><th>Remark changed</th><th>Closed</th><th>Rows in file</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
           <p class="hint">Stored in this browser. “Remark changed” counts existing NCRs whose buyer remark differs from the previous upload.</p></section>`
       : '<div class="empty">No uploads recorded yet. <a href="#/import">Import your first file</a>.</div>'}`,
