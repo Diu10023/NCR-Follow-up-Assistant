@@ -571,7 +571,13 @@ window.NCR = window.NCR || {};
         const { records } = I2.buildRecords(imp.table, imp.mapping, st.settings.jiraKeywords);
         const p = I2.plan(records, st.ncrs), r = I2.apply(p, Object.assign({}, imp.opts, { date: imp.opts.date || L.todayISO() }));
         const nClosed = p.added.filter((x) => x.CloseReason).length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0);
-        S.applyImport(r, { file: imp.name, fileDate: imp.opts.date || L.todayISO(), added: p.added.length, updated: p.updated.length, remarkChanged: p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark')).length, closed: nClosed, total: records.length });
+        S.applyImport(r, { file: imp.name, fileDate: imp.opts.date || L.todayISO(), added: p.added.length, updated: p.updated.length, remarkChanged: p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark')).length, closed: nClosed, total: records.length, byBuyer: (() => {
+          const m = {}, b = (n) => (m[n || NO_BUYER] = m[n || NO_BUYER] || { added: 0, updated: 0, closed: 0 });
+          p.added.forEach((r) => { b(r.Buyer).added++; if (r.CloseReason) b(r.Buyer).closed++; });
+          p.updated.forEach((u) => { if (u.changes.some((c) => c.field === 'Buyer_Remark')) b(u.old.Buyer).updated++; });
+          p.closeNow.forEach((c) => { b(c.old.Buyer).closed++; });
+          return m;
+        })() });
         imp.opts.date = '';
         const back = p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark' && c.to) && isFollowed(S.getNcr(u.old.NCR_ID))).length; // followed-up NCRs with a new buyer remark
         S.saveSettings({ importMapping: Object.assign({}, imp.mapping) });
@@ -620,8 +626,23 @@ window.NCR = window.NCR || {};
       <td>${p === null ? '<span class="muted">–</span>' : `<span class="rate ${p >= 60 ? 'good' : p >= 30 ? 'mid' : 'low'}">${p}%</span>`}</td>
       <td>${r.answered ? (r.daysSum / r.answered).toFixed(1) + ' d' : '<span class="muted">–</span>'}</td>
       <td>${r.noReply ? `<a href="#/followed" data-wfilter='${esc(JSON.stringify({ buyer: r.name === NO_BUYER ? '__none' : r.name }))}' class="bad strong">${r.noReply}</a>` : '<span class="muted">0</span>'}</td><td>${r.closedMonth}</td></tr>`; }).join('');
+    // Latest upload vs the one before: what to do this Monday
+    const logSorted = S.getImports().filter((x) => x.byBuyer).sort((a, b) => String(a.at).localeCompare(String(b.at))), lastL = logSorted[logSorted.length - 1], prevL = logSorted[logSorted.length - 2];
+    let weekly = '';
+    if (lastL) {
+      const names = [...new Set(Object.keys(lastL.byBuyer).concat(rows.map((r) => r.name)))].filter((nm) => rows.find((r) => r.name === nm) || lastL.byBuyer[nm]);
+      const line = names.map((nm) => {
+        const d = lastL.byBuyer[nm] || { added: 0, updated: 0, closed: 0 }, pd = prevL && prevL.byBuyer && prevL.byBuyer[nm], r = per[nm] || { open: 0 };
+        const carried = Math.max(0, r.open - d.added + 0 - d.updated);
+        const delta = pd ? d.updated - pd.updated : null;
+        return { nm, d, carried, delta, open: r.open };
+      }).sort((a, b) => b.d.added - a.d.added || b.carried - a.carried);
+      weekly = `<section class="block"><h2>Latest upload: what changed</h2><p class="hint">File <b>${esc(lastL.file || '')}</b> (${L.fmtDate(lastL.fileDate || lastL.at)})${prevL ? ` compared with the one before (${L.fmtDate(prevL.fileDate || prevL.at)})` : ''}. Your Monday check: new NCRs to chase, buyers who updated, and the older ones still waiting.</p>
+        <div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th title="New NCRs in this file">New to chase</th><th title="Existing NCRs whose Remarks changed">Buyer updated</th><th title="Updated count vs the previous upload">vs previous</th><th title="Still open and no change in this file">Carried over</th><th>Closed by file</th></tr></thead><tbody>${line.map((x) => `<tr><td><b>${esc(x.nm)}</b></td><td>${x.d.added ? `<b class="bad">${x.d.added}</b>` : '<span class="muted">0</span>'}</td><td>${x.d.updated}</td><td>${x.delta === null ? '<span class="muted">–</span>' : x.delta > 0 ? `<span class="rate good">+${x.delta}</span>` : x.delta < 0 ? `<span class="rate low">${x.delta}</span>` : '<span class="muted">0</span>'}</td><td>${x.carried}</td><td>${x.d.closed}</td></tr>`).join('')}</tbody></table></div></section>`;
+    }
     const thin = uploadWeeks.size < 3;
     return { html: `<div class="page-head"><div><h1>Buyer response</h1><div class="muted">How often each buyer answers when QA follows up · <a href="#/imports">${logs.length} upload${logs.length === 1 ? '' : 's'}</a></div></div></div>
+      ${weekly}
       ${thin ? '<div class="alert warn">Only a few weeks of data so far, so treat these numbers as a first look. They get reliable after several weekly uploads.</div>' : ''}
       <section class="block"><h2>Remark updates per week</h2><p class="hint">Each cell = how many NCRs of that buyer had their Remarks changed in the file dated that week. Darker = more updates. Empty = none. Hatched = no file was uploaded that week, so it is unknown rather than zero.</p>${heat}</section>
       <section class="block"><h2>Response by buyer</h2><p class="hint"><b>Answered</b> = after a QA follow-up, the buyer changed the Remarks within 7 days. File dates decide the timing, so set the right File date when you upload late. These numbers compare buyers over time; use them to decide whom to chase, not as a score.</p>
