@@ -226,3 +226,19 @@ dialog{border:0;border-radius:var(--r-card);padding:0;width:min(720px,94vw);back
 #cfg .form+.form{margin-top:20px}#cfg h2+.hint+.form,#cfg h2:not(:first-child){margin-top:26px}
 
 .grp{padding:16px 18px;border-radius:var(--r-base);box-shadow:var(--ins-s)}.grp h3{margin:0 0 10px}.grp .form.inner{margin-top:12px}
+
+/* priority tabs (To follow up / Followed up): 1 is the loudest */
+.prio{display:grid;grid-template-columns:1.5fr 1.2fr 1fr;gap:16px;margin:4px 0 22px}
+@media(max-width:760px){.prio{grid-template-columns:1fr}}
+.ptab{display:flex;align-items:center;gap:14px;text-align:left;font-family:var(--body);color:var(--fg);background:var(--bg);border:0;border-radius:24px;padding:16px 20px;cursor:pointer;box-shadow:var(--ext);transition:all var(--ease)}
+.ptab:hover{transform:translateY(-1px)}
+.ptab .pn{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:18px;background:var(--bg);box-shadow:var(--ins-s);color:var(--mut)}
+.ptab .pt{flex:1;display:flex;flex-direction:column;gap:2px}.ptab .pt b{font-size:17px;font-weight:800}.ptab .pt small{font-size:13px;color:var(--mut);font-weight:500;line-height:1.3}
+.ptab .pc{font-size:30px;font-weight:800;color:var(--mut)}
+.ptab.p-none .pc{font-size:42px;color:var(--acc)}.ptab.p-none .pn{background:var(--acc);color:#fff;box-shadow:none}.ptab.p-none .pt b{font-size:20px}
+.ptab.p-has .pc{color:var(--acc)}
+.ptab.on{box-shadow:var(--ins)}.ptab.on .pt b{color:var(--acc)}
+td.rank,th.rank{width:34px;text-align:center;font-weight:800;color:var(--mut)}
+td.rank{font-size:15px}
+tr.rp-none>td:first-child{box-shadow:inset 5px 0 0 var(--acc)}
+tr.rp-long>td:first-child{box-shadow:inset 5px 0 0 var(--ph)}

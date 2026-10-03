@@ -36,6 +36,16 @@ window.NCR = window.NCR || {};
     + (i.remarkGroup === 'hold' ? '<div class="sub">⏳ Hold / scrap – cannot close yet</div>' : i.remarkGroup === 'none' ? '<div class="sub">📭 no buyer update</div>' : '');
   const newChip = (i) => (i.isNew ? ' <span class="chip new">NEW</span>' : '');
 
+  // "Rounds" = follow-ups plus buyer remark changes. Many rounds on an NCR that has a remark means it keeps moving but never finishes.
+  const roundsOf = (n) => (Number(n.Followup_Count) || 0) + S.historyFor(n.NCR_ID).filter((x) => /^Buyer update|^Buyer cleared/.test(x.Action)).length;
+  const LONG_ROUNDS = 3;
+  const longRunning = (n) => inf(n).remarkGroup !== 'none' && roundsOf(n) >= LONG_ROUNDS;
+  // Work order: 1) no remark, oldest first  2) has remark, most rounds first (never finishing), then oldest
+  const priSort = (a, b) => {
+    const ga = inf(a).remarkGroup === 'none' ? 0 : 1, gb = inf(b).remarkGroup === 'none' ? 0 : 1;
+    return ga - gb || (ga ? roundsOf(b) - roundsOf(a) : 0) || oldest(a, b);
+  };
+
   // Worklist table: what, who, why, when — and one-click actions.
   function workTable(list, emptyMsg, key, limit, withRemark) {
     if (!list.length) return `<div class="empty">${emptyMsg || 'Nothing here'}</div>`;
@@ -43,16 +53,16 @@ window.NCR = window.NCR || {};
     sectionIds[key] = list.map((n) => n.NCR_ID);
     const shown = showAll[key] ? list : list.slice(0, limit);
     const rows = shown.map((n) => {
-      const i = inf(n);
-      return `<tr data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}
+      const i = inf(n), rd = roundsOf(n), idx = list.indexOf(n) + 1;
+      return `<tr class="${i.remarkGroup === 'none' ? 'rp-none' : longRunning(n) ? 'rp-long' : ''}" data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}<td class="rank">${idx}</td>
         <td class="nowrap"><b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div></td>
         <td class="wide">${esc(buyerOf(n))}<div class="sub clip" title="${esc(n.Buyer_Remark || n.Defect)}">${esc(n.Defect)}${!withRemark && n.Buyer_Remark ? ' · “' + esc(n.Buyer_Remark) + '”' : ''}</div></td>
-        ${withRemark ? `<td class="remark">${remarkText(n, i)}</td>` : ''}<td>${whyText(i)}</td>
+        ${withRemark ? `<td class="remark">${remarkText(n, i)}</td>` : ''}<td>${whyText(i)}${longRunning(n) ? `<div><span class="chip age-attention">🔁 ${rd} rounds, still open</span></div>` : ''}</td>
         <td class="nowrap">${dueText(n, i)}<div class="sub">${i.count ? i.count + ' follow-up' + (i.count > 1 ? 's' : '') : 'not followed up'}</div></td>
-        <td class="right nowrap">${i.needsReview ? `<button class="btn sm" data-action="reviewed" data-id="${esc(n.NCR_ID)}" title="I read the buyer update – check again in ${st.settings.defaultCheckDays} days">✓ Reviewed</button> ` : ''}<button class="btn sm" data-action="followup" data-id="${esc(n.NCR_ID)}">Follow-up</button></td></tr>`;
+        <td class="right nowrap">${i.needsReview ? `<button class="btn sm" data-action="reviewed" data-id="${esc(n.NCR_ID)}" title="I read the buyer update – check again in ${st.settings.defaultCheckDays} days">✓ Reviewed</button>` : ''}</td></tr>`;
     }).join('');
     const more = list.length > limit ? `<div class="more"><button class="link" data-action="showall" data-key="${key}">${showAll[key] ? 'Show fewer' : `Show all ${list.length}`}</button> · <button class="link" data-action="selsection" data-key="${key}">Select all ${list.length}</button></div>` : '';
-    return `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead}<th>NCR</th><th>Buyer / Defect</th>${withRemark ? '<th>Buyer remark</th>' : ''}<th>Why</th><th>Next check</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
+    return `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th>${withRemark ? '<th>Buyer remark</th>' : ''}<th>Why</th><th>Next check</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
   }
 
   const byDue = (a, b) => (a.Due_Date || '9999') < (b.Due_Date || '9999') ? -1 : (a.Due_Date || '9999') > (b.Due_Date || '9999') ? 1 : 0;
@@ -234,8 +244,8 @@ window.NCR = window.NCR || {};
   function currentIds() { const v = visibleList(); return (LF.tab === 'none' ? v.none : LF.tab === 'has' ? v.has : v.shown).map((n) => n.NCR_ID); }
 
   // Shared by To follow up and Followed up: buyer pills, the three tabs, and a per-buyer count line.
-  const TAB_DEFS = [['none', '1 · No remark'], ['has', '2 · Has remark'], ['all', '3 · All']];
-  const tabsHtml = (cnt, cur, attr) => `<div class="tabs">${TAB_DEFS.map(([k, l]) => `<button class="tab${cur === k ? ' on' : ''}" ${attr}="${k}">${l} <b>${cnt[k]}</b></button>`).join('')}</div>`;
+  const TAB_DEFS = [['none', '1', 'No remark', 'Chase these first. The buyer has written nothing.'], ['has', '2', 'Has remark', 'Check progress. Push the ones that never finish.'], ['all', '3', 'All', 'Everything, in work order.']];
+  const tabsHtml = (cnt, cur, attr) => `<div class="prio">${TAB_DEFS.map(([k, n, l, h]) => `<button class="ptab p-${k}${cur === k ? ' on' : ''}" ${attr}="${k}"><span class="pn">${n}</span><span class="pt"><b>${l}</b><small>${h}</small></span><span class="pc">${cnt[k]}</span></button>`).join('')}</div>`;
   const pillsHtml = (per, total, cur, attr) => {
     const names = Object.keys(per).sort((x, y) => per[y] - per[x] || x.localeCompare(y));
     return `<div class="pills">${[`<button class="pill${cur ? '' : ' on'}" ${attr}="">All buyers <b>${total}</b></button>`].concat(names.map((b) => { const v = b === NO_BUYER ? '__none' : b; return `<button class="pill${cur === v ? ' on' : ''}" ${attr}="${esc(v)}">${esc(b)} <b>${per[b]}</b></button>`; })).join('')}</div>`;
@@ -256,18 +266,18 @@ window.NCR = window.NCR || {};
     const tabs = tabsHtml({ none: v.none.length, has: v.has.length, all: v.shown.length }, LF.tab, 'data-tab');
     let body;
     if (LF.tab === 'none') {
-      body = `<section class="block"><h2>No remark: chase these first <span class="count">${v.none.length}</span></h2><p class="hint">The buyer has written nothing in Remarks. Oldest first.</p>${workTable(v.none.slice().sort(oldest), 'Every open NCR has a remark.', 'none', 25)}</section>`;
+      body = `<section class="block"><h2>No remark: chase these first <span class="count">${v.none.length}</span></h2><p class="hint">The buyer has written nothing in Remarks. Numbered in work order: oldest first.</p>${workTable(v.none.slice().sort(oldest), 'Every open NCR has a remark.', 'none', 25)}</section>`;
     } else if (LF.tab === 'has') {
-      const g = (fn) => v.has.filter(fn).sort(oldest);
+      const g = (fn) => v.has.filter(fn).sort(priSort);
       const parts = [
         ['rv', 'Buyer updated — read, then ✓ Reviewed', 'Remarks changed since you last reviewed.', g((n) => inf(n).needsReview)],
-        ['pr', 'In progress', 'Remarks written, not finished. Follow up for the next step.', g((n) => inf(n).remarkGroup === 'progress' && !inf(n).needsReview)],
+        ['pr', 'In progress', 'Remarks written, not finished. NCRs with the most rounds come first: they keep moving but never end.', g((n) => inf(n).remarkGroup === 'progress' && !inf(n).needsReview)],
         ['hd', 'Hold / scrap', 'Waiting for scrap. Cannot close yet.', g((n) => inf(n).remarkGroup === 'hold' && !inf(n).needsReview)],
       ].filter((x) => x[3].length);
       body = parts.map(([k, t, h, l]) => `<section class="block"><h2>${t} <span class="count">${l.length}</span></h2><p class="hint">${h}</p>${workTable(l, '', k, 25, true)}</section>`).join('')
         || '<div class="empty">No NCRs with a remark.</div>';
     } else {
-      body = `<section class="block"><h2>All <span class="count">${v.shown.length}</span></h2>${workTable(allSorted(v.shown), 'No open NCRs match.', 'all', 40, true)}</section>`;
+      body = `<section class="block"><h2>All <span class="count">${v.shown.length}</span></h2>${workTable(v.shown.slice().sort(priSort), 'No open NCRs match.', 'all', 40, true)}</section>`;
     }
     return `${pills}${buyerLine(LF.buyer)}${tabs}
       <div class="row-between wait-line"><span class="muted">${hidden ? `${hidden} already followed up — <a href="#/followed" data-wfilter='${esc(JSON.stringify({ buyer: LF.buyer }))}'>see Followed up</a>` : ''}</span>
@@ -281,7 +291,7 @@ window.NCR = window.NCR || {};
     const sel = (id, label, html) => `<label>${label}<select id="${id}">${html}</select></label>`;
     const o = (pairs, cur) => pairs.map(([v, l]) => `<option value="${v}"${cur === v ? ' selected' : ''}>${l}</option>`).join('');
     const todo = st.ncrs.filter((n) => inf(n).bucket === 'todo').length, noRem = st.ncrs.filter((n) => inf(n).bucket === 'todo' && inf(n).remarkGroup === 'none').length;
-    return { html: `<div class="page-head"><div><h1>To follow up</h1><div class="muted"><b>${todo}</b> to follow up · <b>${noRem}</b> with no remark</div></div><button class="btn primary" data-action="add">+ Add NCR</button></div>
+    return { html: `<div class="page-head"><div><h1>To follow up</h1><div class="muted"><b>${todo}</b> to follow up · <b>${noRem}</b> with no remark</div></div></div>
       <div class="card filters">
         <label class="grow">Search<input id="f-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(LF.q)}"></label>
         <button class="btn" id="f-clear">Clear</button>
@@ -327,6 +337,8 @@ window.NCR = window.NCR || {};
   function attention(n) {
     const i = inf(n), nr = noReplyAfter(n);
     if (nr) return { rank: 0, label: `No reply after ${nr} follow-ups`, cls: 'b-overdue', noReply: true };
+    if (i.remarkGroup === 'none') return { rank: 1, label: 'Still no remark', cls: 'b-overdue' };
+    if (longRunning(n)) return { rank: 1, label: `Open after ${roundsOf(n)} rounds`, cls: 'b-soon' };
     if (i.needsReview) return { rank: 2, label: 'Buyer updated', cls: 'b-review' };
     if (i.dueDiff !== null && i.dueDiff <= 0) return { rank: 3, label: 'Check due', cls: 'b-soon' };
     return null;
@@ -335,7 +347,7 @@ window.NCR = window.NCR || {};
     const q = WF.q.trim().toLowerCase();
     return st.ncrs.filter((n) => isFollowed(n) && (!q || `${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))
       && (!WF.buyer || (WF.buyer === '__none' ? !n.Buyer : n.Buyer === WF.buyer)))
-      .sort((a, b) => { const x = attention(a), y = attention(b); return (x ? x.rank : 9) - (y ? y.rank : 9) || (a.Due_Date || '9999').localeCompare(b.Due_Date || '9999') || oldest(a, b); });
+      .sort((a, b) => { const x = attention(a), y = attention(b); return priSort(a, b) || (x ? x.rank : 9) - (y ? y.rank : 9) || (a.Due_Date || '9999').localeCompare(b.Due_Date || '9999') || oldest(a, b); });
   }
   function timelineRows(n) {
     const h = S.historyFor(n.NCR_ID).slice(0, 6);
@@ -351,20 +363,20 @@ window.NCR = window.NCR || {};
     const rows = list.map((n) => {
       const i = inf(n), at = attention(n), open_ = WF_OPEN.has(n.NCR_ID);
       const changes = S.historyFor(n.NCR_ID).filter((x) => /^Buyer update|^Buyer cleared/.test(x.Action)).length;
-      return `<tr data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}
+      return `<tr class="${i.remarkGroup === 'none' ? 'rp-none' : longRunning(n) ? 'rp-long' : ''}" data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}<td class="rank">${list.indexOf(n) + 1}</td>
         <td class="nowrap"><button class="link tog" data-action="toggletl" data-id="${esc(n.NCR_ID)}" title="Show timeline">${open_ ? '▾' : '▸'}</button> <b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div></td>
         <td class="wide">${esc(buyerOf(n))}<div class="sub clip">${esc(n.Defect)}</div></td>
         <td class="remark">${remarkText(n, i)}</td>
         <td class="nowrap">${n.Last_Followup ? L.fmtDate(n.Last_Followup) : '–'}<div class="sub">${i.count} follow-up${i.count === 1 ? '' : 's'}${changes ? ` · ${changes} buyer update${changes === 1 ? '' : 's'}` : ''}</div></td>
         <td class="nowrap">${n.Due_Date ? L.fmtDate(n.Due_Date) : '<span class="muted">Not set</span>'}${i.dueDiff !== null ? `<div class="sub">${i.dueDiff < 0 ? -i.dueDiff + 'd late' : i.dueDiff === 0 ? 'today' : 'in ' + i.dueDiff + 'd'}</div>` : ''}</td>
         <td>${at ? `<span class="badge ${at.cls}">${at.label}</span>` : '<span class="sub">Waiting</span>'}</td>
-        <td class="right acts">${i.needsReview ? `<button class="btn sm" data-action="reviewed" data-id="${esc(n.NCR_ID)}" title="I read the buyer update">✓ Reviewed</button> ` : ''}<button class="btn sm" data-action="followup" data-id="${esc(n.NCR_ID)}">Follow up again</button></td></tr>
-        ${open_ ? `<tr class="sub-row"><td colspan="8"><ul class="mini-tl">${timelineRows(n)}</ul><a href="#/ncr/${esc(n.NCR_ID)}">Full timeline →</a></td></tr>` : ''}`;
+        <td class="right acts">${i.needsReview ? `<button class="btn sm" data-action="reviewed" data-id="${esc(n.NCR_ID)}" title="I read the buyer update">✓ Reviewed</button>` : ''}</td></tr>
+        ${open_ ? `<tr class="sub-row"><td colspan="9"><ul class="mini-tl">${timelineRows(n)}</ul><a href="#/ncr/${esc(n.NCR_ID)}">Full timeline →</a></td></tr>` : ''}`;
     }).join('');
     return `${pillsHtml(per, all.length, WF.buyer, 'data-wbuyer')}${buyerLine(WF.buyer)}${tabsHtml(cnt, WF.tab, 'data-wtab')}
       <div class="row-between wait-line"><span class="muted">${list.length ? `<b>${attn}</b> of these need your attention${unanswered ? ` (<b>${unanswered}</b> with no reply after ${st.settings.escalationThreshold || 3}+ follow-ups)` : ''}: no reply, buyer updated, or check date reached. The rest are waiting.` : ''}</span>
         <button class="btn" data-action="export" data-src="followed"${list.length ? '' : ' disabled'}>Export to Excel</button></div>
-      <section class="block">${list.length ? `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead}<th>NCR</th><th>Buyer / Defect</th><th>Latest remark</th><th>Last follow-up</th><th>Next check</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+      <section class="block">${list.length ? `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th><th>Latest remark</th><th>Last follow-up</th><th>Next check</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
         : `<div class="empty">${all.length ? 'No NCRs in this tab.' : 'Nothing here yet. Press Follow-up on an NCR in To follow up: it moves here and stays until it is closed.'}</div>`}</section>`;
   }
   function followedPage() {
