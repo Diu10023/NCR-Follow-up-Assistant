@@ -197,23 +197,24 @@ window.NCR = window.NCR || {};
   }
 
   // ---------- Open NCRs (one worklist: no remark first, then has remark) ----------
-  const LF0 = { q: '', buyer: '', tab: 'none', show: 'open', status: '', owner: '', waiting: '', disposition: '', due: '', buyerUpdate: '', fu: '', age: '', sort: 'due', dir: 'asc', from: '', to: '', defect: '' };
+  const LF0 = { q: '', buyer: '', tab: 'none', show: 'open', status: '', owner: '', waiting: '', disposition: '', due: '', buyerUpdate: '', fu: '', age: '', sort: 'due', dir: 'asc', from: '', to: '', defect: '', year: '', month: '' };
   const LF = Object.assign({}, LF0);
   // links from Home pass buyerUpdate; map them onto the two priority tabs
   function setFilter(f) { Object.keys(LF).forEach((k) => delete LF[k]); Object.assign(LF, LF0, f); }
 
   // Created-date range and defect type, shared by To follow up and Followed up
-  const inDates = (n, F) => !((F.from && (n.NCR_Date || '') < F.from) || (F.to && (n.NCR_Date || '') > F.to) || (F.defect && n.Defect !== F.defect));
+  const inDates = (n, F) => !((F.from && (n.NCR_Date || '') < F.from) || (F.to && (n.NCR_Date || '') > F.to) || (F.defect && n.Defect !== F.defect) || (F.year && String(n.NCR_Date || '').slice(0, 4) !== F.year) || (F.month && String(n.NCR_Date || '').slice(5, 7) !== F.month));
   const filterBar = (idp, F) => {
-    const today = L.todayISO(), defects = [...new Set(st.ncrs.map((n) => n.Defect).filter(Boolean))].sort();
-    const chip = (k, label, from, to) => `<button class="chip-btn${F.from === from && F.to === to ? ' on' : ''}" type="button" data-${idp}chip="${k}" data-from="${from}" data-to="${to}">${label}</button>`;
-    return `<div class="datebar"><label>Created from<input type="date" id="${idp}-from" value="${esc(F.from)}"></label><label>to<input type="date" id="${idp}-to" value="${esc(F.to)}"></label>
-      <label>Defect<select id="${idp}-defect">${options(defects, F.defect, 'All')}</select></label>
-      <span class="chips">${chip('7', 'Last 7 days', L.addDays(today, -7), '')}${chip('30', 'Last 30 days', L.addDays(today, -30), '')}${chip('o90', 'Older than 90 days', '', L.addDays(today, -90))}${chip('o365', 'Older than 1 year', '', L.addDays(today, -365))}</span></div>`;
+    const defects = [...new Set(st.ncrs.map((n) => n.Defect).filter(Boolean))].sort();
+    const years = [...new Set(st.ncrs.map((n) => String(n.NCR_Date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+    const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return `<div class="datebar"><label>Year<select id="${idp}-year">${options(years, F.year, 'All')}</select></label>
+      <label>Month<select id="${idp}-month"><option value="">All</option>${MN.map((m, k) => { const v = String(k + 1).padStart(2, '0'); return `<option value="${v}"${F.month === v ? ' selected' : ''}>${m}</option>`; }).join('')}</select></label>
+      <label>Created from<input type="date" id="${idp}-from" value="${esc(F.from)}"></label><label>to<input type="date" id="${idp}-to" value="${esc(F.to)}"></label>
+      <label>Defect<select id="${idp}-defect">${options(defects, F.defect, 'All')}</select></label></div>`;
   };
   function bindFilterBar(root, idp, F, refresh) {
-    ['from', 'to', 'defect'].forEach((k) => root.querySelector(`#${idp}-${k}`).addEventListener('change', (e) => { F[k] = e.target.value; NCR.app.render(); }));
-    root.querySelectorAll(`[data-${idp}chip]`).forEach((b) => b.addEventListener('click', () => { const on = b.classList.contains('on'); F.from = on ? '' : b.dataset.from; F.to = on ? '' : b.dataset.to; NCR.app.render(); }));
+    ['year', 'month', 'from', 'to', 'defect'].forEach((k) => root.querySelector(`#${idp}-${k}`).addEventListener('change', (e) => { F[k] = e.target.value; NCR.app.render(); }));
   }
 
   // every open NCR matching the non-tab filters; `tab` decides which part of it to show
@@ -328,9 +329,9 @@ window.NCR = window.NCR || {};
   }
 
   // ---------- Followed up (stays until the NCR is closed; shows the timeline) ----------
-  const WF = { q: '', buyer: '', tab: 'none', from: '', to: '', defect: '' };
+  const WF = { q: '', buyer: '', tab: 'none', from: '', to: '', defect: '', year: '', month: '' };
   const WF_OPEN = new Set(); // rows whose timeline is expanded
-  function setWaitFilter(f) { Object.assign(WF, { q: '', buyer: '', tab: 'none', from: '', to: '', defect: '' }, f); }
+  function setWaitFilter(f) { Object.assign(WF, { q: '', buyer: '', tab: 'none', from: '', to: '', defect: '', year: '', month: '' }, f); }
   // what, if anything, needs QA's attention on a followed-up NCR
   // Followed up several times and the buyer's remark has not changed since the first follow-up
   function noReplyAfter(n) {
