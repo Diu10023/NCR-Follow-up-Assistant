@@ -269,6 +269,7 @@
     showall: (el) => { V.showAll[el.dataset.key] = !V.showAll[el.dataset.key]; window.__keepScroll = window.scrollY; render(); },
     selsection: (el) => { (V.sectionIds[el.dataset.key] || []).forEach((id) => V.SEL.add(id)); window.__keepScroll = window.scrollY; render(); },
     toggletl: (el) => { const id = el.dataset.id; V.WF_OPEN.has(id) ? V.WF_OPEN.delete(id) : V.WF_OPEN.add(id); window.__keepScroll = window.scrollY; render(); },
+    unreview: (el) => { S.undoReview(el.dataset.id); toast('Review undone: the NCR is flagged “Buyer updated” again'); },
     reviewed: (el) => { S.markReviewed([el.dataset.id], plusDays(st.settings.defaultCheckDays)); toast(`Reviewed – next check in ${st.settings.defaultCheckDays} days`); },
     chase: (el) => {
       const ids = V.currentIds();

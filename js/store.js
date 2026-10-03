@@ -180,7 +180,7 @@ window.NCR = window.NCR || {};
     ids.forEach((id) => {
       const o = getNcr(id); if (!o) return;
       const n = Object.assign({}, o);
-      n.Followup_Count = (Number(n.Followup_Count) || 0) + 1; n.Last_Followup = date; n.Last_Review = L.nowStamp();
+      n.Followup_Count = (Number(n.Followup_Count) || 0) + 1; n.Last_Followup = date; n.Last_Review = reviewStamp(o);
       if (p.waiting) n.Waiting_For = p.waiting;
       if (p.nextDate) n.Due_Date = p.nextDate;
       if (n.Status === 'Not Started' || n.Status === 'Open') n.Status = 'Pending'; // waiting for the buyer's reply
@@ -213,11 +213,13 @@ window.NCR = window.NCR || {};
   }
 
   // QA read the buyer's latest Remarks: clear the "review" flag and schedule the next check.
+  // "Reviewed at" must not be earlier than the buyer's remark date (a file dated in the future would otherwise stay flagged forever)
+  const reviewStamp = (o) => { const now = L.nowStamp(); return o.Buyer_Remark_Date && String(o.Buyer_Remark_Date) >= now ? String(o.Buyer_Remark_Date) : now; };
   function markReviewed(ids, nextDate) {
     const ncrs = [], hist = [], today = L.todayISO();
     ids.forEach((id) => {
-      const o = getNcr(id); if (!o) return;
-      const n = Object.assign({}, o, { Last_Review: L.nowStamp() });
+      const o = getNcr(id); if (!o || !L.info(o, state.settings).needsReview) return; // already reviewed: no duplicate entry
+      const n = Object.assign({}, o, { Last_Review: reviewStamp(o) });
       if (nextDate) n.Due_Date = nextDate;
       stamp(n);
       state.ncrs[state.ncrs.findIndex((x) => x.NCR_ID === id)] = n;
@@ -226,6 +228,19 @@ window.NCR = window.NCR || {};
     });
     state.history.push(...hist);
     commit(ncrs, hist); emit();
+  }
+
+  // Pressed Reviewed by mistake: drop the latest review entry and go back to the previous review time (or "not reviewed")
+  function undoReview(id) {
+    const o = getNcr(id); if (!o) return false;
+    const rows = state.history.filter((h) => h.NCR_ID === id && /^Reviewed buyer update/.test(h.Action)).sort((a, b) => String(b.Created_At).localeCompare(String(a.Created_At)));
+    if (!rows.length) return false;
+    const n = Object.assign({}, o, { Last_Review: rows[1] ? rows[1].Created_At : '' });
+    stamp(n);
+    state.ncrs[state.ncrs.findIndex((x) => x.NCR_ID === id)] = n;
+    state.history = state.history.filter((h) => h.History_ID !== rows[0].History_ID);
+    commit([n], [], { deleteHistoryIds: [rows[0].History_ID] }); emit();
+    return true;
   }
 
   function removeNcr(id) {
@@ -305,5 +320,5 @@ window.NCR = window.NCR || {};
   function demoData() { return { ncrs: [], history: [], settings: {} }; }
 
   NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
-    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, removeNcr, saveMany, applyImport, undoImport, getImports, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
+    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, undoReview, removeNcr, saveMany, applyImport, undoImport, getImports, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
 })(window.NCR);

@@ -468,8 +468,9 @@ window.NCR = window.NCR || {};
     const n = S.getNcr(id);
     if (!n) return { html: '<div class="empty">NCR not found. <a href="#/list">Back to list</a></div>' };
     const i = inf(n), s = st.settings;
+    let undoShown = false; // the newest review entry gets an Undo button
     const hist = S.historyFor(id).map((h) => `<li><div class="t-date">${L.fmtDate(h.Date)}</div><div class="t-body">
-      ${h.Followup_No ? `<span class="chip fu">Follow-up #${esc(h.Followup_No)}</span> ` : ''}${/^Buyer /.test(h.Action) ? '<span class="chip age-followup">Buyer</span> ' : ''}<b>${esc(h.Action)}</b>
+      ${h.Followup_No ? `<span class="chip fu">Follow-up #${esc(h.Followup_No)}</span> ` : ''}${/^Buyer /.test(h.Action) ? '<span class="chip age-followup">Buyer</span> ' : ''}<b>${esc(h.Action)}</b>${/^Reviewed buyer update/.test(h.Action) && !undoShown && (undoShown = true) ? ` <button class="btn sm" data-action="unreview" data-id="${esc(id)}" title="Pressed Reviewed by mistake? Undo it">↩ Undo</button>` : ''}
       ${h.Waiting_For ? `<div class="sub">Waiting for: ${esc(h.Waiting_For)}</div>` : ''}${h.Created_By ? `<div class="sub">By: ${esc(h.Created_By)}</div>` : ''}
       ${h.Remark ? `<div class="sub">${esc(h.Remark)}</div>` : ''}</div></li>`).join('');
     const info = (l, v) => `<div class="kv"><span>${l}</span><b>${esc(v) || '–'}</b></div>`;
