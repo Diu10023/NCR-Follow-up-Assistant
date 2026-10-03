@@ -259,3 +259,13 @@ tr.rp-none td.rank{color:var(--h1)}tr.rp-long td.rank{color:var(--h2)}tr.rp-has 
 .b-overdue,.age-escalation{background:var(--h1);color:#fff}
 .b-soon{background:var(--h2);color:#fff}
 .age-attention{background:var(--h2);color:#fff}
+
+/* import history calendar */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;max-width:420px}
+.cal-h{font-size:12px;font-weight:700;color:var(--mut);text-align:center;padding-bottom:4px}
+.cal-d{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:12px;font-size:14px;font-weight:600;color:var(--mut);box-shadow:var(--ins-s)}
+.cal-d i{font-style:normal;font-size:11px;line-height:1;margin-top:1px}
+.cal-d.up{background:var(--acc);color:#fff;box-shadow:var(--ext-s)}
+.cal-d.today{outline:2px solid var(--acc);outline-offset:1px}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;max-width:420px}.cal-nav h2{margin:0}
+.skips{display:flex;flex-wrap:wrap;gap:8px}

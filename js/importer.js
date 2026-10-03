@@ -133,24 +133,29 @@ window.NCR = window.NCR || {};
   // Returns {ncrs, history} ready for store.saveMany.
   function apply(p, opts) {
     const ncrs = [], history = [];
-    const now = L.nowStamp(), today = L.todayISO();
+    // The file date (default: today) dates every timeline entry this import creates, so a late upload still lands on the right day.
+    const now = L.nowStamp(), today = (opts && opts.date) || L.todayISO();
+    const stampFor = (old) => { // when the buyer's remark changed; never earlier than the QA's last review, or the "Buyer updated" flag would be missed
+      const t = today + now.slice(10);
+      return old && old.Last_Review && t <= old.Last_Review ? now : t;
+    };
     const H = (n, action, remark, by) => history.push({ History_ID: L.uid('H'), NCR_ID: n.NCR_ID, NCR_No: n.NCR_No, Date: today, Followup_No: '', Action: action, Waiting_For: '', Remark: remark || '', Created_By: by || 'Import', Created_At: now });
     p.added.forEach((r) => {
       const n = {}; NCR.store.NCR_FIELDS.forEach((f) => { n[f] = ''; });
       Object.assign(n, r, { Owner: r.Buyer, NCR_ID: L.uid('NCR'), Status: 'Not Started', Followup_Count: 0, Created_At: now, Updated_At: now });
       if (r.CloseReason) { n.Status = 'Closed'; n.Closed_Date = today; n.Next_Action = ''; }
-      n.Aging = L.daysBetween(n.NCR_Date, n.Closed_Date || today);
+      n.Aging = L.daysBetween(n.NCR_Date, n.Closed_Date || L.todayISO());
       delete n.RemarkMapped; delete n.CloseReason; ncrs.push(n); H(n, r.CloseReason ? 'Imported as Closed (' + r.CloseReason + ')' : 'NCR imported from Excel');
       if (n.Buyer_Remark && !r.CloseReason) H(n, 'Buyer Remarks at import: ' + n.Buyer_Remark, '', 'Buyer (Excel)');
     });
     p.updated.forEach(({ rec, old, changes }) => {
       const n = Object.assign({}, old);
       changes.forEach((c) => { n[c.field] = c.to; });
-      n.Aging = L.daysBetween(n.NCR_Date, n.Status === 'Closed' ? n.Closed_Date || today : today);
+      n.Aging = L.daysBetween(n.NCR_Date, n.Status === 'Closed' ? n.Closed_Date || L.todayISO() : L.todayISO());
       n.Updated_At = now;
       const br = changes.find((c) => c.field === 'Buyer_Remark'), others = changes.filter((c) => c.field !== 'Buyer_Remark');
       if (br) {
-        n.Buyer_Remark_Date = now;
+        n.Buyer_Remark_Date = stampFor(old);
         H(n, br.to ? 'Buyer update (Remarks): ' + br.to : 'Buyer cleared Remarks', br.from ? 'Previous: ' + br.from : '', 'Buyer (Excel)');
       }
       if (others.length) H(n, 'Updated from Excel: ' + others.map((c) => c.field.replace('_', ' ')).join(', '));
@@ -161,7 +166,7 @@ window.NCR = window.NCR || {};
       const cur = ncrs.find((x) => x.NCR_ID === o.NCR_ID), n = Object.assign({}, cur || o);
       if (n.Status === 'Closed') return;
       n.Status = 'Closed'; n.Closed_Date = today; n.Updated_At = now;
-      n.Aging = L.daysBetween(n.NCR_Date, today);
+      n.Aging = L.daysBetween(n.NCR_Date, L.todayISO());
       if (cur) ncrs[ncrs.indexOf(cur)] = n; else ncrs.push(n);
       H(n, 'Closed from Excel: ' + why);
     };

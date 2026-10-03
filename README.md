@@ -45,3 +45,6 @@ Home (by buyer) · To follow up (no remark first) · Followed up (waiting for th
 ## Notes
 - Excel parsing uses SheetJS from cdnjs, so the Import page needs internet access.
 - Dates are day-first (`01/10/2026` = 1 Oct); Thai Buddhist years are converted automatically.
+
+## Import history and file date
+On the Import page, set the **File date** (default today) to the day the export was taken: every timeline entry and closed date from that import uses it, so a late upload still lands on the right day. **Import history** lists every upload (file date, new NCRs, remark changes, closed) with a month calendar and the weeks that have no upload. The log is kept in this browser.

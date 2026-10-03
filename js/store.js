@@ -256,11 +256,19 @@ window.NCR = window.NCR || {};
   function getLastImport() { try { return JSON.parse(localStorage.getItem(LAST_KEY)); } catch (e) { return null; } }
   function setLastImport(v) { try { v ? localStorage.setItem(LAST_KEY, JSON.stringify(v)) : localStorage.removeItem(LAST_KEY); } catch (e) { /* storage unavailable */ } }
 
+  // Import log (one entry per upload) for the Import history page. Kept in this browser.
+  const LOG_KEY = 'ncr.imports';
+  function getImports() { try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch (e) { return []; } }
+  function setImports(v) { try { v && v.length ? localStorage.setItem(LOG_KEY, JSON.stringify(v)) : localStorage.removeItem(LOG_KEY); } catch (e) { /* storage unavailable */ } }
+
   // Save an import result and remember how to take it back.
+
   function applyImport(result, meta) {
     const prev = {}, addedIds = [];
     result.ncrs.forEach((n) => { const o = getNcr(n.NCR_ID); if (o) prev[n.NCR_ID] = o; else addedIds.push(n.NCR_ID); });
-    setLastImport(Object.assign({ at: L.nowStamp(), prev, addedIds, historyIds: result.history.map((h) => h.History_ID) }, meta));
+    const at = L.nowStamp();
+    setLastImport(Object.assign({ at, prev, addedIds, historyIds: result.history.map((h) => h.History_ID) }, meta));
+    setImports(getImports().concat([Object.assign({ at }, meta)]));
     return saveMany(result.ncrs, result.history);
   }
   // Remove what the last import added and restore what it changed.
@@ -270,11 +278,12 @@ window.NCR = window.NCR || {};
     state.ncrs = state.ncrs.filter((n) => !added.has(n.NCR_ID)).map((n) => rec.prev[n.NCR_ID] || n);
     state.history = state.history.filter((h) => !added.has(h.NCR_ID) && !dropH.has(h.History_ID));
     commit(restored, [], { deleteIds: rec.addedIds, deleteHistoryIds: rec.historyIds });
+    setImports(getImports().filter((x) => x.at !== rec.at));
     setLastImport(null); emit();
     return true;
   }
   function clearAll() {
-    state.ncrs = []; state.history = []; setLastImport(null);
+    state.ncrs = []; state.history = []; setLastImport(null); setImports([]);
     persist(() => adapter.clear());
     emit();
   }
@@ -284,5 +293,5 @@ window.NCR = window.NCR || {};
   function demoData() { return { ncrs: [], history: [], settings: {} }; }
 
   NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
-    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, removeNcr, saveMany, applyImport, undoImport, getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
+    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, removeNcr, saveMany, applyImport, undoImport, getImports, getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
 })(window.NCR);

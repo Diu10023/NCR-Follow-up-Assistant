@@ -504,7 +504,7 @@ window.NCR = window.NCR || {};
   }
 
   // ---------- import ----------
-  const imp = { wb: null, name: '', sheet: '', table: null, mapping: {}, opts: { closeMissing: false }, done: null };
+  const imp = { wb: null, name: '', sheet: '', table: null, mapping: {}, opts: { closeMissing: false, date: '' }, done: null };
   function importPage() {
     const I = NCR.importer;
     let body = '';
@@ -514,6 +514,8 @@ window.NCR = window.NCR || {};
       const p = I.plan(records, st.ncrs);
       const missingReq = I.FIELDS.filter((f) => f.required && !imp.mapping[f.key]);
       const mapRows = I.FIELDS.map((f) => `<label>${f.label}${f.required ? ' *' : ''}<select data-map="${f.key}">${options(imp.table.headers, imp.mapping[f.key], '— not in file —')}</select></label>`).join('');
+      const fd = imp.opts.date || L.todayISO(), logs = S.getImports(), lastFD = logs.map((x) => x.fileDate || String(x.at).slice(0, 10)).sort().pop();
+      const fdWarn = logs.some((x) => (x.fileDate || String(x.at).slice(0, 10)) === fd) ? 'A file with this date was already uploaded. Is this the same export again?' : lastFD && fd < lastFD ? `This date is earlier than your latest upload (${L.fmtDate(lastFD)}). Make sure this is the right file.` : '';
       const sample = (arr, fn) => arr.slice(0, 8).map(fn).join('');
       const newClosed = p.added.filter((r) => r.CloseReason), toClose = newClosed.length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0);
       const byReason = (arr) => arr.reduce((m, x) => { m[x] = (m[x] || 0) + 1; return m; }, {});
@@ -528,6 +530,8 @@ window.NCR = window.NCR || {};
           <div class="card stat ${toClose ? 'c-ready' : ''}"><div class="num">${toClose}</div><div class="lbl">Will be closed</div></div></div>
           <p class="hint">New NCRs start as <b>Not Started</b> with the Buyer as Owner. Existing follow-up data (Next Action, Owner, Due Date, Status, history…) is never overwritten. Only raw fields (item, batch, supplier, buyer, date, defect, quantity) are refreshed.</p>
           ${bad.length ? `<details class="alert warn"><summary>${bad.length} row(s) with issues</summary>${bad.slice(0, 20).map((b) => `<div>Row ${b.row}: ${esc(b.reason)}</div>`).join('')}</details>` : ''}
+          <div class="alert ${fdWarn ? 'warn' : 'ok'}"><label class="inline">📅 <b>File date</b> <input type="date" id="imp-date" value="${esc(fd)}" max="${L.todayISO()}"></label>
+            <span class="hint"> The date this export was taken. Every timeline entry from this import (buyer updates, closed date) gets this date. Default is today; change it if you are uploading late.</span>${fdWarn ? `<div>⚠️ ${fdWarn}</div>` : ''}</div>
           ${p.added.length ? `<h3>New</h3><div class="table-wrap"><table class="grid compact"><thead><tr><th>NCR</th><th>Item</th><th>Batch</th><th>Date</th><th>Buyer</th><th>Defect</th></tr></thead><tbody>${sample(p.added, (r) => `<tr><td>${esc(r.NCR_No)}</td><td>${esc(r.Item_No)}</td><td>${esc(r.Batch_No)}</td><td>${L.fmtDate(r.NCR_Date)}</td><td>${esc(r.Buyer)}</td><td>${esc(r.Defect)}</td></tr>`)}</tbody></table></div>${p.added.length > 8 ? `<div class="muted small">…and ${p.added.length - 8} more</div>` : ''}` : ''}
           ${p.updated.length ? `<h3>Updated</h3>${sample(p.updated, (u) => `<div class="small"><b>${esc(u.rec.NCR_No)}</b>: ${u.changes.map((c) => `${esc(c.field.replace('_', ' '))} "${esc(c.from)}" → "${esc(c.to)}"`).join('; ')}</div>`)}${p.updated.length > 8 ? `<div class="muted small">…and ${p.updated.length - 8} more</div>` : ''}` : ''}
           ${Object.keys(reasons).length ? `<div class="alert ok"><b>Closed by this file</b> (they move to the Closed page, nothing to close by hand): ${Object.entries(reasons).map(([k, v]) => `${v} × ${esc(k)}`).join(' · ')}. The closed date is today, because the file has no close date.</div>` : ''}
@@ -535,7 +539,7 @@ window.NCR = window.NCR || {};
           <div class="actions"><button class="btn primary" id="imp-go"${missingReq.length || (!p.added.length && !p.updated.length && !p.closeNow.length && !(imp.opts.closeMissing && p.missing.length)) ? ' disabled' : ''}>Import into NCR Master</button>
           <button class="btn" id="imp-cancel">Cancel</button></div></section>`;
     }
-    return { html: `<div class="page-head"><h1>Import from Excel</h1></div>
+    return { html: `<div class="page-head"><h1>Import from Excel</h1><a class="btn" href="#/imports">📅 Import history (${S.getImports().length})</a></div>
       <section class="card"><h2>1. Upload raw data</h2><p class="hint">Upload the periodic NCR export (.xlsx, .xls or .csv). New NCRs are added; existing ones (matched by NCR No.) keep all QA follow-up data.</p>
         <label class="drop" id="drop"><input type="file" id="imp-file" accept=".xlsx,.xls,.xlsm,.csv" hidden><span>📁 Click or drop an Excel file here</span></label></section>${body}`,
     bind(root) {
@@ -557,6 +561,7 @@ window.NCR = window.NCR || {};
       drop.addEventListener('drop', (e) => e.dataTransfer.files[0] && load(e.dataTransfer.files[0]));
       const sh = root.querySelector('#imp-sheet'); if (sh) sh.addEventListener('change', () => pickSheet(sh.value));
       root.querySelectorAll('[data-map]').forEach((s) => s.addEventListener('change', () => { imp.mapping[s.dataset.map] = s.value; NCR.app.render(); }));
+      const dt = root.querySelector('#imp-date'); if (dt) dt.addEventListener('change', () => { imp.opts.date = dt.value; NCR.app.render(); });
       const miss = root.querySelector('#imp-missing'); if (miss) miss.addEventListener('change', () => { imp.opts.closeMissing = miss.checked; NCR.app.render(); });
       const un = root.querySelector('#undo-now');
       if (un) un.addEventListener('click', () => NCR.app.confirmModal({ title: 'Undo this import?', text: 'This removes the NCRs it added and restores the ones it changed.', ok: 'Undo import', onOk: () => { S.undoImport(); imp.done = null; NCR.app.toast('Import undone'); NCR.app.render(); } }));
@@ -564,15 +569,48 @@ window.NCR = window.NCR || {};
       const go = root.querySelector('#imp-go');
       if (go) go.addEventListener('click', () => {
         const { records } = I2.buildRecords(imp.table, imp.mapping, st.settings.jiraKeywords);
-        const p = I2.plan(records, st.ncrs), r = I2.apply(p, imp.opts);
+        const p = I2.plan(records, st.ncrs), r = I2.apply(p, Object.assign({}, imp.opts, { date: imp.opts.date || L.todayISO() }));
         const nClosed = p.added.filter((x) => x.CloseReason).length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0);
-        S.applyImport(r, { file: imp.name, added: p.added.length, updated: p.updated.length, closed: nClosed });
+        S.applyImport(r, { file: imp.name, fileDate: imp.opts.date || L.todayISO(), added: p.added.length, updated: p.updated.length, remarkChanged: p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark')).length, closed: nClosed, total: records.length });
+        imp.opts.date = '';
         const back = p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark' && c.to) && isFollowed(S.getNcr(u.old.NCR_ID))).length; // followed-up NCRs with a new buyer remark
         S.saveSettings({ importMapping: Object.assign({}, imp.mapping) });
         imp.done = `${back ? `${back} followed-up NCR${back === 1 ? ' has' : 's have'} a new buyer remark: see <a href="#/followed" data-wfilter='{}'>Followed up</a>. ` : ''}${p.added.length} added${p.added.length ? ' (' + Object.entries(p.added.reduce((m, r) => { const b = r.Buyer || '(No buyer)'; m[b] = (m[b] || 0) + 1; return m; }, {})).map(([b, c]) => b + ' ' + c).join(', ') + ')' : ''}, ${p.updated.length} updated, ${p.added.filter((r) => r.CloseReason).length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0)} closed (see <a href="#/closed" data-closed="">Closed</a>).`;
         imp.table = null; imp.wb = null; NCR.app.render();
       });
     } };
+  }
+
+  // ---------- import history: list + month calendar ----------
+  const IM = { month: '' };
+  const monthName = (ym) => new Date(ym + '-01T00:00:00Z').toLocaleString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const shiftMonth = (ym, d) => { const [y, m] = ym.split('-').map(Number), t = new Date(Date.UTC(y, m - 1 + d, 1)); return t.getUTCFullYear() + '-' + String(t.getUTCMonth() + 1).padStart(2, '0'); };
+  function importsPage() {
+    const logs = S.getImports().map((x) => Object.assign({}, x, { fd: x.fileDate || String(x.at).slice(0, 10) })).sort((a, b) => b.fd.localeCompare(a.fd) || String(b.at).localeCompare(String(a.at)));
+    const today = L.todayISO(), byDay = {};
+    logs.forEach((x) => { (byDay[x.fd] = byDay[x.fd] || []).push(x); });
+    const ym = IM.month || (logs[0] ? logs[0].fd.slice(0, 7) : today.slice(0, 7));
+    // calendar grid, Monday first
+    const first = ym + '-01', lead = (new Date(first + 'T00:00:00Z').getUTCDay() + 6) % 7, days = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate();
+    let cells = '<div class="cal-h">Mon</div><div class="cal-h">Tue</div><div class="cal-h">Wed</div><div class="cal-h">Thu</div><div class="cal-h">Fri</div><div class="cal-h">Sat</div><div class="cal-h">Sun</div>' + '<div></div>'.repeat(lead);
+    for (let d = 1; d <= days; d++) {
+      const iso = ym + '-' + String(d).padStart(2, '0'), hit = byDay[iso];
+      cells += `<div class="cal-d${hit ? ' up' : ''}${iso === today ? ' today' : ''}"${hit ? ` title="${esc(hit.map((x) => x.file).join(', '))}"` : ''}>${d}${hit ? `<i>${hit.length > 1 ? hit.length + '×' : '●'}</i>` : ''}</div>`;
+    }
+    // weeks (Mon–Sun) with no upload, from the first upload until this week
+    const monday = (iso) => L.addDays(iso, -((new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7));
+    const weeksWith = new Set(logs.map((x) => monday(x.fd))), skipped = [];
+    if (logs.length) for (let w = monday(logs[logs.length - 1].fd); w < monday(today); w = L.addDays(w, 7)) if (!weeksWith.has(w)) skipped.push(w);
+    const wk = (w) => `${L.fmtDate(w)} – ${L.fmtDate(L.addDays(w, 6))}`;
+    const rows = logs.map((x) => `<tr><td class="nowrap"><b>${L.fmtDate(x.fd)}</b>${x.fd !== String(x.at).slice(0, 10) ? `<div class="sub">uploaded ${L.fmtDate(x.at)}</div>` : ''}</td><td>${esc(x.file || 'file')}</td><td>${x.added || 0}</td><td>${x.remarkChanged === undefined ? '–' : x.remarkChanged}</td><td>${x.closed || 0}</td><td>${x.total === undefined ? '–' : x.total}</td></tr>`).join('');
+    return { html: `<div class="page-head"><div><h1>Import history</h1><div class="muted">${logs.length} upload${logs.length === 1 ? '' : 's'} · <a href="#/import">Import a new file</a></div></div></div>
+      ${logs.length ? `<div class="charts"><section class="block"><div class="cal-nav"><button class="btn sm" data-im="${shiftMonth(ym, -1)}">‹</button><h2>${monthName(ym)}</h2><button class="btn sm" data-im="${shiftMonth(ym, 1)}">›</button></div>
+          <div class="cal">${cells}</div><p class="hint">● = a file dated that day was imported. Hover for the file name.</p></section>
+        <section class="block"><h2>Weeks without an upload</h2>${skipped.length ? `<p class="hint">No file is dated in these weeks (Mon–Sun). Upload them in order if you still have the files.</p><div class="skips">${skipped.slice(-12).reverse().map((w) => `<span class="chip age-attention">${wk(w)}</span>`).join(' ')}</div>${skipped.length > 12 ? `<p class="hint">…and ${skipped.length - 12} older weeks</p>` : ''}` : '<p class="hint">✅ Every week since the first upload has a file.</p>'}</section></div>
+        <section class="block"><h2>All uploads</h2><div class="table-wrap"><table class="grid compact"><thead><tr><th>File date</th><th>File</th><th>New NCRs</th><th>Remark changed</th><th>Closed</th><th>Rows in file</th></tr></thead><tbody>${rows}</tbody></table></div>
+          <p class="hint">Stored in this browser. “Remark changed” counts existing NCRs whose buyer remark differs from the previous upload.</p></section>`
+      : '<div class="empty">No uploads recorded yet. <a href="#/import">Import your first file</a>.</div>'}`,
+    bind(root) { root.querySelectorAll('[data-im]').forEach((b) => b.addEventListener('click', () => { IM.month = b.dataset.im; NCR.app.render(); })); } };
   }
 
   // ---------- settings ----------
@@ -621,5 +659,5 @@ window.NCR = window.NCR || {};
     } };
   }
 
-  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
+  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
 })(window.NCR);
