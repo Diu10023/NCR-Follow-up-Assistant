@@ -156,7 +156,7 @@ window.NCR = window.NCR || {};
         <td>${r.closed ? `<a href="#/closed" data-closed="${esc(r.name)}">${r.closed}</a>` : '<span class="muted">0</span>'}</td></tr>
       ${HOME_OPEN.has(r.name) ? `<tr class="sub-row"><td colspan="10"><div class="sub">No remark, still to follow up (${r.none}):</div><div class="nolist">${r.noneIds.length ? r.noneIds.slice().sort(byOldest).slice(0, 60).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(' ') + (r.noneIds.length > 60 ? ' …' : '') : '<span class="muted">none</span>'}</div></td></tr>` : ''}`).join('');
     const big = (v, l, href, attr) => `<a class="big" href="${href}" ${attr || ''}><b>${v}</b><span>${l}</span></a>`;
-    return { html: `<div class="page-head"><h1>Home</h1><span class="muted">${L.fmtDate(L.todayISO())}</span></div>
+    return { html: `<div class="page-head"><h1>Home</h1><span class="inline"><a class="btn" href="#/response">📊 Buyer response</a><span class="muted">${L.fmtDate(L.todayISO())}</span></span></div>
       <div class="bigs">${big(tot.total, 'Total', '#/home')}${big(tot.todo, 'To follow up', '#/list', `data-filter='${esc(JSON.stringify({ tab: 'none' }))}'`)}${big(tot.followed, 'Followed up', '#/followed', `data-wfilter='{}'`)}${big(tot.hold, 'Hold for scrap', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'hold' }))}'`)}${big(tot.jira, 'Jira closed', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'jira' }))}'`)}${big(tot.closed, 'Closed', '#/closed', 'data-closed=""')}</div>
       <div class="charts">
         <section class="block"><h2>Overview by buyer</h2><p class="hint">Each bar is all of one buyer's NCRs, split by status: still to follow up (no remark / in progress), followed up, hold for scrap, Jira closed and closed. Hover a segment for the exact count.</p>${buyerChart(rows)}</section>
@@ -581,6 +581,53 @@ window.NCR = window.NCR || {};
     } };
   }
 
+  // ---------- Buyer response: how often each buyer answers a follow-up ----------
+  const WEEKS_SHOWN = 12;
+  const mondayOf = (iso) => L.addDays(iso, -((new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7));
+  function responsePage() {
+    const today = L.todayISO(), thisWk = mondayOf(today), IS_UPD = /^Buyer update|^Buyer cleared/;
+    const buyerByNcr = {}; st.ncrs.forEach((n) => { buyerByNcr[n.NCR_ID] = buyerOf(n); });
+    const logs = S.getImports().map((x) => x.fileDate || String(x.at).slice(0, 10));
+    const uploadWeeks = new Set(logs.map(mondayOf));
+    const upd = {}, fu = {};   // per NCR: dates of buyer updates / QA follow-ups
+    st.history.forEach((h) => {
+      const d = String(h.Date).slice(0, 10);
+      if (IS_UPD.test(h.Action)) (upd[h.NCR_ID] = upd[h.NCR_ID] || []).push(d);
+      else if (h.Followup_No) (fu[h.NCR_ID] = fu[h.NCR_ID] || []).push(d);
+    });
+    const all = [...Object.values(upd).flat(), ...Object.values(fu).flat(), ...logs].sort();
+    if (!all.length) return { html: `<div class="page-head"><h1>Buyer response</h1></div><div class="empty">Nothing to show yet. After a few weekly uploads you will see how each buyer answers. <a href="#/import">Import a file</a>.</div>` };
+    const firstWk = mondayOf(all[0]), startWk = firstWk > L.addDays(thisWk, -7 * (WEEKS_SHOWN - 1)) ? firstWk : L.addDays(thisWk, -7 * (WEEKS_SHOWN - 1));
+    const weeks = []; for (let w = startWk; w <= thisWk; w = L.addDays(w, 7)) weeks.push(w);
+    const per = {}, row = (b) => (per[b] = per[b] || { name: b, wk: {}, updates: 0, fus: 0, answered: 0, daysSum: 0, noReply: 0, open: 0, closedMonth: 0 });
+    st.ncrs.forEach((n) => {
+      const r = row(buyerOf(n)), i = inf(n);
+      if (['todo', 'followed'].includes(i.bucket)) r.open++;
+      if (i.bucket === 'closed' && String(n.Closed_Date || '').slice(0, 7) === today.slice(0, 7)) r.closedMonth++;
+      if (i.bucket === 'followed' && noReplyAfter(n)) r.noReply++;
+    });
+    Object.entries(upd).forEach(([id, ds]) => { const b = buyerByNcr[id]; if (!b) return; const r = row(b); ds.forEach((d) => { r.updates++; const w = mondayOf(d); r.wk[w] = (r.wk[w] || 0) + 1; }); });
+    Object.entries(fu).forEach(([id, ds]) => {
+      const b = buyerByNcr[id]; if (!b) return; const r = row(b), us = (upd[id] || []).slice().sort();
+      ds.forEach((d) => { r.fus++; const hit = us.find((u) => u >= d && L.daysBetween(d, u) <= 7); if (hit) { r.answered++; r.daysSum += L.daysBetween(d, hit); } });
+    });
+    const rows = Object.values(per).filter((r) => r.updates || r.fus || r.open).sort((a, b) => b.open - a.open || a.name.localeCompare(b.name));
+    const maxCell = Math.max(1, ...rows.flatMap((r) => weeks.map((w) => r.wk[w] || 0)));
+    const wkLabel = (w) => { const p = L.fmtDate(w).split('-'); return p[0] + ' ' + p[1]; };
+    const heat = `<div class="table-wrap"><table class="grid heat"><thead><tr><th>Buyer</th>${weeks.map((w) => `<th class="hw${uploadWeeks.has(w) ? '' : ' nofile'}" title="Week of ${L.fmtDate(w)}${uploadWeeks.has(w) ? '' : ' (no file uploaded)'}">${wkLabel(w)}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr><td class="nowrap"><b>${esc(r.name)}</b></td>${weeks.map((w) => { const v = r.wk[w] || 0, up = uploadWeeks.has(w); return `<td class="hc${up ? '' : ' nofile'}${v ? ' hit' : ''}" style="${v ? `--heat:${(0.18 + 0.82 * v / maxCell).toFixed(2)}` : ''}" title="${esc(r.name)} · week of ${L.fmtDate(w)}: ${v} remark update${v === 1 ? '' : 's'}${up ? '' : ' (no file uploaded that week)'}">${v || ''}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
+    const pct = (r) => (r.fus ? Math.round((100 * r.answered) / r.fus) : null);
+    const tbody = rows.map((r) => { const p = pct(r); return `<tr><td><b>${esc(r.name)}</b></td><td>${r.open}</td><td>${r.fus}</td><td>${r.updates}</td>
+      <td>${p === null ? '<span class="muted">–</span>' : `<span class="rate ${p >= 60 ? 'good' : p >= 30 ? 'mid' : 'low'}">${p}%</span>`}</td>
+      <td>${r.answered ? (r.daysSum / r.answered).toFixed(1) + ' d' : '<span class="muted">–</span>'}</td>
+      <td>${r.noReply ? `<a href="#/followed" data-wfilter='${esc(JSON.stringify({ buyer: r.name === NO_BUYER ? '__none' : r.name }))}' class="bad strong">${r.noReply}</a>` : '<span class="muted">0</span>'}</td><td>${r.closedMonth}</td></tr>`; }).join('');
+    const thin = uploadWeeks.size < 3;
+    return { html: `<div class="page-head"><div><h1>Buyer response</h1><div class="muted">How often each buyer answers when QA follows up · <a href="#/imports">${logs.length} upload${logs.length === 1 ? '' : 's'}</a></div></div></div>
+      ${thin ? '<div class="alert warn">Only a few weeks of data so far, so treat these numbers as a first look. They get reliable after several weekly uploads.</div>' : ''}
+      <section class="block"><h2>Remark updates per week</h2><p class="hint">Each cell = how many NCRs of that buyer had their Remarks changed in the file dated that week. Darker = more updates. Empty = none. Hatched = no file was uploaded that week, so it is unknown rather than zero.</p>${heat}</section>
+      <section class="block"><h2>Response by buyer</h2><p class="hint"><b>Answered</b> = after a QA follow-up, the buyer changed the Remarks within 7 days. File dates decide the timing, so set the right File date when you upload late. These numbers compare buyers over time; use them to decide whom to chase, not as a score.</p>
+        <div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th>Open</th><th title="Follow-ups recorded by QA">QA follow-ups</th><th title="Times the buyer changed the Remarks">Remark updates</th><th title="After a QA follow-up, the Remarks changed within 7 days">Answered ≤7d</th><th>Avg days to answer</th><th title="Followed up ${st.settings.escalationThreshold || 3}+ times with no remark change">No reply ${st.settings.escalationThreshold || 3}+</th><th>Closed this month</th></tr></thead><tbody>${tbody}</tbody></table></div></section>` };
+  }
+
   // ---------- import history: list + month calendar ----------
   const IM = { month: '' };
   const monthName = (ym) => new Date(ym + '-01T00:00:00Z').toLocaleString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
@@ -659,5 +706,5 @@ window.NCR = window.NCR || {};
     } };
   }
 
-  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
+  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, responsePage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
 })(window.NCR);

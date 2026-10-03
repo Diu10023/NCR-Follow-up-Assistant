@@ -13,7 +13,7 @@
   function render() {
     if (!st.loaded) { main.innerHTML = `<div class="empty">${st.error ? esc(st.error) : 'Loading…'}</div>`; return; }
     const { page, arg } = route();
-    const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, followed: V.followedPage, hold: V.holdPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, imports: V.importsPage, settings: V.settings };
+    const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, followed: V.followedPage, hold: V.holdPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, imports: V.importsPage, response: V.responsePage, settings: V.settings };
     current = (views[page] || V.home)();
     current.closed = page === 'ncr' && (S.getNcr(arg) || {}).Status === 'Closed';
     main.innerHTML = (page === 'home' || page === 'overview' || page === 'dashboard' ? '' : '<div class="backbar"><button class="btn sm" data-action="back">← Back</button></div>') + current.html;

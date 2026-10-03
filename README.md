@@ -48,3 +48,6 @@ Home (by buyer) · To follow up (no remark first) · Followed up (waiting for th
 
 ## Import history and file date
 On the Import page, set the **File date** (default today) to the day the export was taken: every timeline entry and closed date from that import uses it, so a late upload still lands on the right day. **Import history** lists every upload (file date, new NCRs, remark changes, closed) with a month calendar and the weeks that have no upload. The log is kept in this browser.
+
+## Buyer response
+Home → **Buyer response**: a weekly heatmap of how many NCRs each buyer updated in Remarks (hatched weeks = no file uploaded) and a table with QA follow-ups, remark updates, % answered within 7 days, average days to answer, no-reply count and closed this month. Timing uses the file dates of your uploads.

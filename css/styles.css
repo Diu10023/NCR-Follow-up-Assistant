@@ -269,3 +269,12 @@ tr.rp-none td.rank{color:var(--h1)}tr.rp-long td.rank{color:var(--h2)}tr.rp-has 
 .cal-d.today{outline:2px solid var(--acc);outline-offset:1px}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;max-width:420px}.cal-nav h2{margin:0}
 .skips{display:flex;flex-wrap:wrap;gap:8px}
+
+/* Buyer response */
+.heat th.hw{text-align:center;font-size:12px;padding:6px 4px;white-space:nowrap}.heat th.nofile{opacity:.55}
+.heat td.hc{text-align:center;min-width:44px;height:40px;font-weight:700;font-size:14px;border-radius:10px;box-shadow:var(--ins-s);color:var(--fg)}
+.heat td.hc.hit{background:color-mix(in srgb,var(--acc) calc(var(--heat,.2)*100%),var(--bg));color:#fff;box-shadow:none}
+.heat td.hc.nofile{background:repeating-linear-gradient(45deg,transparent 0 5px,var(--line-s) 5px 7px)}
+.heat{border-collapse:separate;border-spacing:5px}
+.rate{font-weight:800;padding:3px 10px;border-radius:999px;box-shadow:var(--ext-s)}
+.rate.good{color:var(--acc)}.rate.mid{color:var(--h3)}.rate.low{color:var(--h1)}
