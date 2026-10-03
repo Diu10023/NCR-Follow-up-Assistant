@@ -323,3 +323,22 @@ a.cal-d.up{text-decoration:none}
 .gtabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px}
 .gtab{padding:9px 18px;border-radius:16px;font-weight:700;font-size:15px;color:var(--mut);background:var(--bg);box-shadow:var(--ext-s);text-decoration:none}
 .gtab:hover{color:var(--fg)}.gtab.on{color:var(--acc);box-shadow:var(--ins-s)}
+
+/* Buyer response cards */
+.bsum{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:6px 0 20px}
+.bsum div{padding:16px 18px;border-radius:20px;box-shadow:var(--ext-s);display:flex;flex-direction:column;gap:2px}
+.bsum b{font-size:30px;font-weight:800}.bsum span{font-size:14px;color:var(--mut)}
+.bcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
+.bcard{padding:18px 20px;border-radius:24px;box-shadow:var(--ext);display:flex;flex-direction:column;gap:10px;border-left:6px solid transparent}
+.bcard h3{margin:0;font-size:19px}
+.bcard.lv-low{border-left-color:var(--h1)}.bcard.lv-mid{border-left-color:var(--h3)}.bcard.lv-good{border-left-color:var(--acc)}
+.blv{font-size:13px;font-weight:800;padding:4px 12px;border-radius:999px;box-shadow:var(--ext-s)}
+.blv.low{color:var(--h1)}.blv.mid{color:var(--h3)}.blv.good{color:var(--acc)}.blv.none{color:var(--mut)}
+.bsay{font-size:15.5px}
+.bbar{display:flex;gap:3px;height:14px;border-radius:8px;overflow:hidden;background:var(--bg);box-shadow:var(--ins-s)}
+.bbar i{display:block;border-radius:4px}
+.bbar i.n,.bleg i.n{background:var(--h1)}.bbar i.u,.bleg i.u{background:var(--acc)}.bbar i.w,.bleg i.w{background:#9AA5B1}
+.bleg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13.5px;color:var(--mut)}
+.bleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px}
+.bfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+@media(max-width:700px){.bsum{grid-template-columns:1fr}}

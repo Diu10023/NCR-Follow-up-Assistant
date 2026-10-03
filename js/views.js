@@ -646,12 +646,25 @@ window.NCR = window.NCR || {};
       const active = recent.slice(1).filter((x) => ((x.byBuyer || {})[nm] || {}).updated > 0).length;
       return { nm, o, d, still: Math.max(0, o - d.added - d.updated), active };
     }).sort((x, y) => y.d.added - x.d.added || y.still - x.still || y.o - x.o);
-    const link = (nm) => `<a href="#/followed" data-wfilter='${esc(JSON.stringify({ buyer: nm === NO_BUYER ? '__none' : nm }))}'><b>${esc(nm)}</b></a>`;
-    const dots = (x) => (asked ? `<span class="rate ${x.active / asked >= 0.6 ? 'good' : x.active / asked >= 0.3 ? 'mid' : 'low'}">${x.active} of ${asked}</span>` : '<span class="muted">–</span>');
-    const body = rows.map((x) => `<tr><td>${link(x.nm)}</td><td>${x.o}</td><td>${x.d.added ? `<b class="bad">${x.d.added}</b>` : '<span class="muted">0</span>'}</td><td>${x.d.updated || '<span class="muted">0</span>'}</td><td>${x.still}</td><td>${dots(x)}</td></tr>`).join('');
-    return { html: `<div class="page-head"><div><h1>Buyer response</h1><div class="muted">Latest upload: <b>${esc(last.file || 'file')}</b> (${L.fmtDate(last.fileDate || last.at)}). <a href="#/changes">See what changed</a></div></div></div>
-      <section class="block"><div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th title="NCRs not closed">Open</th><th title="New NCRs in the latest file">New</th><th title="Existing NCRs whose Remarks the buyer changed in the latest file">Updated</th><th title="Open NCRs with no change in the latest file">Still waiting</th><th title="In how many of the recent uploads the buyer changed at least one Remark">Active in recent uploads</th></tr></thead><tbody>${body}</tbody></table></div>
-        <p class="hint"><b>New</b>: chase these. <b>Updated</b>: read what the buyer wrote. <b>Still waiting</b>: older NCRs the buyer has not touched. <b>Active in recent uploads</b>: ${asked ? `out of the last ${asked} upload${asked === 1 ? '' : 's'}, how many had a Remark update from this buyer.` : 'needs at least two uploads.'} Use it to decide whom to chase, not as a score.</p></section>` };
+    const tot = rows.reduce((t, x) => ({ n: t.n + x.d.added, u: t.u + x.d.updated, w: t.w + x.still }), { n: 0, u: 0, w: 0 });
+    const level = (x) => (x.nm === NO_BUYER ? { k: 'none', t: 'No buyer assigned' } : !asked ? { k: 'none', t: 'Not enough data yet' } : x.active / asked >= 0.6 ? { k: 'good', t: 'Responsive' } : x.active / asked >= 0.3 ? { k: 'mid', t: 'Sometimes' } : { k: 'low', t: 'Quiet' });
+    const rank = { low: 0, mid: 1, none: 2, good: 3 };
+    rows.sort((a, b) => rank[level(a).k] - rank[level(b).k] || b.d.added - a.d.added || b.still - a.still);
+    const seg = (n, cls, label, base) => (n ? `<i class="${cls}" style="flex:${n}" title="${n} ${label}"></i>` : '');
+    const cards = rows.map((x) => {
+      const lv = level(x), bf = x.nm === NO_BUYER ? '__none' : x.nm;
+      const said = x.d.updated ? `Wrote on <b>${x.d.updated}</b> NCR${x.d.updated === 1 ? '' : 's'} in the latest file.` : 'Wrote nothing new in the latest file.';
+      return `<div class="bcard lv-${lv.k}"><div class="row-between"><h3>${esc(x.nm)}</h3><span class="blv ${lv.k}">${lv.t}</span></div>
+        <div class="bsay">${said}</div>
+        <div class="bbar" role="img" aria-label="${x.d.added} new, ${x.d.updated} updated, ${x.still} still waiting">${seg(x.d.added, 'n', 'new')}${seg(x.d.updated, 'u', 'updated')}${seg(x.still, 'w', 'still waiting')}</div>
+        <div class="bleg"><span><i class="n"></i> ${x.d.added} new</span><span><i class="u"></i> ${x.d.updated} updated</span><span><i class="w"></i> ${x.still} still waiting</span></div>
+        <div class="bfoot"><span class="sub">${x.o} open NCR${x.o === 1 ? '' : 's'}${asked && x.nm !== NO_BUYER ? ` · wrote in ${x.active} of the last ${asked} upload${asked === 1 ? '' : 's'}` : ''}</span>
+          <a class="btn sm" href="#/list" data-filter='${esc(JSON.stringify({ buyer: bf }))}'>View NCRs</a></div></div>`;
+    }).join('');
+    return { html: `<div class="page-head"><div><h1>Buyer response</h1><div class="muted">Latest file: <b>${esc(last.file || 'file')}</b> (${L.fmtDate(last.fileDate || last.at)}). <a href="#/changes">See what changed</a></div></div></div>
+      <div class="bsum"><div><b style="color:var(--h1)">${tot.n}</b><span>new NCRs to chase</span></div><div><b>${tot.u}</b><span>buyer updates to read</span></div><div><b>${tot.w}</b><span>still waiting for a buyer</span></div></div>
+      <div class="bcards">${cards}</div>
+      <p class="hint" style="margin-top:16px">Quiet buyers are listed first, so you know whom to chase. “Wrote” means the buyer changed the Remarks column. It is a guide for follow-up, not a score.</p>` };
   }
 
   // ---------- Trends: a snapshot per upload, line charts and a monthly summary ----------

@@ -50,7 +50,7 @@ Home (by buyer) · To follow up (no remark first) · Followed up (waiting for th
 On the Import page, set the **File date** (default today) to the day the export was taken: every timeline entry and closed date from that import uses it, so a late upload still lands on the right day. **Import history** lists every upload (file date, new NCRs, remark changes, closed) with a month calendar and the weeks that have no upload. The log is kept in this browser.
 
 ## Buyer response
-Home → **Buyer response**: one table per buyer for the latest upload: open NCRs, new, updated, still waiting, and in how many of the recent uploads the buyer updated a Remark.
+Uploads → **Buyers**: one card per buyer for the latest upload, quiet buyers first. Each card says in plain words what the buyer wrote, shows new / updated / still-waiting as a bar, and links to the buyer's NCRs.
 
 In **Import history**, every upload has a Delete button. Uploads are removed newest first: deleting an older one also removes the ones built on top of it. The File date can be any date, including future ones, which is handy when you simulate weekly uploads with test files.
 
