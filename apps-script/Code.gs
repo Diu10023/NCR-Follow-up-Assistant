@@ -20,7 +20,7 @@ var CHUNK = 40000; // a Sheets cell holds at most 50,000 characters
 // The page is split into five HTML files (Index, Styles, Core, Views, App) so each is small enough to paste.
 var PAGE_FILES = ['Index', 'Styles', 'Core', 'Views', 'App'];
 // A complete file ends with its closing tag; a file that was cut off while pasting does not.
-var PAGE_ENDS = { Index: /<\/html>\s*$/, Styles: /<\/style>\s*$/, Core: /<\/script>\s*$/, Views: /<\/script>\s*$/, App: /<\/script>\s*$/ };
+var PAGE_ENDS = { Index: /<\/html>\s*$/, Styles: /<\/style>\s*(<!--[\s\S]*?-->\s*)?$/, Core: /<\/script>\s*(<!--[\s\S]*?-->\s*)?$/, Views: /<\/script>\s*(<!--[\s\S]*?-->\s*)?$/, App: /<\/script>\s*(<!--[\s\S]*?-->\s*)?$/ };
 function include(name) { return HtmlService.createHtmlOutputFromFile(name).getContent(); }
 
 function doGet() {
