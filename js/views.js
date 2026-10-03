@@ -212,7 +212,13 @@ window.NCR = window.NCR || {};
     return recentMap[n.NCR_No] || null;
   }
   const recentChips = (n) => { const r = recentOf(n); if (!r) return ''; return r.map((c) => c.t === 'new' ? '<span class="chip new" title="New in the latest upload">🆕 New</span>' : c.t === 'update' ? '<span class="chip new" title="Remarks changed in the latest upload">🔔 Updated</span>' : c.t === 'cleared' ? '<span class="chip age-escalation" title="Buyer cleared the Remarks in the latest upload">📭 Cleared</span>' : '').join(' '); };
-  const recentCount = () => { const l = S.getImports().filter((x) => x.changes).pop(); return l ? new Set(l.changes.filter((c) => ['new', 'update', 'cleared'].includes(c.t)).map((c) => c.no)).size : 0; };
+  // How many NCRs of the latest upload sit on this page (`bucket`) and how many went elsewhere (Hold & Jira, Closed)
+  function recentCount(bucket) {
+    const l = S.getImports().filter((x) => x.changes).pop(); if (!l) return { here: 0, other: 0 };
+    const nos = new Set(l.changes.filter((c) => ['new', 'update', 'cleared'].includes(c.t)).map((c) => c.no)), byNo = new Map(st.ncrs.map((n) => [n.NCR_No, n]));
+    let here = 0, other = 0; nos.forEach((no) => { const n = byNo.get(no); if (!n) return; inf(n).bucket === bucket ? here++ : other++; });
+    return { here, other };
+  }
   const filterBar = (idp, F) => {
     const defects = [...new Set(st.ncrs.map((n) => n.Defect).filter(Boolean))].sort();
     const years = [...new Set(st.ncrs.map((n) => String(n.NCR_Date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
@@ -224,7 +230,7 @@ window.NCR = window.NCR || {};
       <label>Defect<select id="${idp}-defect">${options(defects, F.defect, 'All')}</select></label></div></details>`;
   };
   // the bell toggle lives outside the filter box, next to the tabs
-  const changedBtn = (attr, F) => (recentCount() ? `<button class="btn${F.changed ? ' primary' : ''}" type="button" ${attr}="1" title="Show only the NCRs that are new, or whose Remarks changed, in the latest uploaded file">🔔 New or changed since last upload (${recentCount()})</button>` : '');
+  const changedBtn = (attr, F, bucket) => { const c = recentCount(bucket); return c.here || F.changed ? `<button class="btn${F.changed ? ' primary' : ''}" type="button" ${attr}="1" title="Only the NCRs on this page that are new, or whose Remarks changed, in the latest uploaded file${c.other ? `. ${c.other} more are on Hold &amp; Jira or Closed` : ''}">🔔 New or changed since last upload (${c.here})</button>` : ''; };
   function bindFilterBar(root, idp, F, refresh) {
     ['year', 'month', 'from', 'to', 'defect'].forEach((k) => root.querySelector(`#${idp}-${k}`).addEventListener('change', (e) => { F[k] = e.target.value; NCR.app.render(); }));
   }
@@ -309,7 +315,7 @@ window.NCR = window.NCR || {};
     }
     return `${pills}${buyerLine(LF.buyer)}${tabs}
       <div class="row-between wait-line"><span class="muted">${hidden ? `${hidden} already followed up — <a href="#/followed" data-wfilter='${esc(JSON.stringify({ buyer: LF.buyer }))}'>see Followed up</a>` : ''}</span>
-        <span class="inline">${changedBtn('data-chg', LF)}<button class="btn" data-action="export" data-src="todo">Export to Excel</button>${LF.buyer ? `<button class="btn primary" data-action="chase" data-buyer="${esc(cur)}"${currentIds().length ? '' : ' disabled'}>Message ${esc(cur)} (${currentIds().length})</button>` : ''}</span></div>
+        <span class="inline">${changedBtn('data-chg', LF, 'todo')}<button class="btn" data-action="export" data-src="todo">Export to Excel</button>${LF.buyer ? `<button class="btn primary" data-action="chase" data-buyer="${esc(cur)}"${currentIds().length ? '' : ' disabled'}>Message ${esc(cur)} (${currentIds().length})</button>` : ''}</span></div>
       ${body}`;
   }
 
@@ -393,7 +399,7 @@ window.NCR = window.NCR || {};
     }).join('');
     return `${pillsHtml(per, all.length, WF.buyer, 'data-wbuyer')}${buyerLine(WF.buyer)}${tabsHtml(cnt, WF.tab, 'data-wtab')}
       <div class="row-between wait-line"><span class="muted">${list.length && attn ? `<b>${attn}</b> need attention${unanswered ? ` · <b>${unanswered}</b> with no reply after ${st.settings.escalationThreshold || 3}+ follow-ups` : ''}` : ''}</span>
-        <span class="inline">${changedBtn('data-wchg', WF)}<button class="btn" data-action="export" data-src="followed"${list.length ? '' : ' disabled'}>Export to Excel</button></span></div>
+        <span class="inline">${changedBtn('data-wchg', WF, 'followed')}<button class="btn" data-action="export" data-src="followed"${list.length ? '' : ' disabled'}>Export to Excel</button></span></div>
       <section class="block">${list.length ? `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead('followed')}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th><th>Latest remark</th><th>Follow-ups</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
         : `<div class="empty">${all.length ? 'No NCRs in this tab.' : 'Nothing here yet. Press Follow-up on an NCR in To follow up: it moves here and stays until it is closed.'}</div>`}</section>`;
   }
