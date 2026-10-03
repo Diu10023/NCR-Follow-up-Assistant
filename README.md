@@ -9,7 +9,7 @@ Plain HTML/CSS/JS web app (no framework). It runs in two modes:
 
 ## Team mode files
 - `apps-script/Code.gs`: the script that serves the app and reads/writes the Sheet (tabs `NCR_Master`, `Followup_History`, `Settings`, `_Data`). Optional `ACCESS_CODE` passcode inside.
-- `apps-script/Index.html`: the whole app in one file. **Generated**: run `python3 tools/build_apps_script.py` after changing anything under `js/`, `css/` or `index.html`, then paste the new file into the Apps Script project and deploy a new version.
+- `apps-script/Index.html`, `Styles.html`, `Core.html`, `Views.html`, `App.html`: the whole app split in five smaller files (minified). **Generated**: run `python3 tools/build_apps_script.py` after changing anything under `js/`, `css/` or `index.html`, then paste the changed files into the Apps Script project and deploy a new version. `apps-script/paste-me/*.txt` are plain-text copies for copy-paste. `Code.gs` reports which file is missing or incomplete.
 - Not yet tested against a real Google account. It was tested against an in-memory simulation of the Apps Script services (load, save, two users, undo, clear, restore, passcode).
 
 ## Uploaded the wrong file?

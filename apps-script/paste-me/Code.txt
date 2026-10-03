@@ -2,7 +2,7 @@
  * NCR Follow-up Control: Team mode (Google Sheets as the database).
  *
  * This script is bound to a Google Sheet (Extensions -> Apps Script). It does two things:
- *   1. doGet() serves the web app (the file "Index", generated from the project) to your team.
+ *   1. doGet() serves the web app (HTML files Index, Styles, Core, Views, App, generated from the project) to your team.
  *   2. api*() functions, called by the page through google.script.run, read and write the Sheet.
  * Sheets NCR_Master, Followup_History, Settings and _Data are created automatically.
  * Setup steps: see SETUP.md.
@@ -17,14 +17,23 @@ var HIST_HEADERS = ['History_ID', 'NCR_ID', 'NCR_No', 'Date', 'Followup_No', 'Ac
 var CHUNK = 40000; // a Sheets cell holds at most 50,000 characters
 
 // ---------- web app ----------
+// The page is split into five HTML files (Index, Styles, Core, Views, App) so each is small enough to paste.
+var PAGE_FILES = ['Index', 'Styles', 'Core', 'Views', 'App'];
+function include(name) { return HtmlService.createHtmlOutputFromFile(name).getContent(); }
+
 function doGet() {
-  var out = HtmlService.createHtmlOutputFromFile('Index'), html = out.getContent();
-  // The Index file is large; if it was only partly pasted the page would be blank. Say so instead.
-  if (html.indexOf('NCR-APP-END') < 0) {
-    return HtmlService.createHtmlOutput('<div style="font-family:Arial,sans-serif;padding:28px;max-width:640px"><h2>The file "Index" is incomplete</h2>' +
-      '<p>It has only ' + Math.round(html.length / 1024) + ' KB and was cut off while pasting. Open the file Index.html in this Apps Script project, delete everything, and paste the whole Index.html again (download it to your computer and open it with Notepad, then Ctrl+A and Ctrl+C). The last line must be <code>&lt;/html&gt;</code>. Save, then Deploy a new version.</p></div>');
+  var bad = [];
+  PAGE_FILES.forEach(function (n) {
+    var t = null;
+    try { t = include(n); } catch (e) { bad.push('<li><b>' + n + '</b>: file not found. Create an HTML file with exactly this name.</li>'); return; }
+    if (t.indexOf('NCR-END-' + n) < 0) bad.push('<li><b>' + n + '</b>: incomplete or an old version (' + Math.round(t.length / 1024) + ' KB). Paste the whole file again.</li>');
+  });
+  if (bad.length) {
+    return HtmlService.createHtmlOutput('<div style="font-family:Arial,sans-serif;padding:28px;max-width:680px"><h2>Some files are missing or incomplete</h2><ul>' + bad.join('') +
+      '</ul><p>Open each file in this Apps Script project, delete everything, paste the whole content again (download it, open it with Notepad, Ctrl+A, Ctrl+C), and save. The last line of each file is a comment starting with <code>NCR-END</code>. Then Deploy a new version.</p></div>');
   }
-  return out.setTitle('NCR Follow-up Control')
+  return HtmlService.createTemplateFromFile('Index').evaluate()
+    .setTitle('NCR Follow-up Control')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
