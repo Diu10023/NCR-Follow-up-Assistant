@@ -7,6 +7,8 @@ Plain HTML/CSS/JS web app (no framework). It runs in two modes:
 - **This browser only** (default): open `index.html`; data stays in the browser. Good for trying it out. Use Settings → Backup (Excel) to keep a copy.
 - **Team mode (Google Sheet as the database):** a few teammates open one link, see the same data and every change is saved to a Google Sheet automatically. The app is served by a Google Apps Script web app, so no hosting is needed. Setup (about 10 minutes, no coding): see **`apps-script/SETUP.md`** (Thai).
 
+- **Website mode (Vercel + GitHub):** host this folder as a static site and point it to the Apps Script API with `config.js`. Updates deploy by `git push`. Needs an `ACCESS_CODE`. See **`VERCEL.md`** (Thai).
+
 ## Team mode files
 - `apps-script/Code.gs`: the script that serves the app and reads/writes the Sheet (tabs `NCR_Master`, `Followup_History`, `Settings`, `_Data`). Optional `ACCESS_CODE` passcode inside.
 - `apps-script/Index.html`, `Styles.html`, `Core.html`, `Views.html`, `App.html`: the whole app split in five smaller files (minified). **Generated**: run `python3 tools/build_apps_script.py` after changing anything under `js/`, `css/` or `index.html`, then paste the changed files into the Apps Script project and deploy a new version. `apps-script/paste-me/*.txt` are plain-text copies for copy-paste. `Code.gs` reports which file is missing or incomplete.

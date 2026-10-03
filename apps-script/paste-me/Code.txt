@@ -3,7 +3,7 @@
  *
  * This script is bound to a Google Sheet (Extensions -> Apps Script). It does two things:
  *   1. doGet() serves the web app (HTML files Index, Styles, Core, Views, App, generated from the project) to your team.
- *   2. api*() functions, called by the page through google.script.run, read and write the Sheet.
+ *   2. api*() functions, called by the page through google.script.run (or by doPost for a website hosted elsewhere), read and write the Sheet.
  * Sheets NCR_Master, Followup_History, Settings and _Data are created automatically.
  * Setup steps: see SETUP.md.
  */
@@ -24,6 +24,11 @@ var PAGE_ENDS = { Index: /<\/html>\s*$/, Styles: /<\/style>\s*(<!--[\s\S]*?-->\s
 function include(name) { return HtmlService.createHtmlOutputFromFile(name).getContent(); }
 
 function doGet() {
+  var present = 0;
+  PAGE_FILES.forEach(function (n) { try { include(n); present++; } catch (e) { /* not there */ } });
+  if (present === 0) { // API-only use (the app is hosted elsewhere, e.g. Vercel): no page files needed
+    return HtmlService.createHtmlOutput('<div style="font-family:Arial,sans-serif;padding:28px"><h2>NCR API is running</h2><p>Use this link as the API URL of the app. ' + (ACCESS_CODE ? '' : '<b>ACCESS_CODE is empty: set one in Code.gs before using it from a website.</b>') + '</p></div>');
+  }
   var bad = [];
   PAGE_FILES.forEach(function (n) {
     var t = null;
@@ -40,6 +45,19 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+// ---------- API for a website hosted elsewhere (fetch POST, text/plain) ----------
+function doPost(e) {
+  var out;
+  try {
+    if (!ACCESS_CODE) throw new Error('Set ACCESS_CODE in Code.gs before using the API from a website');
+    var b = JSON.parse(e.postData.contents), fn = API[b.fn];
+    if (!fn) throw new Error('Unknown function');
+    var json = b.arg === null || b.arg === undefined ? undefined : JSON.stringify(b.arg);
+    out = { result: JSON.parse(fn(b.code, json)) };
+  } catch (err) { out = { error: String(err.message || err) }; }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
 // ---------- API called from the page (google.script.run) ----------
 function apiLoad(code) { return api_(code, false, function () { return load_(); }); }
 function apiSave(code, json) { return api_(code, true, function () { save_(JSON.parse(json)); return { ok: true }; }); }
@@ -47,6 +65,8 @@ function apiSaveSettings(code, json) { return api_(code, true, function () { sav
 function apiSaveMeta(code, json) { return api_(code, true, function () { var m = JSON.parse(json); kvSet_('imports', JSON.stringify(m.imports || [])); kvSet_('stack', JSON.stringify(m.stack || [])); return { ok: true }; }); }
 function apiClear(code) { return api_(code, true, function () { clear_(); return { ok: true }; }); }
 function apiRestore(code, json) { return api_(code, true, function () { restore_(JSON.parse(json)); return { ok: true }; }); }
+
+var API = { apiLoad: apiLoad, apiSave: apiSave, apiSaveSettings: apiSaveSettings, apiSaveMeta: apiSaveMeta, apiClear: apiClear, apiRestore: apiRestore };
 
 function api_(code, write, fn) {
   if (ACCESS_CODE && code !== ACCESS_CODE) throw new Error('Wrong or missing access code');

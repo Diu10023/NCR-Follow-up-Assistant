@@ -64,6 +64,30 @@ window.NCR = window.NCR || {};
   // Team mode: the app is served by an Apps Script web app and talks to the Google Sheet through google.script.run.
   const hasGas = () => typeof google !== 'undefined' && google.script && google.script.run;
   let accessCode = '';
+  const lsGet = (k) => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+  const lsSet = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (e) { /* storage unavailable */ } };
+  // Website mode: the app is hosted anywhere (e.g. Vercel) and calls the Apps Script web app with fetch. Needs an access code.
+  const apiUrl = () => ((typeof window !== 'undefined' && window.NCR_CONFIG && window.NCR_CONFIG.apiUrl) || lsGet('ncr.apiUrl') || '').trim();
+  function FetchAdapter(url) {
+    const call = async (fn, arg) => {
+      let res;
+      try { res = await fetch(url, { method: 'POST', body: JSON.stringify({ fn, code: accessCode, arg: arg === undefined ? null : arg }) }); } // text/plain: no CORS preflight
+      catch (e) { throw new Error('Cannot reach the Google Sheet. Check the API URL, and that the Apps Script access is set to "Anyone".'); }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      let j; try { j = await res.json(); } catch (e) { throw new Error('The API URL did not answer with data. Is it the /exec link of a Web app deployed for "Anyone"?'); }
+      if (j.error) throw new Error(j.error);
+      return j.result;
+    };
+    return {
+      name: 'sheets',
+      load: () => call('apiLoad'),
+      save: (p) => call('apiSave', p),
+      clear: () => call('apiClear'),
+      saveSettings: (s) => call('apiSaveSettings', s),
+      saveMeta: (m) => call('apiSaveMeta', m),
+      restore: (d) => call('apiRestore', d),
+    };
+  }
   function GasAdapter() {
     const run = (fn, arg) => new Promise((res, rej) => {
       const r = google.script.run.withSuccessHandler(res).withFailureHandler((e) => rej(new Error((e && e.message) || String(e))));
@@ -102,12 +126,13 @@ window.NCR = window.NCR || {};
   }
 
   async function init() {
-    adapter = hasGas() ? GasAdapter() : LocalAdapter;
+    if (!accessCode) accessCode = lsGet('ncr.code');
+    adapter = hasGas() ? GasAdapter() : apiUrl() ? FetchAdapter(apiUrl()) : LocalAdapter;
     state.mode = adapter.name;
     await reload();
   }
   async function reload() {
-    try { normalize(await adapter.load()); state.error = null; state.needCode = false; } catch (e) { state.needCode = /access code/i.test(e.message); state.error = state.needCode ? null : 'Cannot load data: ' + e.message; }
+    try { normalize(await adapter.load()); state.error = null; state.needCode = false; if (adapter.name === 'sheets') lsSet('ncr.code', accessCode); } catch (e) { state.needCode = /access code/i.test(e.message); state.error = state.needCode ? null : 'Cannot load data: ' + e.message; }
     emit();
   }
   function persist(fn) {
@@ -355,5 +380,5 @@ window.NCR = window.NCR || {};
   function demoData() { return { ncrs: [], history: [], settings: {} }; }
 
   NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
-    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, undoReview, removeNcr, saveMany, applyImport, undoImport, exportBundle, bundleError, restoreBundle, storageInfo, lastBackup: () => ls.get(BK_KEY), getImports, patchImportLog, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, resetDemo, setAccessCode: (c) => { accessCode = String(c || ''); }, isTeamMode: () => hasGas() };
+    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, undoReview, removeNcr, saveMany, applyImport, undoImport, exportBundle, bundleError, restoreBundle, storageInfo, lastBackup: () => ls.get(BK_KEY), getImports, patchImportLog, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, resetDemo, setAccessCode: (c) => { accessCode = String(c || ''); lsSet('ncr.code', accessCode); }, isTeamMode: () => hasGas() || !!apiUrl(), getApiUrl: apiUrl, setApiUrl: (u) => lsSet('ncr.apiUrl', String(u || '').trim()), forgetCode: () => { accessCode = ''; lsSet('ncr.code', ''); } };
 })(window.NCR);

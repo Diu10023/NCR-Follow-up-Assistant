@@ -888,7 +888,9 @@ window.NCR = window.NCR || {};
       <section class="card"><h2>Data source</h2>
         ${st.mode === 'sheets' ? `<p><b>Team mode.</b> Everyone who opens this link sees the same data, and every change is saved to the Google Sheet automatically.${(st.meta || {}).user ? ` You are signed in as <b>${esc(st.meta.user)}</b>.` : ''}</p>
           ${(st.meta || {}).sheetUrl ? `<div class="actions"><a class="btn" href="${esc(st.meta.sheetUrl)}" target="_blank" rel="noopener">Open the Google Sheet ↗</a></div>` : ''}`
-        : `<p><b>This browser only.</b> Data stays in this browser. To let a few teammates work on the same data, with automatic saving to a Google Sheet, set up Team mode: see <b>apps-script/SETUP.md</b> in the project files (about 10 minutes, no coding).</p>`}</section>
+        : `<p><b>This browser only.</b> Data stays in this browser. To let a few teammates work on the same data, with automatic saving to a Google Sheet, set up Team mode: see <b>apps-script/SETUP.md</b> (served by Apps Script) or <b>VERCEL.md</b> (hosted on your own website).</p>
+          <form id="apiurl" class="form"><label class="full">Apps Script API URL (website mode)<input name="url" value="${esc(S.getApiUrl())}" placeholder="https://script.google.com/macros/s/…/exec"></label>
+            <div class="full actions"><button class="btn primary" type="submit">Save and connect</button></div></form>`}${st.mode === 'sheets' ? '<div class="actions"><button class="btn" type="button" id="forget-code">Forget the access code on this device</button></div>' : ''}</section>
       <section class="card"><h2>Backup</h2>
         ${(() => { const lb = S.lastBackup(), si = S.storageInfo(); return `<p>${st.mode === 'sheets' ? 'Your data is saved in the Google Sheet. An extra backup is optional.' : 'Everything lives in this browser.'} The backup is an <b>Excel file</b> (it also opens in Google Sheets) that keeps your NCRs, history and uploads safe if the browser data is cleared or you change computer. <b>Last backup:</b> ${lb ? L.fmtDate(lb) : '<span class="bad">never</span>'}. ${st.mode === 'sheets' ? '' : `<span class="muted">Browser storage used: ${si.kb} KB (${si.pct}%).</span>`}</p>
           <div class="actions"><button class="btn primary" data-action="backup">⬇ Save backup (Excel)</button><button class="btn" data-action="restore">⬆ Restore from backup…</button><input type="file" id="restore-file" accept=".xlsx,.xls,.json" hidden></div>
@@ -906,6 +908,9 @@ window.NCR = window.NCR || {};
           <label>Close at import when Remarks contain<textarea name="jiraKeywords" rows="3">${esc((s.jiraKeywords || []).join('\n'))}</textarea></label></div>
         <div class="actions"><button class="btn primary" type="submit">Save settings</button></div></form>`,
     bind(root) {
+      const au = root.querySelector('#apiurl');
+      if (au) au.addEventListener('submit', async (e) => { e.preventDefault(); S.setApiUrl(String(new FormData(e.target).get('url') || '')); await S.init(); NCR.app.toast(st.error || 'Connected'); NCR.app.render(); });
+      const fc = root.querySelector('#forget-code'); if (fc) fc.addEventListener('click', () => { S.forgetCode(); NCR.app.toast('Access code forgotten. You will be asked for it next time'); });
       const ui = root.querySelector('#undo-import');
       if (ui) ui.addEventListener('click', () => NCR.app.confirmModal({ title: 'Undo the last import?', text: 'This removes the NCRs it added and restores the ones it changed.', ok: 'Undo import', onOk: () => { S.undoImport(); NCR.app.toast('Import undone'); NCR.app.render(); } }));
       root.querySelector('#clear-all').addEventListener('click', () => NCR.app.confirmModal({ title: 'Delete all NCR data?', text: `This deletes all ${st.ncrs.length} NCRs and their history from ${st.mode === 'sheets' ? 'the Google Sheet' : 'this browser'}. It cannot be undone.`, typed: 'DELETE', ok: 'Delete everything', onOk: () => { S.clearAll(); NCR.app.toast('All NCR data deleted'); NCR.app.render(); } }));
