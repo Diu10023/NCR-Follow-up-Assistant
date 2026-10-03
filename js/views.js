@@ -775,6 +775,9 @@ window.NCR = window.NCR || {};
         ${row('Rounds', 'Follow-ups you made plus remark changes by the buyer. Many rounds and still open means it keeps moving but never finishes.')}
         ${row('# (work order)', 'The number on each row is the order to work in: No remark first (oldest first), then the ones with the most rounds.')}
         ${row('Carried over', 'Open NCRs that did not change in the latest file. They are the old ones you keep chasing.')}
+        ${row('Buyers (Uploads)', 'Per buyer for the latest upload: new, updated, still waiting. Appears after your first import; the last column needs at least two imports.')}
+        ${row('Trends (Uploads)', 'Backlog over time. One point is saved per import, so lines appear after two imports made with this version; the monthly Excel summary needs one month with data.')}
+        ${row('Hold, Jira, Closed', 'No menu entry: open them from the big cards on Home. The two tabs at the top of those pages switch between them.')}
         ${row('File date', 'The day the Excel export was taken. Leave it as today unless you upload late.')}
       </table></div></section>
       <section class="block"><h2>What the colours mean</h2><div class="table-wrap"><table class="grid">
