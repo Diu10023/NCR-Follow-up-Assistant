@@ -54,7 +54,7 @@ window.NCR = window.NCR || {};
     const shown = showAll[key] ? list : list.slice(0, limit);
     const rows = shown.map((n) => {
       const i = inf(n), rd = roundsOf(n), idx = list.indexOf(n) + 1;
-      return `<tr class="${i.remarkGroup === 'none' ? 'rp-none' : longRunning(n) ? 'rp-long' : ''}" data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}<td class="rank">${idx}</td>
+      return `<tr class="${i.remarkGroup === 'none' ? 'rp-none' : longRunning(n) ? 'rp-long' : 'rp-has'}" data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}<td class="rank">${idx}</td>
         <td class="nowrap"><b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div></td>
         <td class="wide">${esc(buyerOf(n))}<div class="sub clip" title="${esc(n.Buyer_Remark || n.Defect)}">${esc(n.Defect)}${!withRemark && n.Buyer_Remark ? ' · “' + esc(n.Buyer_Remark) + '”' : ''}</div></td>
         ${withRemark ? `<td class="remark">${remarkText(n, i)}</td>` : ''}<td>${whyText(i)}${longRunning(n) ? `<div><span class="chip age-attention">🔁 ${rd} rounds, still open</span></div>` : ''}</td>
@@ -363,7 +363,7 @@ window.NCR = window.NCR || {};
     const rows = list.map((n) => {
       const i = inf(n), at = attention(n), open_ = WF_OPEN.has(n.NCR_ID);
       const changes = S.historyFor(n.NCR_ID).filter((x) => /^Buyer update|^Buyer cleared/.test(x.Action)).length;
-      return `<tr class="${i.remarkGroup === 'none' ? 'rp-none' : longRunning(n) ? 'rp-long' : ''}" data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}<td class="rank">${list.indexOf(n) + 1}</td>
+      return `<tr class="${i.remarkGroup === 'none' ? 'rp-none' : longRunning(n) ? 'rp-long' : 'rp-has'}" data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}<td class="rank">${list.indexOf(n) + 1}</td>
         <td class="nowrap"><button class="link tog" data-action="toggletl" data-id="${esc(n.NCR_ID)}" title="Show timeline">${open_ ? '▾' : '▸'}</button> <b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div></td>
         <td class="wide">${esc(buyerOf(n))}<div class="sub clip">${esc(n.Defect)}</div></td>
         <td class="remark">${remarkText(n, i)}</td>
