@@ -40,6 +40,7 @@ window.NCR = window.NCR || {};
       d.settings = s;
       localStorage.setItem(DATA_KEY, JSON.stringify(d));
     },
+    async restore(d) { localStorage.setItem(DATA_KEY, JSON.stringify(d)); },
     reset() { localStorage.removeItem(DATA_KEY); },
     async clear() { this.reset(); },
   };
@@ -266,6 +267,36 @@ window.NCR = window.NCR || {};
     emit();
   }
 
+  // ---- backup / restore: one JSON file with everything ----
+  const BK_KEY = 'ncr.lastBackup', SEEN_KEY = 'ncr.seenChanges';
+  const ls = { get: (k) => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* storage unavailable */ } } };
+  function exportBundle() {
+    ls.set(BK_KEY, L.nowStamp());
+    return { format: 'ncr-follow-up-backup', version: 1, exportedAt: L.nowStamp(), ncrs: state.ncrs, history: state.history, settings: state.settings, imports: getImports(), importStack: getStack(), seen: ls.get(SEEN_KEY) };
+  }
+  function bundleError(b) {
+    if (!b || b.format !== 'ncr-follow-up-backup') return 'This is not a backup file made by this app.';
+    if (!Array.isArray(b.ncrs) || !Array.isArray(b.history)) return 'The backup file is incomplete (no NCR list).';
+    if (b.ncrs.some((n) => !n || !n.NCR_ID || !n.NCR_No)) return 'The backup file has NCRs without an ID or number.';
+    return '';
+  }
+  async function restoreBundle(b) {
+    const err = bundleError(b); if (err) throw new Error(err);
+    const d = { ncrs: b.ncrs, history: b.history, settings: b.settings };
+    normalize(d); setImports(Array.isArray(b.imports) ? b.imports : []); setStack(Array.isArray(b.importStack) ? b.importStack : []);
+    if (b.seen) ls.set(SEEN_KEY, b.seen);
+    ls.set(BK_KEY, L.nowStamp()); emit();
+    return persist(async () => {
+      if (adapter.restore) await adapter.restore(d);
+      else { await adapter.clear(); await adapter.save({ ncrs: state.ncrs, history: state.history }); await adapter.saveSettings(state.settings); }
+    });
+  }
+  // rough browser storage use (localStorage is about 5 MB per site)
+  function storageInfo() {
+    let chars = 0; try { Object.keys(localStorage).forEach((k) => { if (k.startsWith('ncr.')) chars += k.length + (localStorage.getItem(k) || '').length; }); } catch (e) { /* ignore */ }
+    const kb = Math.round(chars / 1024); return { kb, pct: Math.min(100, Math.round((chars / (5 * 1024 * 1024)) * 100)) };
+  }
+
   // ---- undo a wrong import / clear everything ----
   const LAST_KEY = 'ncr.lastImport';
   // Every import keeps how to take it back, so uploads can be removed newest-first (a stack).
@@ -322,5 +353,5 @@ window.NCR = window.NCR || {};
   function demoData() { return { ncrs: [], history: [], settings: {} }; }
 
   NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
-    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, undoReview, removeNcr, saveMany, applyImport, undoImport, getImports, patchImportLog, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
+    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, undoReview, removeNcr, saveMany, applyImport, undoImport, exportBundle, bundleError, restoreBundle, storageInfo, lastBackup: () => ls.get(BK_KEY), getImports, patchImportLog, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
 })(window.NCR);

@@ -99,7 +99,7 @@ window.NCR = window.NCR || {};
       rec.Buyer_Remark = normText(get('Buyer_Remark'));
       const yes = isClosedValue(get('Closed')), jira = kw.some((k) => rec.Buyer_Remark.toLowerCase().includes(k));
       rec.CloseReason = yes ? 'Closed = Yes in Excel' : jira ? 'Remarks mention Jira' : '';
-      rec.RemarkMapped = col.Buyer_Remark >= 0;
+      rec.RemarkMapped = col.Buyer_Remark >= 0; rec.ClosedMapped = col.Closed >= 0;
       rec.NCR_Date = parseDate(get('NCR_Date'));
       if (get('NCR_Date') !== '' && !rec.NCR_Date) bad.push({ row: table.headerRow + 1 + i, reason: 'Unreadable date "' + get('NCR_Date') + '" (NCR ' + no + ')' });
       out.push(rec);
@@ -112,13 +112,15 @@ window.NCR = window.NCR || {};
   // Compare against existing NCRs (key = NCR No., case-insensitive). Follow-up fields are never touched.
   function plan(records, existing) {
     const byNo = new Map(existing.map((n) => [String(n.NCR_No).trim().toLowerCase(), n]));
-    const seen = new Set(), added = [], updated = [], unchanged = [], closeNow = [];
+    const seen = new Set(), added = [], updated = [], unchanged = [], closeNow = [], reopen = [];
     records.forEach((r) => {
       const key = r.NCR_No.toLowerCase();
       if (seen.has(key)) return; seen.add(key);
       const old = byNo.get(key);
       if (!old) { added.push(r); return; }
       if (r.CloseReason && old.Status !== 'Closed') closeNow.push({ old, reason: r.CloseReason }); // closed by the file, no manual step
+      // the file is the truth both ways: closed here but no longer closed in the file (needs the Closed and Remarks columns to judge)
+      else if (!r.CloseReason && old.Status === 'Closed' && r.ClosedMapped && r.RemarkMapped) reopen.push({ old });
       const changes = [];
       UPDATABLE.forEach((f) => { if (r[f] && String(r[f]) !== String(old[f] || '')) changes.push({ field: f, from: old[f] || '', to: r[f] }); });
       // Remarks mirror the file: a change (including the buyer clearing it) is recorded, never silently lost.
@@ -127,7 +129,7 @@ window.NCR = window.NCR || {};
       if (changes.length) updated.push({ rec: r, old, changes }); else unchanged.push(old);
     });
     const missing = existing.filter((n) => n.Status !== 'Closed' && !seen.has(String(n.NCR_No).trim().toLowerCase()));
-    return { added, updated, unchanged, missing, closeNow };
+    return { added, updated, unchanged, missing, closeNow, reopen };
   }
 
   // Returns {ncrs, history} ready for store.saveMany.
@@ -145,7 +147,7 @@ window.NCR = window.NCR || {};
       Object.assign(n, r, { Owner: r.Buyer, NCR_ID: L.uid('NCR'), Status: 'Not Started', Followup_Count: 0, Created_At: now, Updated_At: now });
       if (r.CloseReason) { n.Status = 'Closed'; n.Closed_Date = today; n.Next_Action = ''; }
       n.Aging = L.daysBetween(n.NCR_Date, n.Closed_Date || L.todayISO());
-      delete n.RemarkMapped; delete n.CloseReason; ncrs.push(n); H(n, r.CloseReason ? 'Imported as Closed (' + r.CloseReason + ')' : 'NCR imported from Excel');
+      delete n.RemarkMapped; delete n.ClosedMapped; delete n.CloseReason; ncrs.push(n); H(n, r.CloseReason ? 'Imported as Closed (' + r.CloseReason + ')' : 'NCR imported from Excel');
       if (n.Buyer_Remark && !r.CloseReason) H(n, 'Buyer Remarks at import: ' + n.Buyer_Remark, '', 'Buyer (Excel)');
     });
     p.updated.forEach(({ rec, old, changes }) => {
@@ -171,6 +173,13 @@ window.NCR = window.NCR || {};
       H(n, 'Closed from Excel: ' + why);
     };
     p.closeNow.forEach(({ old, reason }) => close(old, reason));
+    (p.reopen || []).forEach(({ old }) => {
+      const cur = ncrs.find((x) => x.NCR_ID === old.NCR_ID), n = Object.assign({}, cur || old);
+      n.Status = Number(n.Followup_Count) > 0 ? 'Pending' : 'Not Started'; n.Closed_Date = ''; n.Updated_At = now;
+      n.Aging = L.daysBetween(n.NCR_Date, L.todayISO());
+      if (cur) ncrs[ncrs.indexOf(cur)] = n; else ncrs.push(n);
+      H(n, 'Reopened from Excel: no longer closed in the file');
+    });
     if (opts && opts.closeMissing) p.missing.forEach((o) => close(o, 'not in the latest Excel file'));
     return { ncrs, history };
   }

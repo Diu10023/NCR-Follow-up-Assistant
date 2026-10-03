@@ -30,10 +30,11 @@
     $('#fu-badge').textContent = by.followed;     // followed up, not closed yet
     $('#hold-badge').textContent = by.hold + by.jira;
     const lg = S.getImports().filter((x) => x.changes).pop();   // unseen upload: show how many NCRs it touched
-    $('#chg-badge').textContent = lg && S.getSeen() !== lg.at ? new Set(lg.changes.filter((c) => ['new', 'update', 'cleared'].includes(c.t)).map((c) => c.no)).size || '' : '';
+    $('#chg-badge').textContent = lg && S.getSeen() !== lg.at ? new Set(lg.changes.filter((c) => ['new', 'update', 'cleared', 'reopened'].includes(c.t)).map((c) => c.no)).size || '' : '';
     const el = $('#sync');
-    el.className = 'sync' + (st.error ? ' err' : '');
-    el.textContent = st.error ? '⚠️ ' + st.error : st.saving ? 'Saving…' : st.mode === 'sheets' ? '✓ Synced with Google Sheets' : '';
+    const si = S.storageInfo();
+    el.className = 'sync' + (st.error || si.pct >= 80 ? ' err' : '');
+    el.textContent = st.error ? '⚠️ ' + st.error : si.pct >= 80 ? `⚠️ Browser storage is ${si.pct}% full. Save a backup (Settings → Your data) and consider clearing old data.` : st.saving ? 'Saving…' : st.mode === 'sheets' ? '✓ Synced with Google Sheets' : '';
     $('#mode').hidden = st.mode !== 'demo';
   }
 
@@ -84,48 +85,11 @@
     });
   }
 
-  function ncrForm(id) {
-    const n = id ? S.getNcr(id) : { NCR_Date: L.todayISO(), Status: 'Not Started' }, s = st.settings, edit = !!id;
-    const inp = (name, label, o) => `<label>${label}${o && o.req ? ' *' : ''}<input name="${name}" value="${esc(n[name])}"${o && o.req ? ' required' : ''}${o && o.type ? ` type="${o.type}"` : ''}${o && o.list ? ` list="${o.list}"` : ''}></label>`;
-    openModal(`<form id="nf" class="form modal-form"><h2>${edit ? 'Edit ' + esc(n.NCR_No) : 'Add NCR'}</h2>
-      ${inp('NCR_No', 'NCR No.', { req: 1 })}${inp('Item_No', 'Item No.', { req: 1 })}${inp('Batch_No', 'Batch No.', { req: 1 })}
-      ${inp('NCR_Date', 'NCR Date', { req: 1, type: 'date' })}${inp('Buyer', 'Buyer', { req: 1, list: 'buyers' })}${inp('Quantity', 'Quantity', { req: 1 })}
-      <label class="full">Defect *<textarea name="Defect" rows="2" required>${esc(n.Defect)}</textarea></label>
-      <details class="full" ${edit ? 'open' : ''}><summary>Optional / follow-up details</summary><div class="form inner">
-        ${inp('Supplier', 'Supplier')}
-        <label>Disposition<select name="Disposition">${V.options(V.withCurrent(s.dispositions, n.Disposition), n.Disposition, '—')}</select></label>
-        <label>Next Action<select name="Next_Action">${V.options(V.withCurrent(s.nextActions, n.Next_Action), n.Next_Action, '—')}</select></label>
-        ${inp('Owner', 'Owner', { list: 'owners' })}
-        <label>Waiting For<select name="Waiting_For">${V.options(V.withCurrent(s.waitingFor, n.Waiting_For), n.Waiting_For, '—')}</select></label>
-        ${inp('Due_Date', 'Due Date', { type: 'date' })}
-        ${edit ? `<label>Status<select name="Status"${n.Status === 'Closed' ? ' disabled' : ''}>${V.options(V.withCurrent(L.PICKABLE, n.Status), n.Status)}</select></label>` : ''}
-        <label class="full">Remark<textarea name="Remark" rows="2">${esc(n.Remark)}</textarea></label></div></details>
-      <datalist id="buyers">${S.buyers().map((b) => `<option value="${esc(b)}">`).join('')}</datalist>
-      <datalist id="owners">${S.owners().map((b) => `<option value="${esc(b)}">`).join('')}</datalist>
-      <div class="full actions">${edit ? '<label class="check"><input type="checkbox" name="rec" checked> Record changes in history</label>' : ''}
-        ${edit ? '<button type="button" class="btn danger" id="nf-del">Delete</button>' : ''}<span class="grow"></span>
-        <button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">${edit ? 'Save' : 'Add NCR'}</button></div></form>`, (m) => {
-      m.querySelector('#nf').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const f = new FormData(e.target), upd = Object.assign({}, n);
-        S.NCR_FIELDS.forEach((k) => { if (f.has(k)) upd[k] = String(f.get(k)).trim(); });
-        if (st.ncrs.some((x) => x.NCR_ID !== upd.NCR_ID && String(x.NCR_No).trim().toLowerCase() === upd.NCR_No.toLowerCase())) { toast('NCR No. already exists', true); return; }
-        const saved = S.saveNcr(upd, { recordChanges: !!f.get('rec'), by: 'QA' });
-        modal.close(); toast(edit ? 'Saved' : 'NCR added');
-        if (!edit) location.hash = '#/ncr/' + saved.NCR_ID;
-      });
-      const del = m.querySelector('#nf-del');
-      if (del) del.addEventListener('click', () => { // two clicks: the first arms the button
-        if (!del.dataset.armed) { del.dataset.armed = '1'; del.textContent = 'Click again to delete'; setTimeout(() => { del.dataset.armed = ''; del.textContent = 'Delete'; }, 4000); return; }
-        S.removeNcr(id); modal.close(); location.hash = '#/list';
-      });
-    });
-  }
 
   const plusDays = (n) => L.addDays(L.todayISO(), n);
   const buyerNames = (list) => [...new Set(list.map((n) => V.buyerOf(n)))];
 
-  // Follow-up for one or many NCRs: copy the message, record it, and set the next check date.
+  // Follow-up for one or many NCRs: copy the message and record that it was sent.
   function followupModal(ids) {
     const list = ids.map(S.getNcr).filter(Boolean), s = st.settings;
     if (!list.length) return;
@@ -140,10 +104,8 @@
         action: who ? 'Asked ' + who + ' for status update' : 'Asked for status update' };
     });
     const many = groups.length > 1;
-    const nextDefault = plusDays(s.defaultCheckDays);
-    const allWaiting = [...new Set(list.map((n) => n.Waiting_For))];
     openModal(`<form id="hf" class="form modal-form"><h2>${one ? `Follow-up #${(Number(n0.Followup_Count) || 0) + 1} – ${esc(n0.NCR_No)}` : `Follow-up – ${list.length} NCRs${many ? ' · ' + groups.length + ' buyers' : ''}`}</h2>
-      <ol class="steps full"><li><b>Copy</b> each buyer's message and send it (Teams or email).</li><li><b>Choose</b> when you will check again.</li><li><b>Press Record</b>. The NCRs move to Followed up and stay there until they are closed. On the check date they are flagged so you chase again.</li></ol>
+      <ol class="steps full"><li><b>Copy</b> each buyer's message and send it (Teams or email).</li><li><b>Press Record</b>. The NCRs move to Followed up and stay there until they are closed. The next file shows how the buyer answered.</li></ol>
       ${groups.map((g, k) => `<section class="grp full">
         ${many || !one ? `<h3>${esc(g.name)} <span class="count">${g.ncrs.length} NCR${g.ncrs.length === 1 ? '' : 's'}</span></h3>` : ''}
         <label>${one ? 'Message (editable)' : 'Message for ' + esc(g.name)}<textarea class="msg" rows="${one ? 9 : Math.min(12, 6 + g.ncrs.length)}">${esc(g.msg)}</textarea></label>
@@ -155,58 +117,12 @@
         </div></section>`).join('')}
       <hr class="full">
       <label>Date<input type="date" name="date" value="${L.todayISO()}" required></label>
-      <label>Waiting For<select name="waiting">${V.options(V.withCurrent(s.waitingFor, allWaiting.length === 1 ? allWaiting[0] : ''), allWaiting.length === 1 ? allWaiting[0] : '', '— unchanged —')}</select></label>
-      <label class="full">Next check date * <span class="muted">– flagged in Followed up when this date arrives</span>
-        <div class="inline"><input type="date" name="nextDate" id="nd" value="${nextDefault}" min="${plusDays(1)}" required>
-        ${[3, 7, 14].map((d) => `<button type="button" class="btn sm" data-plus="${d}">+${d}d</button>`).join('')}</div></label>
       <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">I sent it, record${one ? '' : ' (' + list.length + ')'}</button></div></form>`, (m) => {
       m.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', () => copyText(m.querySelectorAll('.msg')[b.dataset.k].value)));
-      m.querySelectorAll('[data-plus]').forEach((b) => b.addEventListener('click', () => { m.querySelector('#nd').value = plusDays(Number(b.dataset.plus)); }));
       m.querySelector('#hf').addEventListener('submit', (e) => {
         e.preventDefault(); const f = new FormData(e.target);
-        groups.forEach((g, k) => S.recordFollowups(g.ids, { date: f.get('date'), by: f.get('by_' + k), action: f.get('action_' + k), waiting: f.get('waiting'), remark: f.get('remark_' + k), nextDate: f.get('nextDate') }));
-        V.SEL.clear(); modal.close(); toast(`Recorded. ${one ? 'It is' : list.length + ' NCRs are'} now in Followed up, flagged again on ${L.fmtDate(f.get('nextDate'))}`);
-      });
-    });
-  }
-
-  // Plain history entry (e.g. "Evidence received"); optionally counts as a follow-up.
-  function noteModal(id) {
-    const n = S.getNcr(id), s = st.settings;
-    openModal(`<form id="hf" class="form modal-form"><h2>Add history entry – ${esc(n.NCR_No)}</h2>
-      <label>Date<input type="date" name="date" value="${L.todayISO()}" required></label>
-      <label>Person / department<input name="by" list="owners"></label>
-      <label class="full">Action / note *<input name="action" required placeholder="e.g. Evidence received"></label>
-      <label>Waiting For<select name="waiting">${V.options(V.withCurrent(s.waitingFor, n.Waiting_For), n.Waiting_For, '— unchanged —')}</select></label>
-      <label>Remark<input name="remark"></label>
-      <datalist id="owners">${S.owners().map((b) => `<option value="${esc(b)}">`).join('')}</datalist>
-      <div class="full actions"><label class="check"><input type="checkbox" name="count"> Count as follow-up</label><span class="grow"></span>
-        <button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">Add entry</button></div></form>`, (m) => {
-      m.querySelector('#hf').addEventListener('submit', (e) => {
-        e.preventDefault(); const f = new FormData(e.target);
-        S.addHistory(id, { date: f.get('date'), by: f.get('by'), action: f.get('action'), waiting: f.get('waiting'), remark: f.get('remark'), countAsFollowup: !!f.get('count') });
-        modal.close(); toast('Entry added');
-      });
-    });
-  }
-
-  // Set next check / owner / waiting for / status on all selected NCRs.
-  function bulkModal(ids) {
-    const s = st.settings;
-    openModal(`<form id="bf" class="form modal-form"><h2>Update ${ids.length} NCR${ids.length > 1 ? 's' : ''}</h2>
-      <p class="full muted small">Leave a field empty to keep it unchanged.</p>
-      <label class="full">Next check date<div class="inline"><input type="date" name="Due_Date" id="nd" min="${plusDays(1)}">${[3, 7, 14].map((d) => `<button type="button" class="btn sm" data-plus="${d}">+${d}d</button>`).join('')}</div></label>
-      <label>Owner<input name="Owner" list="owners"></label>
-      <label>Waiting For<select name="Waiting_For">${V.options(s.waitingFor, '', '— unchanged —')}</select></label>
-      <label>Status<select name="Status">${V.options(['Open', 'Pending'], '', '— unchanged —')}</select></label>
-      <datalist id="owners">${S.owners().map((b) => `<option value="${esc(b)}">`).join('')}</datalist>
-      <div class="full actions"><span class="grow"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">Apply</button></div></form>`, (m) => {
-      m.querySelectorAll('[data-plus]').forEach((b) => b.addEventListener('click', () => { m.querySelector('#nd').value = plusDays(Number(b.dataset.plus)); }));
-      m.querySelector('#bf').addEventListener('submit', (e) => {
-        e.preventDefault(); const f = new FormData(e.target), fields = {};
-        ['Due_Date', 'Owner', 'Waiting_For', 'Status'].forEach((k) => { if (f.get(k)) fields[k] = f.get(k); });
-        if (!Object.keys(fields).length) { toast('Nothing to change', true); return; }
-        S.bulkSet(ids, fields); V.SEL.clear(); modal.close(); toast('Updated ' + ids.length + ' NCRs');
+        groups.forEach((g, k) => S.recordFollowups(g.ids, { date: f.get('date'), by: f.get('by_' + k), action: f.get('action_' + k), remark: f.get('remark_' + k) }));
+        V.SEL.clear(); modal.close(); toast(`Recorded. ${one ? 'It is' : list.length + ' NCRs are'} now in Followed up`);
       });
     });
   }
@@ -215,7 +131,7 @@
   function updateBulkBar() {
     const bar = $('#bulkbar'), n = V.SEL.size;
     bar.hidden = !n;
-    if (n) bar.innerHTML = `<b>${n} selected</b><button class="btn primary" data-action="bulk-followup">📨 Follow-up</button><button class="btn" data-action="bulk-set">Set next check / owner / status</button><button class="btn" data-action="bulk-clear">Clear</button>`;
+    if (n) bar.innerHTML = `<b>${n} selected</b><button class="btn primary" data-action="bulk-followup">📨 Follow-up</button><button class="btn" data-action="bulk-clear">Clear</button>`;
   }
   document.addEventListener('change', (e) => {
     const cb = e.target;
@@ -246,6 +162,24 @@
     const who = Object.keys(by).length === 1 ? '_' + Object.keys(by)[0].replace(/[^\w\-]+/g, '_') : '';
     const filename = `NCR_${label}${who}_${L.todayISO()}.xlsx`;
     await saveBook(wb, filename);
+  }
+  async function backupNow() {
+    const text = JSON.stringify(S.exportBundle()), filename = `NCR_backup_${L.todayISO()}.json`;
+    try {
+      const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+      if (dl) { await dl.save({ filename, data: text }); }
+      else { const u = URL.createObjectURL(new Blob([text], { type: 'application/json' })), a = document.createElement('a'); a.href = u; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(u), 2000); }
+      toast('Backup saved. Keep the file somewhere safe'); render();
+    } catch (e) { if (!e || e.code !== 'declined') toast('Could not save the backup' + (e && e.message ? ': ' + e.message : ''), true); }
+  }
+  function restoreFrom(file) {
+    const rd = new FileReader();
+    rd.onload = () => {
+      let b; try { b = JSON.parse(rd.result); } catch (e) { toast('That file is not a valid backup (not JSON)', true); return; }
+      const err = S.bundleError(b); if (err) { toast(err, true); return; }
+      confirmModal({ title: 'Restore this backup?', text: `This replaces ALL current data (${st.ncrs.length} NCRs) with the backup: ${b.ncrs.length} NCRs, ${b.history.length} history entries, ${(b.imports || []).length} uploads, saved ${L.fmtDate(b.exportedAt)}. Make a backup of the current data first if you may need it.`, ok: 'Restore', onOk: async () => { await S.restoreBundle(b); toast('Backup restored'); render(); } });
+    };
+    rd.readAsText(file);
   }
   async function saveBook(wb, filename) {
     try {
@@ -294,8 +228,12 @@
     } catch (e) { if (!e || e.code !== 'declined') toast('Could not create the image here. Use the Excel summary instead', true); }
   }
 
+  document.addEventListener('change', (e) => { if (e.target && e.target.id === 'restore-file' && e.target.files[0]) { restoreFrom(e.target.files[0]); e.target.value = ''; } });
+
   const actions = {
     'export-all': () => exportAll(),
+    backup: () => backupNow(),
+    restore: () => $('#restore-file') && $('#restore-file').click(),
     'export-month': () => exportMonth(),
     'export-trend-png': () => exportTrendPng(),
     'dismiss-changes': () => { const l = S.getImports().filter((x) => x.changes).pop(); if (l) S.setSeen(l.at); render(); },
@@ -304,18 +242,14 @@
       const { page } = route();
       location.hash = page === 'ncr' ? (current.closed ? '#/closed' : '#/list') : '#/home';
     },
-    add: () => ncrForm(),
-    edit: (el) => ncrForm(el.dataset.id),
     followup: (el) => followupModal([el.dataset.id]),
-    note: (el) => noteModal(el.dataset.id),
     'bulk-followup': () => followupModal([...V.SEL]),
-    'bulk-set': () => bulkModal([...V.SEL]),
     'bulk-clear': () => { V.SEL.clear(); render(); },
     showall: (el) => { V.showAll[el.dataset.key] = !V.showAll[el.dataset.key]; window.__keepScroll = window.scrollY; render(); },
     selsection: (el) => { (V.sectionIds[el.dataset.key] || []).forEach((id) => V.SEL.add(id)); window.__keepScroll = window.scrollY; render(); },
     toggletl: (el) => { const id = el.dataset.id; V.WF_OPEN.has(id) ? V.WF_OPEN.delete(id) : V.WF_OPEN.add(id); window.__keepScroll = window.scrollY; render(); },
     unreview: (el) => { S.undoReview(el.dataset.id); toast('Review undone: the NCR is flagged “Buyer updated” again'); },
-    reviewed: (el) => { S.markReviewed([el.dataset.id], plusDays(st.settings.defaultCheckDays)); toast(`Reviewed – next check in ${st.settings.defaultCheckDays} days`); },
+    reviewed: (el) => { S.markReviewed([el.dataset.id]); toast('Marked as read'); },
     chase: (el) => {
       const ids = V.currentIds();
       if (ids.length) followupModal(ids);

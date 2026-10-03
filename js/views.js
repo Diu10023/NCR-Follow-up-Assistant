@@ -58,7 +58,7 @@ window.NCR = window.NCR || {};
         <td class="nowrap"><b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div>${recentChips(n) || longRunning(n) ? `<div>${recentChips(n)}${longRunning(n) ? ` <span class="chip age-attention" title="Follow-ups plus buyer remark changes">🔁 ${rd} rounds</span>` : ''}</div>` : ''}</td>
         <td class="wide">${esc(buyerOf(n))}<div class="sub clip" title="${esc(n.Buyer_Remark || n.Defect)}">${esc(n.Defect)}${!withRemark && n.Buyer_Remark ? ' · “' + esc(n.Buyer_Remark) + '”' : ''}</div></td>
         ${withRemark ? `<td class="remark">${remarkText(n, i)}</td>` : ''}
-        <td class="right nowrap">${i.needsReview ? `<button class="btn sm" data-action="reviewed" data-id="${esc(n.NCR_ID)}" title="I read the buyer update – check again in ${st.settings.defaultCheckDays} days">✓ Reviewed</button>` : ''}</td></tr>`;
+        <td class="right nowrap">${i.needsReview ? `<button class="btn sm" data-action="reviewed" data-id="${esc(n.NCR_ID)}" title="I read the buyer update">✓ Reviewed</button>` : ''}</td></tr>`;
     }).join('');
     const more = list.length > limit ? `<div class="more"><button class="link" data-action="showall" data-key="${key}">${showAll[key] ? 'Show fewer' : `Show all ${list.length}`}</button> · <button class="link" data-action="selsection" data-key="${key}">Select all ${list.length}</button></div>` : '';
     return `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead(key)}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th>${withRemark ? '<th>Buyer remark</th>' : ''}<th></th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
@@ -156,6 +156,7 @@ window.NCR = window.NCR || {};
       ${HOME_OPEN.has(r.name) ? `<tr class="sub-row"><td colspan="10"><div class="sub">No remark, still to follow up (${r.none}):</div><div class="nolist">${r.noneIds.length ? r.noneIds.slice().sort(byOldest).slice(0, 60).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(' ') + (r.noneIds.length > 60 ? ' …' : '') : '<span class="muted">none</span>'}</div></td></tr>` : ''}`).join('');
     const big = (v, l, href, attr) => `<a class="big" href="${href}" ${attr || ''}><b>${v}</b><span>${l}</span></a>`;
     return { html: `<div class="page-head"><h1>Home</h1><span class="inline"><button class="btn" data-action="export-all" title="One Excel file: every status on its own sheet, plus summary, timeline and uploads">⬇ Export all to Excel</button><a class="btn" href="#/help">❓ How to use</a><span class="muted">${L.fmtDate(L.todayISO())}</span></span></div>
+      ${(() => { const lb = S.lastBackup(), age = lb ? L.daysBetween(lb, L.todayISO()) : null; return st.ncrs.length && (!lb || age > 14) ? `<div class="alert warn">💾 ${lb ? `Your last backup was ${age} days ago.` : 'No backup yet.'} Save a backup file in case this browser's data is cleared. <button class="btn sm primary" data-action="backup" type="button">Back up now</button></div>` : ''; })()}
       <div class="bigs">${big(tot.total, 'Total', '#/home')}${big(tot.todo, 'To follow up', '#/list', `data-filter='${esc(JSON.stringify({ tab: 'none' }))}'`)}${big(tot.followed, 'Followed up', '#/followed', `data-wfilter='{}'`)}${big(tot.hold, 'Hold for scrap', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'hold' }))}'`)}${big(tot.jira, 'Jira closed', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'jira' }))}'`)}${big(tot.closed, 'Closed', '#/closed', 'data-closed=""')}</div>
       <div class="charts">
         <section class="block"><h2>Overview by buyer</h2><p class="hint">Each bar is all of one buyer's NCRs, split by status: still to follow up (no remark / in progress), followed up, hold for scrap, Jira closed and closed. Hover a segment for the exact count.</p>${buyerChart(rows)}</section>
@@ -202,7 +203,7 @@ window.NCR = window.NCR || {};
   function setFilter(f) { Object.keys(LF).forEach((k) => delete LF[k]); Object.assign(LF, LF0, f); }
 
   // Created-date range and defect type, shared by To follow up and Followed up
-  const inDates = (n, F) => !((F.from && (n.NCR_Date || '') < F.from) || (F.to && (n.NCR_Date || '') > F.to) || (F.defect && n.Defect !== F.defect) || (F.year && String(n.NCR_Date || '').slice(0, 4) !== F.year) || (F.month && String(n.NCR_Date || '').slice(5, 7) !== F.month) || (F.changed && !(recentOf(n) || []).some((c) => ['new', 'update', 'cleared'].includes(c.t))));
+  const inDates = (n, F) => !((F.from && (n.NCR_Date || '') < F.from) || (F.to && (n.NCR_Date || '') > F.to) || (F.defect && n.Defect !== F.defect) || (F.year && String(n.NCR_Date || '').slice(0, 4) !== F.year) || (F.month && String(n.NCR_Date || '').slice(5, 7) !== F.month) || (F.changed && !(recentOf(n) || []).some((c) => ['new', 'update', 'cleared', 'reopened'].includes(c.t))));
   // what the latest upload changed, by NCR No. (drives the NEW / updated markers and the "only changed" filter)
   let recentKey = null, recentMap = {};
   function recentOf(n) {
@@ -211,11 +212,11 @@ window.NCR = window.NCR || {};
     if (recentKey !== l.at) { recentKey = l.at; recentMap = {}; l.changes.forEach((c) => { (recentMap[c.no] = recentMap[c.no] || []).push(c); }); }
     return recentMap[n.NCR_No] || null;
   }
-  const recentChips = (n) => { const r = recentOf(n); if (!r) return ''; return r.map((c) => c.t === 'new' ? '<span class="chip new" title="New in the latest upload">🆕 New</span>' : c.t === 'update' ? '<span class="chip new" title="Remarks changed in the latest upload">🔔 Updated</span>' : c.t === 'cleared' ? '<span class="chip age-escalation" title="Buyer cleared the Remarks in the latest upload">📭 Cleared</span>' : '').join(' '); };
+  const recentChips = (n) => { const r = recentOf(n); if (!r) return ''; return r.map((c) => c.t === 'new' ? '<span class="chip new" title="New in the latest upload">🆕 New</span>' : c.t === 'update' ? '<span class="chip new" title="Remarks changed in the latest upload">🔔 Updated</span>' : c.t === 'cleared' ? '<span class="chip age-escalation" title="Buyer cleared the Remarks in the latest upload">📭 Cleared</span>' : c.t === 'reopened' ? '<span class="chip age-attention" title="Reopened by the latest upload: the file no longer says it is closed">↩ Reopened</span>' : c.t === 'missing' ? '<span class="chip age-escalation" title="This NCR was not in the latest file">❓ Not in file</span>' : '').join(' '); };
   // How many NCRs of the latest upload sit on this page (`bucket`) and how many went elsewhere (Hold & Jira, Closed)
   function recentCount(bucket) {
     const l = S.getImports().filter((x) => x.changes).pop(); if (!l) return { here: 0, other: 0 };
-    const nos = new Set(l.changes.filter((c) => ['new', 'update', 'cleared'].includes(c.t)).map((c) => c.no)), byNo = new Map(st.ncrs.map((n) => [n.NCR_No, n]));
+    const nos = new Set(l.changes.filter((c) => ['new', 'update', 'cleared', 'reopened'].includes(c.t)).map((c) => c.no)), byNo = new Map(st.ncrs.map((n) => [n.NCR_No, n]));
     let here = 0, other = 0; nos.forEach((no) => { const n = byNo.get(no); if (!n) return; inf(n).bucket === bucket ? here++ : other++; });
     return { here, other };
   }
@@ -365,7 +366,6 @@ window.NCR = window.NCR || {};
     if (i.remarkGroup === 'none') return { rank: 1, label: 'Still no remark', cls: 'b-overdue' };
     if (longRunning(n)) return { rank: 1, label: `Open after ${roundsOf(n)} rounds`, cls: 'b-soon' };
     if (i.needsReview) return { rank: 2, label: 'Buyer updated', cls: 'b-review' };
-    if (i.dueDiff !== null && i.dueDiff <= 0) return { rank: 3, label: 'Check due', cls: 'b-soon' };
     return null;
   }
   function followedList() {
@@ -532,7 +532,7 @@ window.NCR = window.NCR || {};
           <p class="hint">Everything else comes from the Excel file. Record a chase with Follow-up above; the next upload shows how the buyer answered.</p></section>
       </div>
       <section class="card"><div class="row-between"><h2>Follow-up History <span class="count">${S.historyFor(id).length}</span></h2>
-        <button class="btn sm" data-action="note" data-id="${esc(id)}">+ Add entry</button></div>
+</div>
         ${hist ? `<ul class="timeline">${hist}</ul>` : '<div class="empty">No history yet.</div>'}</section>
 `,
     bind(root) {
@@ -570,9 +570,10 @@ window.NCR = window.NCR || {};
             <span class="hint"> The date this export was taken (any date, also a future one when you simulate weekly uploads). Every timeline entry from this import (buyer updates, closed date) gets this date. Default is today; change it if you are uploading late.</span>${fdWarn ? `<div>⚠️ ${fdWarn}</div>` : ''}</div>
           ${p.added.length ? `<h3>New</h3><div class="table-wrap"><table class="grid compact"><thead><tr><th>NCR</th><th>Item</th><th>Batch</th><th>Date</th><th>Buyer</th><th>Defect</th></tr></thead><tbody>${sample(p.added, (r) => `<tr><td>${esc(r.NCR_No)}</td><td>${esc(r.Item_No)}</td><td>${esc(r.Batch_No)}</td><td>${L.fmtDate(r.NCR_Date)}</td><td>${esc(r.Buyer)}</td><td>${esc(r.Defect)}</td></tr>`)}</tbody></table></div>${p.added.length > 8 ? `<div class="muted small">…and ${p.added.length - 8} more</div>` : ''}` : ''}
           ${p.updated.length ? `<h3>Updated</h3>${sample(p.updated, (u) => `<div class="small"><b>${esc(u.rec.NCR_No)}</b>: ${u.changes.map((c) => `${esc(c.field.replace('_', ' '))} "${esc(c.from)}" → "${esc(c.to)}"`).join('; ')}</div>`)}${p.updated.length > 8 ? `<div class="muted small">…and ${p.updated.length - 8} more</div>` : ''}` : ''}
+          ${p.reopen.length ? `<div class="alert warn">↩ <b>${p.reopen.length} closed NCR${p.reopen.length === 1 ? '' : 's'} will be reopened</b>: the file no longer says they are closed. ${esc(p.reopen.slice(0, 8).map((x) => x.old.NCR_No).join(', '))}${p.reopen.length > 8 ? '…' : ''}</div>` : ''}
           ${Object.keys(reasons).length ? `<div class="alert ok"><b>Closed by this file</b> (they move to the Closed page, nothing to close by hand): ${Object.entries(reasons).map(([k, v]) => `${v} × ${esc(k)}`).join(' · ')}. The closed date is today, because the file has no close date.</div>` : ''}
           ${p.missing.length ? `${p.missing.length > 0.5 * st.ncrs.filter((n) => n.Status !== 'Closed').length ? '<div class="alert warn">⚠️ More than half of the open NCRs are missing from this file — is it a partial / filtered export? Leave the box below unticked if so.</div>' : ''}<label class="check block"><input type="checkbox" id="imp-missing"${imp.opts.closeMissing ? ' checked' : ''}> ${p.missing.length} open NCR(s) are not in this file. Close them too (only if the export lists every NCR): ${esc(p.missing.slice(0, 6).map((n) => n.NCR_No).join(', '))}${p.missing.length > 6 ? '…' : ''}</label>` : ''}
-          <div class="actions"><button class="btn primary" id="imp-go"${missingReq.length || (!p.added.length && !p.updated.length && !p.closeNow.length && !(imp.opts.closeMissing && p.missing.length)) ? ' disabled' : ''}>Import into NCR Master</button>
+          <div class="actions"><button class="btn primary" id="imp-go"${missingReq.length || (!p.added.length && !p.updated.length && !p.closeNow.length && !p.reopen.length && !(p.missing.length && !imp.opts.closeMissing) && !(imp.opts.closeMissing && p.missing.length)) ? ' disabled' : ''}>Import into NCR Master</button>
           <button class="btn" id="imp-cancel">Cancel</button></div></section>`;
     }
     return { html: `<div class="page-head"><h1>Import from Excel</h1></div>
@@ -608,7 +609,7 @@ window.NCR = window.NCR || {};
         const { records } = I2.buildRecords(imp.table, imp.mapping, st.settings.jiraKeywords);
         const p = I2.plan(records, st.ncrs), r = I2.apply(p, Object.assign({}, imp.opts, { date: imp.opts.date || L.todayISO() }));
         const nClosed = p.added.filter((x) => x.CloseReason).length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0);
-        S.applyImport(r, { file: imp.name, fileDate: imp.opts.date || L.todayISO(), added: p.added.length, updated: p.updated.length, remarkChanged: p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark')).length, closed: nClosed, total: records.length, changes: (() => {
+        S.applyImport(r, { file: imp.name, fileDate: imp.opts.date || L.todayISO(), added: p.added.length, updated: p.updated.length, remarkChanged: p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark')).length, closed: nClosed, reopened: p.reopen.length, missing: imp.opts.closeMissing ? 0 : p.missing.length, total: records.length, changes: (() => {
           const out = [], cut = (t) => String(t || '').slice(0, 220), B = (x) => x || NO_BUYER;
           p.added.forEach((r) => out.push({ t: r.CloseReason ? 'closed' : 'new', no: r.NCR_No, buyer: B(r.Buyer), to: cut(r.Buyer_Remark), why: r.CloseReason }));
           p.updated.forEach((u) => u.changes.forEach((c) => {
@@ -616,6 +617,8 @@ window.NCR = window.NCR || {};
             else if (c.field === 'Buyer') out.push({ t: 'buyer', no: u.old.NCR_No, buyer: B(c.to), from: B(c.from), to: B(c.to) });
           }));
           p.closeNow.forEach((c) => out.push({ t: 'closed', no: c.old.NCR_No, buyer: B(c.old.Buyer), why: c.reason }));
+          p.reopen.forEach((c) => out.push({ t: 'reopened', no: c.old.NCR_No, buyer: B(c.old.Buyer) }));
+          if (!imp.opts.closeMissing) p.missing.forEach((o) => out.push({ t: 'missing', no: o.NCR_No, buyer: B(o.Buyer) }));
           return out.slice(0, 600);
         })(), byBuyer: (() => {
           const m = {}, b = (n) => (m[n || NO_BUYER] = m[n || NO_BUYER] || { added: 0, updated: 0, closed: 0 });
@@ -755,7 +758,7 @@ window.NCR = window.NCR || {};
   function groupTabs(page) {
     const tab = (href, label, on, extra) => `<a class="gtab${on ? ' on' : ''}" href="${href}">${label}${extra || ''}</a>`;
     if (['import', 'imports', 'changes', 'response', 'trends'].includes(page)) {
-      const lg = latestLog(), unseen = lg && S.getSeen() !== lg.at ? new Set(lg.changes.filter((c) => ['new', 'update', 'cleared'].includes(c.t)).map((c) => c.no)).size : 0;
+      const lg = latestLog(), unseen = lg && S.getSeen() !== lg.at ? new Set(lg.changes.filter((c) => ['new', 'update', 'cleared', 'reopened'].includes(c.t)).map((c) => c.no)).size : 0;
       return `<div class="gtabs">${tab('#/import', 'Import', page === 'import' || page === 'imports')}${tab('#/changes', 'What changed', page === 'changes', unseen ? ` <span class="nbadge">${unseen}</span>` : '')}${tab('#/response', 'Buyers', page === 'response')}${tab('#/trends', 'Trends', page === 'trends')}</div>`;
     }
     return '';
@@ -772,7 +775,7 @@ window.NCR = window.NCR || {};
           ${step(2, 'Read what changed', 'A 🔔 banner appears. <a href="#/changes">What changed</a> lists buyer updates, new NCRs and closed ones. <a href="#/response">Buyers</a> shows who updates, and <a href="#/trends">Trends</a> shows whether the backlog is shrinking. All of them are under the Uploads menu.')}
           ${step(3, 'Chase the new ones', '<a href="#/list">To follow up</a>: start with <b>1 · No remark</b> (red). Tick the rows → <b>Follow-up</b> → copy the message to each buyer.')}
           ${step(4, 'Keep chasing the old ones', '<a href="#/followed">Followed up</a>: red and orange rows have no reply or keep going without finishing. Use <b>Export to Excel</b> to attach a list per buyer to your email.')}
-          ${step(5, 'Nothing to close by hand', 'NCRs close themselves when the next file says Closed = Yes or the remark mentions Jira. You never close or edit an NCR here.')}
+          ${step(5, 'Nothing to close by hand', 'NCRs close themselves when the next file says Closed = Yes or the remark mentions Jira, and reopen if a later file no longer says so. NCRs missing from a file are listed in What changed. You never close or edit an NCR here.')}
         </ol></section>
       <section class="block"><h2>What the words mean</h2><div class="table-wrap"><table class="grid">
         ${row('To follow up', 'NCRs you have not chased yet.')}
@@ -786,6 +789,7 @@ window.NCR = window.NCR || {};
         ${row('Carried over', 'Open NCRs that did not change in the latest file. They are the old ones you keep chasing.')}
         ${row('Buyers (Uploads)', 'Per buyer for the latest upload: new, updated, still waiting. Appears after your first import; the last column needs at least two imports.')}
         ${row('Trends (Uploads)', 'Backlog over time. One point is saved per import, so lines appear after two imports made with this version; the monthly Excel summary needs one month with data.')}
+        ${row('Backup', 'Settings → Backup saves one file with everything (NCRs, history, uploads). Restore puts it back. Do it every week or two: the data lives only in this browser.')}
         ${row('File date', 'The day the Excel export was taken. Leave it as today unless you upload late.')}
       </table></div></section>
       <section class="block"><h2>What the colours mean</h2><div class="table-wrap"><table class="grid">
@@ -801,7 +805,7 @@ window.NCR = window.NCR || {};
   function changeBanner() {
     const l = latestLog(); if (!l || S.getSeen() === l.at) return '';
     const n = (t) => l.changes.filter((c) => c.t === t).length;
-    return `<div class="alert ok banner">🔔 <b>New upload: ${esc(l.file || 'file')}</b> — ${n('update')} buyer update${n('update') === 1 ? '' : 's'} · ${n('new')} new NCR${n('new') === 1 ? '' : 's'} · ${n('closed')} closed${n('cleared') ? ` · ${n('cleared')} remark cleared` : ''}. <a href="#/changes/${encodeURIComponent(l.at)}">See what changed</a> <button class="btn sm" data-action="dismiss-changes" type="button">Dismiss</button></div>`;
+    return `<div class="alert ok banner">🔔 <b>New upload: ${esc(l.file || 'file')}</b> — ${n('update')} buyer update${n('update') === 1 ? '' : 's'} · ${n('new')} new NCR${n('new') === 1 ? '' : 's'} · ${n('closed')} closed${n('cleared') ? ` · ${n('cleared')} remark cleared` : ''}${n('reopened') ? ` · <b>${n('reopened')} reopened</b>` : ''}${n('missing') ? ` · <b>${n('missing')} not in the file</b>` : ''}. <a href="#/changes/${encodeURIComponent(l.at)}">See what changed</a> <button class="btn sm" data-action="dismiss-changes" type="button">Dismiss</button></div>`;
   }
   function changesPage(at) {
     const logs = S.getImports().filter((x) => x.changes), l = logs.find((x) => x.at === at) || logs[logs.length - 1];
@@ -822,6 +826,8 @@ window.NCR = window.NCR || {};
       ${sec('new', '🆕 New NCRs to chase', 'These NCRs were not in the previous upload.', ['NCR', 'Buyer', 'Remark in file'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td><td class="remark">${rem(c.to)}</td>`)}
       ${sec('cleared', '📭 Buyer cleared the Remarks', 'The Remarks were removed in this file. Worth asking why.', ['NCR', 'Buyer', 'Previous remark'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td><td class="remark">${rem(c.from)}</td>`)}
       ${sec('buyer', '🔀 Buyer changed', 'The Buyer column differs from the previous upload.', ['NCR', 'From', 'To'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.from)}</td><td>${esc(c.to)}</td>`)}
+      ${sec('reopened', '↩ Reopened by this file', 'These NCRs were closed before, but the file no longer says they are closed, so they are open again.', ['NCR', 'Buyer'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td>`)}
+      ${sec('missing', '❓ Not in this file', 'Open NCRs that are missing from this upload. They stay open here. Check whether they were closed at the source, or whether the export was filtered.', ['NCR', 'Buyer'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td>`)}
       ${sec('closed', '✅ Closed by this file', 'Moved to Closed (Closed = Yes, or a Jira remark).', ['NCR', 'Buyer', 'Reason'], (c) => `<td class="nowrap">${link(c.no)}</td><td>${esc(c.buyer)}</td><td>${esc(c.why || '')}</td>`)}
       ${l.changes.length ? '' : '<div class="empty">Nothing changed in this upload.</div>'}${l.changes.length >= 600 ? '<p class="hint">Showing the first 600 changes.</p>' : ''}`;
     return { html, bind(root) { const pick = root.querySelector('#chg-pick'); if (pick) pick.addEventListener('change', () => { location.hash = '#/changes/' + encodeURIComponent(pick.value); }); } };
@@ -884,6 +890,9 @@ window.NCR = window.NCR || {};
         <form id="api" class="form"><label class="full">Apps Script Web App URL<input name="url" value="${esc(cfg.url || '')}" placeholder="https://script.google.com/macros/s/…/exec"></label>
           <label>API key (optional)<input name="key" value="${esc(cfg.key || '')}"></label>
           <div class="full actions"><button class="btn primary" type="submit">Save &amp; connect</button></div></form></section>
+      <section class="card"><h2>Backup</h2>
+        ${(() => { const lb = S.lastBackup(), si = S.storageInfo(); return `<p>Everything lives in this browser. A backup file keeps your NCRs, history and uploads safe if the browser data is cleared or you change computer. <b>Last backup:</b> ${lb ? L.fmtDate(lb) : '<span class="bad">never</span>'}. <span class="muted">Browser storage used: ${si.kb} KB (${si.pct}%).</span></p>
+          <div class="actions"><button class="btn primary" data-action="backup">⬇ Save backup file</button><button class="btn" data-action="restore">⬆ Restore from backup…</button><input type="file" id="restore-file" accept=".json,application/json" hidden></div>`; })()}</section>
       <section class="card"><h2>Your data</h2>
         ${(() => { const li = S.getLastImport(); return li ? `<p><b>Last import:</b> ${esc(li.file || 'file')} on ${L.fmtDate(li.at)} — ${li.added || 0} added, ${li.updated || 0} updated, ${li.closed || 0} closed.</p>
           <p class="hint">Uploaded the wrong file? <b>Undo</b> removes the NCRs that import added and puts back the ones it changed. Follow-ups you recorded on those NCRs since then are lost too. Only the most recent import can be undone.</p>
@@ -891,12 +900,10 @@ window.NCR = window.NCR || {};
         <hr class="rule">
         <p><b>Start over:</b> delete every NCR and its history from ${st.mode === 'sheets' ? 'the Google Sheet' : 'this browser'}. Settings (dropdowns, keywords) are kept.</p>
         <div class="actions"><button class="btn danger" id="clear-all">Clear all NCR data…</button></div></section>
-      <form id="cfg" class="card"><h2>Keywords &amp; follow-up timing</h2>
+      <form id="cfg" class="card"><h2>Keywords</h2>
         <p class="hint">Keywords are matched in the buyer's Remarks, any letter case. One per line.</p>
         <div class="form cols3"><label>Hold for scrap: Remarks contain<textarea name="holdKeywords" rows="3">${esc((s.holdKeywords || []).join('\n'))}</textarea></label>
           <label>Close at import when Remarks contain<textarea name="jiraKeywords" rows="3">${esc((s.jiraKeywords || []).join('\n'))}</textarea></label></div>
-        <div class="form cols3"><label>Default next check after a follow-up (days)<input type="number" min="1" name="defaultCheckDays" value="${s.defaultCheckDays}"></label>
-          <label>Flag a buyer remark that has not changed for (days)<input type="number" min="1" name="buyerStaleDays" value="${s.buyerStaleDays}"></label></div>
         <div class="actions"><button class="btn primary" type="submit">Save settings</button></div></form>`,
     bind(root) {
       root.querySelector('#api').addEventListener('submit', async (e) => {
@@ -912,7 +919,7 @@ window.NCR = window.NCR || {};
         const lines = (k) => String(f.get(k)).split('\n').map((x) => x.trim()).filter(Boolean);
         const num = (k, d) => Math.max(1, parseInt(f.get(k), 10) || d);
         S.saveSettings({ holdKeywords: lines('holdKeywords'), jiraKeywords: lines('jiraKeywords'),
-          buyerStaleDays: num('buyerStaleDays', 7), defaultCheckDays: num('defaultCheckDays', 7) });
+          });
         NCR.app.toast('Settings saved');
       });
     } };
