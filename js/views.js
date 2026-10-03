@@ -479,12 +479,10 @@ window.NCR = window.NCR || {};
         <div class="btns">
           <button class="btn primary" data-action="followup" data-id="${esc(id)}">📨 Follow-up</button>
           ${i.needsReview ? `<button class="btn" data-action="reviewed" data-id="${esc(id)}">✓ Reviewed</button>` : ''}
-          <button class="btn" data-action="edit" data-id="${esc(id)}">Edit NCR</button>
         </div></div>
       ${i.reasons.length ? `<div class="alert info"><b>Needs your action:</b> ${i.reasons.map(esc).join(' · ')}</div>` : (!i.closed ? `<div class="alert ok">⏳ Waiting${n.Due_Date ? ` — next check <b>${L.fmtDate(n.Due_Date)}</b>${i.dueDiff > 0 ? ` (in ${i.dueDiff}d)` : ''}` : ''}. It will return to Today automatically.</div>` : '')}
       ${i.noUpdate ? '<div class="alert warn">📭 Buyer has not written any progress in Remarks — QA must follow up with the Buyer.</div>' : ''}
       ${i.stale ? `<div class="alert warn">⏳ Buyer's Remarks have not changed for ${i.staleDays} days (since ${L.fmtDate(n.Buyer_Remark_Date)}).</div>` : ''}
-      ${i.missingNext ? '<div class="alert bad">⚠️ Next Action is required for this NCR.</div>' : ''}
       ${i.escalate ? `<div class="alert warn">⚠️ Escalation Recommended — ${i.count} follow-ups so far (threshold ${s.escalationThreshold}).</div>` : ''}
       <div class="grid2">
         <section class="card"><h2>NCR Information</h2><div class="kvs">
@@ -494,33 +492,18 @@ window.NCR = window.NCR || {};
           ${i.closed ? info('Closed Date', L.fmtDate(n.Closed_Date)) : ''}</div>
           <div class="kv block"><span>Defect</span><b>${esc(n.Defect) || '–'}</b></div>
           <div class="kv block"><span>Buyer Remark (from Excel)${n.Buyer_Remark_Date ? ' · updated ' + L.fmtDate(n.Buyer_Remark_Date) : ''}</span><b>${n.Buyer_Remark ? esc(n.Buyer_Remark) : '<span class="bad">No buyer update yet</span>'}</b></div></section>
-        <section class="card"><h2>Follow-up Control</h2>
-          <form id="ctl" class="form">
-            <label>Disposition<select name="Disposition">${options(withCurrent(s.dispositions, n.Disposition), n.Disposition, '— select —')}</select></label>
-            <label>Current Status<select name="Status"${i.closed ? ' disabled title="Closed from the uploaded file"' : ''}>${options(withCurrent(L.PICKABLE, n.Status), n.Status)}</select></label>
-            <label>Next Action<select name="Next_Action">${options(withCurrent(s.nextActions, n.Next_Action), n.Next_Action, '— select —')}</select></label>
-            <label>Owner<input name="Owner" list="owners" value="${esc(n.Owner)}"></label>
-            <label>Waiting For<select name="Waiting_For">${options(withCurrent(s.waitingFor, n.Waiting_For), n.Waiting_For, '— select —')}</select></label>
-            <label>Next check / Due Date<input type="date" name="Due_Date" value="${esc(n.Due_Date)}"></label>
-            <label class="full">QA Remark<textarea name="Remark" rows="2">${esc(n.Remark)}</textarea></label>
-            <div class="kv"><span>Last Follow-up</span><b>${n.Last_Followup ? L.fmtDate(n.Last_Followup) : '–'}</b></div>
-            <div class="kv"><span>Follow-up Count</span><b>${i.count} · ${L.followupLabel(i.count)}</b></div>
-            <div class="full actions"><label class="check"><input type="checkbox" name="rec" checked> Record changes in history</label>
-              <button class="btn primary" type="submit">Save changes</button></div>
-          </form></section>
+        <section class="card"><h2>Follow-up status</h2><div class="kvs">
+          ${info('Status', n.Status)}${info('Follow-ups', i.count + ' · ' + L.followupLabel(i.count))}
+          ${info('Last follow-up', n.Last_Followup ? L.fmtDate(n.Last_Followup) : '')}${info('Next check', n.Due_Date ? L.fmtDate(n.Due_Date) : '')}
+          ${info('Waiting for', n.Waiting_For)}</div>
+          ${n.Remark ? `<div class="kv block"><span>QA note</span><b>${esc(n.Remark)}</b></div>` : ''}
+          <p class="hint">Everything else comes from the Excel file. Record a chase with Follow-up above; the next upload shows how the buyer answered.</p></section>
       </div>
       <section class="card"><div class="row-between"><h2>Follow-up History <span class="count">${S.historyFor(id).length}</span></h2>
         <button class="btn sm" data-action="note" data-id="${esc(id)}">+ Add entry</button></div>
         ${hist ? `<ul class="timeline">${hist}</ul>` : '<div class="empty">No history yet.</div>'}</section>
-      <datalist id="owners">${S.owners().map((o) => `<option value="${esc(o)}">`).join('')}</datalist>`,
+`,
     bind(root) {
-      root.querySelector('#ctl').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const f = new FormData(e.target), upd = Object.assign({}, n);
-        ['Disposition', 'Status', 'Next_Action', 'Owner', 'Waiting_For', 'Due_Date', 'Remark'].forEach((k) => { if (f.has(k)) upd[k] = f.get(k) || ''; });
-        S.saveNcr(upd, { recordChanges: !!f.get('rec'), by: 'QA' });
-        NCR.app.toast('Saved');
-      });
     } };
   }
 
