@@ -218,14 +218,15 @@ window.NCR = window.NCR || {};
     const defects = [...new Set(st.ncrs.map((n) => n.Defect).filter(Boolean))].sort();
     const years = [...new Set(st.ncrs.map((n) => String(n.NCR_Date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
     const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    return `<div class="datebar"><label>Year<select id="${idp}-year">${options(years, F.year, 'All')}</select></label>
+    const active = ['year', 'month', 'from', 'to', 'defect'].filter((k) => F[k]).length;
+    return `<details class="datefilter"${active ? ' open' : ''}><summary>🗓 Filter by date or defect${active ? ` <span class="chip new">${active} active</span>` : ''}</summary><div class="datebar"><label>Year<select id="${idp}-year">${options(years, F.year, 'All')}</select></label>
       <label>Month<select id="${idp}-month"><option value="">All</option>${MN.map((m, k) => { const v = String(k + 1).padStart(2, '0'); return `<option value="${v}"${F.month === v ? ' selected' : ''}>${m}</option>`; }).join('')}</select></label>
       <label>Created from<input type="date" id="${idp}-from" value="${esc(F.from)}"></label><label>to<input type="date" id="${idp}-to" value="${esc(F.to)}"></label>
-      <label>Defect<select id="${idp}-defect">${options(defects, F.defect, 'All')}</select></label>
-      ${recentCount() ? `<label class="check chg"><input type="checkbox" id="${idp}-changed"${F.changed ? ' checked' : ''}> 🔔 Only what changed in the latest upload (${recentCount()})</label>` : ''}</div>`;
+      <label>Defect<select id="${idp}-defect">${options(defects, F.defect, 'All')}</select></label></div></details>`;
   };
+  // the bell toggle lives outside the filter box, next to the tabs
+  const changedBtn = (attr, F) => (recentCount() ? `<button class="btn${F.changed ? ' primary' : ''}" type="button" ${attr}="1" title="Show only NCRs that are new or changed in the latest upload">🔔 Changed in latest upload (${recentCount()})</button>` : '');
   function bindFilterBar(root, idp, F, refresh) {
-    const ch = root.querySelector(`#${idp}-changed`); if (ch) ch.addEventListener('change', () => { F.changed = ch.checked; NCR.app.render(); });
     ['year', 'month', 'from', 'to', 'defect'].forEach((k) => root.querySelector(`#${idp}-${k}`).addEventListener('change', (e) => { F[k] = e.target.value; NCR.app.render(); }));
   }
 
@@ -309,7 +310,7 @@ window.NCR = window.NCR || {};
     }
     return `${pills}${buyerLine(LF.buyer)}${tabs}
       <div class="row-between wait-line"><span class="muted">${hidden ? `${hidden} already followed up — <a href="#/followed" data-wfilter='${esc(JSON.stringify({ buyer: LF.buyer }))}'>see Followed up</a>` : ''}</span>
-        <span class="inline"><button class="btn" data-action="export" data-src="todo">Export to Excel</button>${LF.buyer ? `<button class="btn primary" data-action="chase" data-buyer="${esc(cur)}"${currentIds().length ? '' : ' disabled'}>Message ${esc(cur)} (${currentIds().length})</button>` : ''}</span></div>
+        <span class="inline">${changedBtn('data-chg', LF)}<button class="btn" data-action="export" data-src="todo">Export to Excel</button>${LF.buyer ? `<button class="btn primary" data-action="chase" data-buyer="${esc(cur)}"${currentIds().length ? '' : ' disabled'}>Message ${esc(cur)} (${currentIds().length})</button>` : ''}</span></div>
       ${body}`;
   }
 
@@ -334,7 +335,7 @@ window.NCR = window.NCR || {};
       root.querySelector('#f-clear').addEventListener('click', () => { setFilter({}); NCR.app.render(); });
       main.addEventListener('click', (e) => { // pills and tabs live inside the refreshed area
         const b = e.target.closest('[data-buyer].pill'), t = e.target.closest('[data-tab]');
-        if (b) { LF.buyer = b.dataset.buyer; refresh(); } else if (t) { LF.tab = t.dataset.tab; refresh(); }
+        if (e.target.closest('[data-chg]')) { LF.changed = !LF.changed; refresh(); } else if (b) { LF.buyer = b.dataset.buyer; refresh(); } else if (t) { LF.tab = t.dataset.tab; refresh(); }
       });
     },
     refresh: () => { const el = document.querySelector('#open-main'); if (el) el.innerHTML = openMain(); } };
@@ -394,7 +395,7 @@ window.NCR = window.NCR || {};
     }).join('');
     return `${pillsHtml(per, all.length, WF.buyer, 'data-wbuyer')}${buyerLine(WF.buyer)}${tabsHtml(cnt, WF.tab, 'data-wtab')}
       <div class="row-between wait-line"><span class="muted">${list.length ? `<b>${attn}</b> of these need your attention${unanswered ? ` (<b>${unanswered}</b> with no reply after ${st.settings.escalationThreshold || 3}+ follow-ups)` : ''}: no reply, buyer updated, or check date reached. The rest are waiting.` : ''}</span>
-        <button class="btn" data-action="export" data-src="followed"${list.length ? '' : ' disabled'}>Export to Excel</button></div>
+        <span class="inline">${changedBtn('data-wchg', WF)}<button class="btn" data-action="export" data-src="followed"${list.length ? '' : ' disabled'}>Export to Excel</button></span></div>
       <section class="block">${list.length ? `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead('followed')}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th><th>Latest remark</th><th>Last follow-up</th><th>Next check</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
         : `<div class="empty">${all.length ? 'No NCRs in this tab.' : 'Nothing here yet. Press Follow-up on an NCR in To follow up: it moves here and stays until it is closed.'}</div>`}</section>`;
   }
@@ -409,7 +410,7 @@ window.NCR = window.NCR || {};
       bindFilterBar(root, 'w', WF, refresh);
       root.querySelector('#w-clear').addEventListener('click', () => { setWaitFilter({}); NCR.app.render(); });
       root.querySelector('#w-q').addEventListener('input', (e) => { WF.q = e.target.value; refresh(); });
-      main.addEventListener('click', (e) => { const b = e.target.closest('[data-wbuyer]'), t = e.target.closest('[data-wtab]'); if (b) { WF.buyer = b.dataset.wbuyer; refresh(); } else if (t) { WF.tab = t.dataset.wtab; refresh(); } });
+      main.addEventListener('click', (e) => { const b = e.target.closest('[data-wbuyer]'), t = e.target.closest('[data-wtab]'); if (e.target.closest('[data-wchg]')) { WF.changed = !WF.changed; refresh(); } else if (b) { WF.buyer = b.dataset.wbuyer; refresh(); } else if (t) { WF.tab = t.dataset.wtab; refresh(); } });
     } };
   }
 

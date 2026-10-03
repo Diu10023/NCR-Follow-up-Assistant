@@ -293,3 +293,5 @@ tr.rp-none td.rank{color:var(--h1)}tr.rp-long td.rank{color:var(--h2)}tr.rp-has 
 .steps2 li{display:flex;gap:14px;align-items:flex-start;font-size:16px}
 .stepn{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:var(--acc);color:#fff}
 .steps2 .muted{margin-top:2px}
+
+details.datefilter{margin-top:6px}details.datefilter>summary{font-size:15px}
