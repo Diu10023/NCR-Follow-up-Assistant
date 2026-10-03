@@ -284,6 +284,8 @@ window.NCR = window.NCR || {};
   function getImports() { try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch (e) { return []; } }
   function setImports(v) { try { v && v.length ? localStorage.setItem(LOG_KEY, JSON.stringify(v)) : localStorage.removeItem(LOG_KEY); } catch (e) { /* storage unavailable */ } }
 
+  function patchImportLog(at, patch) { setImports(getImports().map((x) => (x.at === at ? Object.assign({}, x, patch) : x))); }
+
   // Save an import result and remember how to take it back.
 
   function applyImport(result, meta) {
@@ -320,5 +322,5 @@ window.NCR = window.NCR || {};
   function demoData() { return { ncrs: [], history: [], settings: {} }; }
 
   NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
-    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, undoReview, removeNcr, saveMany, applyImport, undoImport, getImports, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
+    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, undoReview, removeNcr, saveMany, applyImport, undoImport, getImports, patchImportLog, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
 })(window.NCR);

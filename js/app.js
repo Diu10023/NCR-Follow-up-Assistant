@@ -13,7 +13,7 @@
   function render() {
     if (!st.loaded) { main.innerHTML = `<div class="empty">${st.error ? esc(st.error) : 'Loading…'}</div>`; return; }
     const { page, arg } = route();
-    const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, followed: V.followedPage, hold: V.holdPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, imports: V.importsPage, help: V.helpPage, changes: () => V.changesPage(arg),  response: V.responsePage, settings: V.settings };
+    const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, followed: V.followedPage, hold: V.holdPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, imports: V.importsPage, trends: V.trendsPage, help: V.helpPage, changes: () => V.changesPage(arg),  response: V.responsePage, settings: V.settings };
     current = (views[page] || V.home)();
     current.closed = page === 'ncr' && (S.getNcr(arg) || {}).Status === 'Closed';
     main.innerHTML = (['home', 'overview', 'dashboard', 'list', 'today', 'followed', 'hold', 'closed', 'import', 'help', 'settings'].includes(page) ? '' : '<div class="backbar"><button class="btn sm" data-action="back">← Back</button></div>') + (['home', 'overview', 'dashboard', 'list', 'today', 'followed'].includes(page) ? V.changeBanner() : '') + current.html;
@@ -268,8 +268,36 @@
     await saveBook(wb, `NCR_all_${L.todayISO()}.xlsx`);
   }
 
+  async function exportMonth() {
+    const sel = $('#tr-month'); if (!sel) return;
+    const book = V.monthBook(sel.value); if (!book) { toast('No data for that month', true); return; }
+    if (typeof XLSX === 'undefined') { toast('Excel library not loaded (check internet connection)', true); return; }
+    const wb = XLSX.utils.book_new();
+    book.forEach(([name, rows]) => {
+      const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ Info: 'Nothing here' }]);
+      ws['!cols'] = Object.keys(rows[0] || { Info: 1 }).map((k) => ({ wch: /remark|Measure|Defect/i.test(k) ? 44 : 16 }));
+      XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
+    });
+    await saveBook(wb, `NCR_monthly_${sel.value}.xlsx`);
+  }
+  async function exportTrendPng() {
+    const t = V.trendsSvg(); if (!t) { toast('Charts need at least two imports', true); return; }
+    try {
+      const img = new Image();
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(t.svg); });
+      const c = document.createElement('canvas'); c.width = t.w * 2; c.height = t.h * 2;
+      const g = c.getContext('2d'); g.scale(2, 2); g.drawImage(img, 0, 0);
+      const blob = await new Promise((res) => c.toBlob(res, 'image/png'));
+      const filename = `NCR_trend_${L.todayISO()}.png`, dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+      if (dl) { await dl.save({ filename, data: await blob.arrayBuffer() }); toast('Image ready'); }
+      else { const u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(u), 2000); toast('Image downloaded'); }
+    } catch (e) { if (!e || e.code !== 'declined') toast('Could not create the image here. Use the Excel summary instead', true); }
+  }
+
   const actions = {
     'export-all': () => exportAll(),
+    'export-month': () => exportMonth(),
+    'export-trend-png': () => exportTrendPng(),
     'dismiss-changes': () => { const l = S.getImports().filter((x) => x.changes).pop(); if (l) S.setSeen(l.at); render(); },
     back: () => {
       if (history.length > 1) { history.back(); return; }

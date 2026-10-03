@@ -66,3 +66,6 @@ The **What changed** menu item is always there. It opens the latest upload and l
 
 ## Export all to Excel
 Home → **Export all to Excel** downloads one workbook: Summary (per buyer), To follow up, Followed up, Hold for scrap, Jira closed, Closed, Timeline (every history entry) and Uploads. Each status sheet is in work order with a # column.
+
+## Trends
+Home → **Trends**. Every import saves a snapshot (open, no remark, followed up, hold, Jira closed, closed, open over 90 days). The page draws the backlog lines and new vs closed bars, with the numbers underneath. **Monthly summary (Excel)** gives start vs end of a month, uploads, a per-buyer sheet and the NCRs open over 90 days; **Chart (PNG)** saves the charts as an image. Trends start from the first import made after this feature was added.

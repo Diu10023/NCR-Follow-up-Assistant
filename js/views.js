@@ -155,7 +155,7 @@ window.NCR = window.NCR || {};
         <td>${r.closed ? `<a href="#/closed" data-closed="${esc(r.name)}">${r.closed}</a>` : '<span class="muted">0</span>'}</td></tr>
       ${HOME_OPEN.has(r.name) ? `<tr class="sub-row"><td colspan="10"><div class="sub">No remark, still to follow up (${r.none}):</div><div class="nolist">${r.noneIds.length ? r.noneIds.slice().sort(byOldest).slice(0, 60).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(' ') + (r.noneIds.length > 60 ? ' …' : '') : '<span class="muted">none</span>'}</div></td></tr>` : ''}`).join('');
     const big = (v, l, href, attr) => `<a class="big" href="${href}" ${attr || ''}><b>${v}</b><span>${l}</span></a>`;
-    return { html: `<div class="page-head"><h1>Home</h1><span class="inline"><button class="btn" data-action="export-all" title="One Excel file: every status on its own sheet, plus summary, timeline and uploads">⬇ Export all to Excel</button><a class="btn" href="#/help">❓ How to use</a><a class="btn" href="#/response">📊 Buyer response</a><span class="muted">${L.fmtDate(L.todayISO())}</span></span></div>
+    return { html: `<div class="page-head"><h1>Home</h1><span class="inline"><a class="btn" href="#/trends">📈 Trends</a><button class="btn" data-action="export-all" title="One Excel file: every status on its own sheet, plus summary, timeline and uploads">⬇ Export all to Excel</button><a class="btn" href="#/help">❓ How to use</a><a class="btn" href="#/response">📊 Buyer response</a><span class="muted">${L.fmtDate(L.todayISO())}</span></span></div>
       <div class="bigs">${big(tot.total, 'Total', '#/home')}${big(tot.todo, 'To follow up', '#/list', `data-filter='${esc(JSON.stringify({ tab: 'none' }))}'`)}${big(tot.followed, 'Followed up', '#/followed', `data-wfilter='{}'`)}${big(tot.hold, 'Hold for scrap', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'hold' }))}'`)}${big(tot.jira, 'Jira closed', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'jira' }))}'`)}${big(tot.closed, 'Closed', '#/closed', 'data-closed=""')}</div>
       <div class="charts">
         <section class="block"><h2>Overview by buyer</h2><p class="hint">Each bar is all of one buyer's NCRs, split by status: still to follow up (no remark / in progress), followed up, hold for scrap, Jira closed and closed. Hover a segment for the exact count.</p>${buyerChart(rows)}</section>
@@ -626,6 +626,7 @@ window.NCR = window.NCR || {};
         })() });
         imp.opts.date = '';
         const back = p.updated.filter((u) => u.changes.some((c) => c.field === 'Buyer_Remark' && c.to) && isFollowed(S.getNcr(u.old.NCR_ID))).length; // followed-up NCRs with a new buyer remark
+        { const lg = S.getImports().pop(); if (lg) S.patchImportLog(lg.at, { snap: snapshotNow() }); } // one trend point per upload
         S.saveSettings({ importMapping: Object.assign({}, imp.mapping) });
         imp.done = `${back ? `${back} followed-up NCR${back === 1 ? ' has' : 's have'} a new buyer remark: see <a href="#/followed" data-wfilter='{}'>Followed up</a>. ` : ''}${p.added.length} added${p.added.length ? ' (' + Object.entries(p.added.reduce((m, r) => { const b = r.Buyer || '(No buyer)'; m[b] = (m[b] || 0) + 1; return m; }, {})).map(([b, c]) => b + ' ' + c).join(', ') + ')' : ''}, ${p.updated.length} updated, ${p.added.filter((r) => r.CloseReason).length + p.closeNow.length + (imp.opts.closeMissing ? p.missing.length : 0)} closed (see <a href="#/closed" data-closed="">Closed</a>). <a class="btn sm primary" href="#/changes">🔔 See what changed</a>`;
         imp.table = null; imp.wb = null; NCR.app.render();
@@ -651,6 +652,90 @@ window.NCR = window.NCR || {};
     return { html: `<div class="page-head"><div><h1>Buyer response</h1><div class="muted">Latest upload: <b>${esc(last.file || 'file')}</b> (${L.fmtDate(last.fileDate || last.at)}). <a href="#/changes">See what changed</a></div></div></div>
       <section class="block"><div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th title="NCRs not closed">Open</th><th title="New NCRs in the latest file">New</th><th title="Existing NCRs whose Remarks the buyer changed in the latest file">Updated</th><th title="Open NCRs with no change in the latest file">Still waiting</th><th title="In how many of the recent uploads the buyer changed at least one Remark">Active in recent uploads</th></tr></thead><tbody>${body}</tbody></table></div>
         <p class="hint"><b>New</b>: chase these. <b>Updated</b>: read what the buyer wrote. <b>Still waiting</b>: older NCRs the buyer has not touched. <b>Active in recent uploads</b>: ${asked ? `out of the last ${asked} upload${asked === 1 ? '' : 's'}, how many had a Remark update from this buyer.` : 'needs at least two uploads.'} Use it to decide whom to chase, not as a score.</p></section>` };
+  }
+
+  // ---------- Trends: a snapshot per upload, line charts and a monthly summary ----------
+  function snapshotNow() {
+    const s = { open: 0, noRemark: 0, over90: 0, todo: 0, followed: 0, hold: 0, jira: 0, closed: 0 };
+    st.ncrs.forEach((n) => {
+      const i = inf(n), k = i.bucket; if (k in s) s[k]++;
+      if (k === 'todo' || k === 'followed') { s.open++; if (i.remarkGroup === 'none') s.noRemark++; if (i.aging !== null && i.aging > 90) s.over90++; }
+    });
+    return s;
+  }
+  const shortDate = (iso) => { const p = L.fmtDate(iso).split('-'); return +p[0] + ' ' + p[1]; };
+  const trendLogs = () => S.getImports().filter((x) => x.snap).map((x) => Object.assign({}, x, { fd: x.fileDate || String(x.at).slice(0, 10) })).sort((a, b) => a.fd.localeCompare(b.fd) || String(a.at).localeCompare(String(b.at)));
+  const TR_SERIES = [{ k: 'open', label: 'Open', color: '#007AC8' }, { k: 'noRemark', label: 'No remark', color: '#D6322B' }, { k: 'over90', label: 'Open over 90 days', color: '#E8650C' }];
+  // each chart returns { w, h, inner } so the same markup works on screen and in the PNG export
+  function lineChart(pts, o) {
+    const W = 900, H = 300, l0 = 46, r0 = 190, t0 = 20, b0 = 44, pw = W - l0 - r0, ph = H - t0 - b0;
+    const max = Math.max(1, ...pts.flatMap((p) => TR_SERIES.map((x) => p.snap[x.k] || 0))), step = niceStep(max), top = Math.ceil(max / step) * step;
+    const x = (i) => l0 + (pts.length === 1 ? pw / 2 : (i * pw) / (pts.length - 1)), y = (v) => t0 + ph - (v / top) * ph, every = Math.ceil(pts.length / 10);
+    let g = '';
+    for (let t = 0; t <= top; t += step) g += `<line x1="${l0}" x2="${l0 + pw}" y1="${y(t)}" y2="${y(t)}" style="stroke:${o.grid}"/><text x="${l0 - 8}" y="${y(t) + 4}" text-anchor="end" font-size="12" style="fill:${o.mut}">${t}</text>`;
+    pts.forEach((p, i) => { if (i % every === 0 || i === pts.length - 1) g += `<text x="${x(i)}" y="${H - 18}" text-anchor="middle" font-size="12" style="fill:${o.mut}">${shortDate(p.fd)}</text>`; });
+    TR_SERIES.forEach((sr) => {
+      const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p.snap[sr.k] || 0)}`).join(' '), lastP = pts[pts.length - 1];
+      g += `<path d="${d}" fill="none" stroke="${sr.color}" stroke-width="2.6" stroke-linejoin="round"/>` + pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.snap[sr.k] || 0)}" r="3.6" fill="${sr.color}"><title>${esc(sr.label)} · ${L.fmtDate(p.fd)}: ${p.snap[sr.k] || 0}</title></circle>`).join('')
+        + `<text x="${x(pts.length - 1) + 10}" y="${y(lastP.snap[sr.k] || 0) + 4}" font-size="12.5" font-weight="700" style="fill:${sr.color}">${esc(sr.label)} ${lastP.snap[sr.k] || 0}</text>`;
+    });
+    return { w: W, h: H, inner: g };
+  }
+  function barChart(pts, o) {   // new vs closed per upload (the first upload is the baseline, left out)
+    const d = pts.slice(1); if (!d.length) return null;
+    const W = 900, H = 260, l0 = 46, r0 = 20, t0 = 24, b0 = 44, pw = W - l0 - r0, ph = H - t0 - b0, band = pw / d.length, bw = Math.min(26, band / 3);
+    const max = Math.max(1, ...d.flatMap((p) => [p.added || 0, p.closed || 0])), step = niceStep(max), top = Math.ceil(max / step) * step, y = (v) => t0 + ph - (v / top) * ph, every = Math.ceil(d.length / 10);
+    let g = `<text x="${l0}" y="14" font-size="12.5" style="fill:#007AC8;font-weight:700">New NCRs</text><text x="${l0 + 90}" y="14" font-size="12.5" style="fill:#6B7280;font-weight:700">Closed by the file</text>`;
+    for (let t = 0; t <= top; t += step) g += `<line x1="${l0}" x2="${l0 + pw}" y1="${y(t)}" y2="${y(t)}" style="stroke:${o.grid}"/><text x="${l0 - 8}" y="${y(t) + 4}" text-anchor="end" font-size="12" style="fill:${o.mut}">${t}</text>`;
+    d.forEach((p, i) => {
+      const cx = l0 + band * i + band / 2;
+      [[p.added || 0, '#007AC8', -bw - 1, 'New'], [p.closed || 0, '#9AA5B1', 1, 'Closed']].forEach(([v, c, off, lb]) => { g += `<rect x="${cx + off}" y="${y(v)}" width="${bw}" height="${t0 + ph - y(v)}" rx="3" fill="${c}"><title>${lb} · ${L.fmtDate(p.fd)}: ${v}</title></rect>`; if (v) g += `<text x="${cx + off + bw / 2}" y="${y(v) - 4}" text-anchor="middle" font-size="11.5" style="fill:${o.ink}">${v}</text>`; });
+      if (i % every === 0 || i === d.length - 1) g += `<text x="${cx}" y="${H - 18}" text-anchor="middle" font-size="12" style="fill:${o.mut}">${shortDate(p.fd)}</text>`;
+    });
+    return { w: W, h: H, inner: g };
+  }
+  const svgWrap = (c, label) => `<svg class="chart" viewBox="0 0 ${c.w} ${c.h}" width="100%" role="img" aria-label="${esc(label)}">${c.inner}</svg>`;
+  // PNG export: both charts on a white card with literal colours
+  function trendsSvg() {
+    const pts = trendLogs(); if (pts.length < 2) return null;
+    const o = { ink: '#3D4852', mut: '#6B7280', grid: '#D9DEE5' }, a = lineChart(pts, o), b = barChart(pts, o), W = 900, H = 60 + a.h + 30 + b.h + 20;
+    return { w: W, h: H, svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Arial, Helvetica, sans-serif"><rect width="${W}" height="${H}" fill="#fff"/>
+      <text x="24" y="30" font-size="20" font-weight="700" fill="#3D4852">NCR trend, ${L.fmtDate(pts[0].fd)} to ${L.fmtDate(pts[pts.length - 1].fd)}</text>
+      <g transform="translate(0,48)">${a.inner}</g><g transform="translate(0,${48 + a.h + 30})">${b.inner}</g></svg>` };
+  }
+  function monthsWithData() { return [...new Set(trendLogs().map((x) => x.fd.slice(0, 7)))].sort().reverse(); }
+  // Monthly summary workbook: start vs end of the month, uploads, buyers, and the old NCRs still open
+  function monthBook(ym) {
+    const all = trendLogs(), inM = all.filter((x) => x.fd.slice(0, 7) === ym); if (!inM.length) return null;
+    const before = all.filter((x) => x.fd.slice(0, 7) < ym).pop(), start = (before || inM[0]).snap, end = inM[inM.length - 1].snap, baseline = all[0];
+    const real = inM.filter((x) => x !== baseline);                      // the very first upload only loads history
+    const sum = (k) => real.reduce((t, x) => t + (x[k] || 0), 0);
+    const d = (a, b) => b - a, row = (name, a, b) => ({ Measure: name, 'Start of month': a, 'End of month': b, Change: d(a, b) });
+    const summary = [row('Open NCRs', start.open, end.open), row('Open with no remark', start.noRemark, end.noRemark), row('Open over 90 days', start.over90, end.over90), row('Followed up', start.followed, end.followed),
+      { Measure: 'New NCRs (in the month)', 'Start of month': '', 'End of month': sum('added'), Change: '' }, { Measure: 'Closed by the file (in the month)', 'Start of month': '', 'End of month': sum('closed'), Change: '' },
+      { Measure: 'Buyer remark updates (in the month)', 'Start of month': '', 'End of month': sum('remarkChanged'), Change: '' }, { Measure: 'Uploads in the month', 'Start of month': '', 'End of month': inM.length, Change: '' }];
+    const uploads = inM.map((x) => ({ 'File date': L.fmtDate(x.fd), File: x.file || '', 'New NCRs': x.added || 0, 'Remark changed': x.remarkChanged || 0, Closed: x.closed || 0, Open: x.snap.open, 'No remark': x.snap.noRemark, 'Open over 90 days': x.snap.over90 }));
+    const bb = {}, cell = (n) => (bb[n] = bb[n] || { Buyer: n, 'New NCRs': 0, 'Remark updates': 0, 'Closed by file': 0, 'Open now': 0, 'Open with no remark now': 0, 'Open over 90 days now': 0 });
+    real.forEach((x) => Object.entries(x.byBuyer || {}).forEach(([n, v]) => { const c = cell(n); c['New NCRs'] += v.added || 0; c['Remark updates'] += v.updated || 0; c['Closed by file'] += v.closed || 0; }));
+    const old = [];
+    st.ncrs.forEach((n) => { const i = inf(n); if (i.bucket !== 'todo' && i.bucket !== 'followed') return; const c = cell(buyerOf(n)); c['Open now']++; if (i.remarkGroup === 'none') c['Open with no remark now']++; if (i.aging !== null && i.aging > 90) { c['Open over 90 days now']++; old.push(n); } });
+    const olds = old.sort(priSort).map((n) => ({ 'NCR No.': n.NCR_No, Buyer: n.Buyer || '', Defect: n.Defect, Created: n.NCR_Date ? L.fmtDate(n.NCR_Date) : '', 'Days open': inf(n).aging, 'Buyer remark': n.Buyer_Remark || '', 'Follow-ups': inf(n).count }));
+    return [[ym + ' summary', summary], ['Uploads', uploads], ['By buyer', Object.values(bb).sort((a, b) => b['Open now'] - a['Open now'])], ['Open over 90 days', olds]];
+  }
+  function trendsPage() {
+    const pts = trendLogs(), months = monthsWithData();
+    const head = `<div class="page-head"><div><h1>Trends</h1><div class="muted">How the backlog moves from upload to upload. A point is saved each time you import a file.</div></div></div>`;
+    if (!pts.length) return { html: head + '<div class="empty">No trend data yet. A snapshot is saved from your next import onward, so charts appear after two imports. <a href="#/import">Import a file</a>.</div>' };
+    const o = { ink: 'var(--fg)', mut: 'var(--mut)', grid: 'var(--line-s)' }, a = lineChart(pts, o), b = barChart(pts, o);
+    const prevOf = (i) => (i ? pts[i - 1].snap : null);
+    const rows = pts.slice().reverse().map((x, k) => { const i = pts.length - 1 - k, pv = prevOf(i), dlt = pv ? x.snap.open - pv.open : null;
+      return `<tr><td class="nowrap"><b>${L.fmtDate(x.fd)}</b></td><td>${esc(x.file || '')}</td><td>${x.snap.open}${dlt === null ? '' : ` <span class="${dlt > 0 ? 'bad' : 'muted'}">(${dlt > 0 ? '+' : ''}${dlt})</span>`}</td><td>${x.snap.noRemark}</td><td>${x.snap.over90}</td><td>${x.snap.followed}</td><td>${x.snap.hold}</td><td>${x.snap.jira}</td><td>${x.snap.closed}</td><td>${i ? x.added || 0 : '–'}</td><td>${i ? x.closed || 0 : '–'}</td></tr>`; }).join('');
+    return { html: `${head}${pts.length < 2 ? '<div class="alert warn">One point so far. Lines appear after the next import.</div>' : ''}
+      <section class="block"><div class="row-between"><h2>Backlog</h2><span class="inline"><select id="tr-month" aria-label="Month">${months.map((m) => `<option value="${m}">${monthName(m)}</option>`).join('')}</select>
+        <button class="btn primary" data-action="export-month">⬇ Monthly summary (Excel)</button><button class="btn" data-action="export-trend-png">⬇ Chart (PNG)</button></span></div>
+        <p class="hint">Open = NCRs not closed. A falling blue line is good. Red = open NCRs with no buyer remark. Orange = open for more than 90 days.</p>${svgWrap(a, 'Line chart of open NCRs, open with no remark and open over 90 days at each upload')}</section>
+      ${b ? `<section class="block"><h2>New vs closed per upload</h2><p class="hint">If closed stays below new, the backlog grows. The first upload only loads history, so it is left out.</p>${svgWrap(b, 'Bar chart of new and closed NCRs per upload')}</section>` : ''}
+      <section class="block"><h2>Numbers behind the charts</h2><div class="table-wrap"><table class="grid compact"><thead><tr><th>File date</th><th>File</th><th>Open</th><th>No remark</th><th>Over 90 d</th><th>Followed up</th><th>Hold</th><th>Jira closed</th><th>Closed</th><th>New</th><th>Closed by file</th></tr></thead><tbody>${rows}</tbody></table></div></section>` };
   }
 
   // ---------- How to use ----------
@@ -808,5 +893,5 @@ window.NCR = window.NCR || {};
     } };
   }
 
-  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, exportBook, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, helpPage, changesPage, changeBanner, responsePage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
+  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, exportBook, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, trendsPage, trendsSvg, monthBook, snapshotNow, helpPage, changesPage, changeBanner, responsePage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
 })(window.NCR);
