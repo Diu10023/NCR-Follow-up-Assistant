@@ -74,7 +74,7 @@ Home → **Trends**. Every import saves a snapshot (open, no remark, followed up
 Home · To follow up · Followed up · Hold & Jira · Closed · **Uploads** (Import with its history and calendar, What changed, Buyers, Trends) · Help · Settings.
 
 ## Backup, reopen and missing NCRs
-- **Settings → Backup**: *Save backup file* writes one JSON file (NCRs, history, uploads, settings). *Restore from backup* replaces all current data with it after a confirmation. Home reminds you when there is no backup or the last one is over 14 days old, and the top bar warns when browser storage is 80% full.
+- **Settings → Backup**: *Save backup (Excel)* writes one workbook (READ ME, NCR_Master, Followup_History, Uploads, Upload_Changes, Settings) that opens in Excel or Google Sheets. *Restore from backup* reads that workbook (or an older .json backup) and replaces all current data after a confirmation. To use it in Google Sheets, upload it to Drive; to restore from Google Sheets, download it as .xlsx first. Do not rename sheets or column headings. Undo data of earlier uploads is not part of the backup. Home reminds you when there is no backup or the last one is over 14 days old, and the top bar warns when browser storage is 80% full.
 - **Reopen**: if a closed NCR comes back in a later file without Closed = Yes (and without a close keyword in Remarks), it is reopened and listed in What changed. This needs the Closed and Remarks columns to be mapped.
 - **Not in this file**: open NCRs that are missing from an upload stay open, get a ❓ chip and are listed in What changed.
 - Manual editing is gone: no Edit/Add NCR, no bulk set of owner/status/next check, no add-entry. Follow-up only records that you chased a buyer.

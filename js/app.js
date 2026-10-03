@@ -163,29 +163,79 @@
     const filename = `NCR_${label}${who}_${L.todayISO()}.xlsx`;
     await saveBook(wb, filename);
   }
+  // ---------- backup as an Excel workbook (opens in Excel or Google Sheets) ----------
+  const DATE_ONLY = new Set(['NCR_Date', 'Due_Date', 'Last_Followup', 'Closed_Date', 'Date']), STAMPS = new Set(['Buyer_Remark_Date', 'Last_Review', 'Created_At', 'Updated_At']);
+  const NUM_FIELDS = new Set(['Followup_Count', 'Aging']);
+  const pad2 = (n) => String(n).padStart(2, '0');
+  // Google Sheets / Excel may turn text dates into date numbers: bring them back to ISO text
+  function fromSerial(v, field) {
+    if (typeof v !== 'number') return String(v == null ? '' : v);
+    if (!(v > 20000 && v < 80000) || !(DATE_ONLY.has(field) || STAMPS.has(field))) return String(v);
+    const ms = Math.round((v - 25569) * 86400000), d = new Date(ms), iso = `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+    return Number.isInteger(v) && DATE_ONLY.has(field) ? iso : `${iso}T${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`;
+  }
+  function bundleToWorkbook(b) {
+    const wb = XLSX.utils.book_new(), add = (name, rows, header, wch) => { const ws = XLSX.utils.json_to_sheet(rows, header ? { header } : undefined); ws['!cols'] = (header || Object.keys(rows[0] || {})).map((h, i) => ({ wch: (wch && wch[i]) || 16 })); XLSX.utils.book_append_sheet(wb, ws, name); };
+    const readme = [
+      ['NCR Follow-up Control: backup'], [`Saved on ${L.fmtDate(b.exportedAt)} · ${b.ncrs.length} NCRs · ${b.history.length} history entries`], [''],
+      ['What is this file?'], ['A complete copy of your data. You can open it in Excel or Google Sheets, read it, filter it and share it.'], [''],
+      ['Open it in Google Sheets'], ['1. Upload this file to Google Drive.'], ['2. Right-click it → Open with → Google Sheets.'], [''],
+      ['Put it back into the app'], ['1. In Google Sheets: File → Download → Microsoft Excel (.xlsx).'], ['2. In the app: Settings → Backup → Restore from backup, and choose that file.'], [''],
+      ['Please do not rename the sheets or the column headings, or the app cannot read the file back.'],
+      ['NCR_Master = every NCR · Followup_History = the timeline · Uploads and Upload_Changes = your weekly uploads · Settings = keywords.'],
+    ];
+    const rs = XLSX.utils.aoa_to_sheet(readme); rs['!cols'] = [{ wch: 110 }]; XLSX.utils.book_append_sheet(wb, rs, 'READ ME');
+    add('NCR_Master', b.ncrs.map((n) => { const r = {}; S.NCR_FIELDS.forEach((f) => { r[f] = n[f] == null ? '' : n[f]; }); return r; }), S.NCR_FIELDS);
+    add('Followup_History', b.history.map((h) => { const r = {}; S.HIST_FIELDS.forEach((f) => { r[f] = h[f] == null ? '' : h[f]; }); return r; }), S.HIST_FIELDS);
+    const UP = ['at', 'file', 'fileDate', 'added', 'updated', 'remarkChanged', 'closed', 'reopened', 'missing', 'total', 'byBuyer', 'snap'];
+    add('Uploads', (b.imports || []).map((x) => { const r = {}; UP.forEach((k) => { const v = x[k]; r[k] = v && typeof v === 'object' ? JSON.stringify(v) : v == null ? '' : v; }); return r; }), UP);
+    const CH = ['uploadAt', 'type', 'no', 'buyer', 'from', 'to', 'why'], chRows = [];
+    (b.imports || []).forEach((x) => (x.changes || []).forEach((c) => chRows.push({ uploadAt: x.at, type: c.t, no: c.no, buyer: c.buyer || '', from: c.from || '', to: c.to || '', why: c.why || '' })));
+    add('Upload_Changes', chRows, CH);
+    add('Settings', Object.entries(b.settings || {}).map(([k, v]) => ({ Key: k, Value: JSON.stringify(v) })), ['Key', 'Value']);
+    add('About', [{ Key: 'format', Value: 'ncr-follow-up-backup' }, { Key: 'version', Value: '2' }, { Key: 'exportedAt', Value: b.exportedAt }], ['Key', 'Value']);
+    return wb;
+  }
+  function workbookToBundle(wb) {
+    const sheet = (name) => (wb.Sheets[name] ? XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: '' }) : null);
+    const nm = sheet('NCR_Master'), hs = sheet('Followup_History');
+    if (!nm || !hs) throw new Error('This workbook has no NCR_Master / Followup_History sheet. Is it a backup from this app?');
+    const row = (r, fields) => { const o = {}; fields.forEach((f) => { const v = r[f]; o[f] = NUM_FIELDS.has(f) ? Number(v) || 0 : f === 'Quantity' ? (v === '' ? '' : v) : fromSerial(v, f); }); return o; };
+    const ncrs = nm.filter((r) => r.NCR_ID && r.NCR_No).map((r) => row(r, S.NCR_FIELDS)), history = hs.filter((r) => r.NCR_ID).map((r) => row(r, S.HIST_FIELDS));
+    const settings = {}; (sheet('Settings') || []).forEach((r) => { try { settings[r.Key] = JSON.parse(r.Value); } catch (e) { settings[r.Key] = r.Value; } });
+    const about = {}; (sheet('About') || []).forEach((r) => { about[r.Key] = r.Value; });
+    const changes = {}; (sheet('Upload_Changes') || []).forEach((r) => { (changes[String(r.uploadAt)] = changes[String(r.uploadAt)] || []).push({ t: r.type, no: String(r.no), buyer: String(r.buyer), from: String(r.from), to: String(r.to), why: String(r.why) }); });
+    const num = (v) => (v === '' ? undefined : Number(v)), js = (v) => { try { return v ? JSON.parse(v) : undefined; } catch (e) { return undefined; } };
+    const imports = (sheet('Uploads') || []).filter((r) => r.at !== '').map((r) => {
+      const x = { at: String(r.at), file: String(r.file), fileDate: fromSerial(r.fileDate, 'Date') };
+      ['added', 'updated', 'remarkChanged', 'closed', 'reopened', 'missing', 'total'].forEach((k) => { const v = num(r[k]); if (v !== undefined) x[k] = v; });
+      const bb = js(r.byBuyer), sn = js(r.snap); if (bb) x.byBuyer = bb; if (sn) x.snap = sn; if (changes[x.at]) x.changes = changes[x.at];
+      return x;
+    });
+    return { format: 'ncr-follow-up-backup', version: 2, exportedAt: String(about.exportedAt || L.nowStamp()), ncrs, history, settings, imports, importStack: [] };
+  }
+
   async function backupNow() {
-    const text = JSON.stringify(S.exportBundle()), filename = `NCR_backup_${L.todayISO()}.json`;
-    try {
-      const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
-      if (dl) { await dl.save({ filename, data: text }); }
-      else { const u = URL.createObjectURL(new Blob([text], { type: 'application/json' })), a = document.createElement('a'); a.href = u; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(u), 2000); }
-      toast('Backup saved. Keep the file somewhere safe'); render();
-    } catch (e) { if (!e || e.code !== 'declined') toast('Could not save the backup' + (e && e.message ? ': ' + e.message : ''), true); }
+    if (typeof XLSX === 'undefined') { toast('Excel library not loaded (check internet connection)', true); return; }
+    const wb = bundleToWorkbook(S.exportBundle()), filename = `NCR_backup_${L.todayISO()}.xlsx`;
+    await saveBook(wb, filename, 'Backup saved. Keep the file somewhere safe (e.g. Google Drive)'); render();
   }
   function restoreFrom(file) {
-    const rd = new FileReader();
+    const isJson = /\.json$/i.test(file.name), rd = new FileReader();
     rd.onload = () => {
-      let b; try { b = JSON.parse(rd.result); } catch (e) { toast('That file is not a valid backup (not JSON)', true); return; }
+      let b;
+      try { b = isJson ? JSON.parse(rd.result) : workbookToBundle(XLSX.read(rd.result, { type: 'array' })); }
+      catch (e) { toast(isJson ? 'That file is not a valid backup (not JSON)' : (e && e.message) || 'Could not read that file', true); return; }
       const err = S.bundleError(b); if (err) { toast(err, true); return; }
       confirmModal({ title: 'Restore this backup?', text: `This replaces ALL current data (${st.ncrs.length} NCRs) with the backup: ${b.ncrs.length} NCRs, ${b.history.length} history entries, ${(b.imports || []).length} uploads, saved ${L.fmtDate(b.exportedAt)}. Make a backup of the current data first if you may need it.`, ok: 'Restore', onOk: async () => { await S.restoreBundle(b); toast('Backup restored'); render(); } });
     };
-    rd.readAsText(file);
+    if (isJson) rd.readAsText(file); else rd.readAsArrayBuffer(file);
   }
-  async function saveBook(wb, filename) {
+  async function saveBook(wb, filename, doneMsg) {
     try {
       const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
-      if (dl) { await dl.save({ filename, data: XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) }); toast('Excel file ready'); }
-      else { XLSX.writeFile(wb, filename); toast('Excel file downloaded'); }
+      if (dl) { await dl.save({ filename, data: XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) }); toast(doneMsg || 'Excel file ready'); }
+      else { XLSX.writeFile(wb, filename); toast(doneMsg || 'Excel file downloaded'); }
     } catch (e) { if (!e || e.code !== 'declined') toast('Could not save the file' + (e && e.message ? ': ' + e.message : ''), true); }
   }
   // Everything, split by status: one sheet per status plus summary, timeline and upload log
