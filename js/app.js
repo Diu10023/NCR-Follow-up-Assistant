@@ -16,7 +16,7 @@
     const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, followed: V.followedPage, hold: V.holdPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, imports: V.importsPage, help: V.helpPage, changes: () => V.changesPage(arg),  response: V.responsePage, settings: V.settings };
     current = (views[page] || V.home)();
     current.closed = page === 'ncr' && (S.getNcr(arg) || {}).Status === 'Closed';
-    main.innerHTML = (page === 'home' || page === 'overview' || page === 'dashboard' ? '' : '<div class="backbar"><button class="btn sm" data-action="back">← Back</button></div>') + (['home', 'overview', 'dashboard', 'list', 'today', 'followed'].includes(page) ? V.changeBanner() : '') + current.html;
+    main.innerHTML = (['home', 'overview', 'dashboard', 'list', 'today', 'followed', 'hold', 'closed', 'import', 'help', 'settings'].includes(page) ? '' : '<div class="backbar"><button class="btn sm" data-action="back">← Back</button></div>') + (['home', 'overview', 'dashboard', 'list', 'today', 'followed'].includes(page) ? V.changeBanner() : '') + current.html;
     if (current.bind) current.bind(main);
     document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + (page === 'today' ? 'list' : page === 'ncr' ? (current.closed ? 'closed' : 'list') : page === 'overview' || page === 'dashboard' ? 'home' : page === 'imports' ? 'import' : page)));
     updateBulkBar();

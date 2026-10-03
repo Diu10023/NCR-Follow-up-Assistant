@@ -55,14 +55,13 @@ window.NCR = window.NCR || {};
     const rows = shown.map((n) => {
       const i = inf(n), rd = roundsOf(n), idx = list.indexOf(n) + 1;
       return `<tr class="${i.remarkGroup === 'none' ? 'rp-none' : longRunning(n) ? 'rp-long' : 'rp-has'}" data-href="#/ncr/${esc(n.NCR_ID)}">${cbCell(n)}<td class="rank">${idx}</td>
-        <td class="nowrap"><b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div>${recentChips(n) ? `<div>${recentChips(n)}</div>` : ''}</td>
+        <td class="nowrap"><b>${esc(n.NCR_No)}</b><div class="sub">Item ${esc(n.Item_No)} · ${i.aging === null ? '' : i.aging + 'd'}</div>${recentChips(n) || longRunning(n) ? `<div>${recentChips(n)}${longRunning(n) ? ` <span class="chip age-attention" title="Follow-ups plus buyer remark changes">🔁 ${rd} rounds</span>` : ''}</div>` : ''}</td>
         <td class="wide">${esc(buyerOf(n))}<div class="sub clip" title="${esc(n.Buyer_Remark || n.Defect)}">${esc(n.Defect)}${!withRemark && n.Buyer_Remark ? ' · “' + esc(n.Buyer_Remark) + '”' : ''}</div></td>
-        ${withRemark ? `<td class="remark">${remarkText(n, i)}</td>` : ''}<td>${whyText(i)}${longRunning(n) ? `<div><span class="chip age-attention">🔁 ${rd} rounds, still open</span></div>` : ''}</td>
-        <td class="nowrap">${dueText(n, i)}<div class="sub">${i.count ? i.count + ' follow-up' + (i.count > 1 ? 's' : '') : 'not followed up'}</div></td>
+        ${withRemark ? `<td class="remark">${remarkText(n, i)}</td>` : ''}
         <td class="right nowrap">${i.needsReview ? `<button class="btn sm" data-action="reviewed" data-id="${esc(n.NCR_ID)}" title="I read the buyer update – check again in ${st.settings.defaultCheckDays} days">✓ Reviewed</button>` : ''}</td></tr>`;
     }).join('');
     const more = list.length > limit ? `<div class="more"><button class="link" data-action="showall" data-key="${key}">${showAll[key] ? 'Show fewer' : `Show all ${list.length}`}</button> · <button class="link" data-action="selsection" data-key="${key}">Select all ${list.length}</button></div>` : '';
-    return `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead(key)}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th>${withRemark ? '<th>Buyer remark</th>' : ''}<th>Why</th><th>Next check</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
+    return `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead(key)}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th>${withRemark ? '<th>Buyer remark</th>' : ''}<th></th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
   }
 
   const byDue = (a, b) => (a.Due_Date || '9999') < (b.Due_Date || '9999') ? -1 : (a.Due_Date || '9999') > (b.Due_Date || '9999') ? 1 : 0;
@@ -187,7 +186,7 @@ window.NCR = window.NCR || {};
     const done = st.ncrs.filter((n) => inf(n).bucket === 'closed');
     const buyers = [...new Set(done.map(buyerOf))].sort();
     return { html: `<div class="page-head"><h1>Closed</h1><span class="muted">${done.length} closed · <a href="#/hold" data-hjfilter='{"tab":"jira"}'>${st.ncrs.filter((n) => inf(n).bucket === 'jira').length} Jira closed</a></span></div>
-      <div class="filters"><label class="grow">Search<input id="c-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(CF.q)}"></label>
+      <div class="filters"><label class="grow">Search<input id="c-q" type="search" placeholder="🔍 Search NCR No., Item No. or Batch No." value="${esc(CF.q)}"></label>
         <label>Buyer<select id="c-buyer">${options(buyers, CF.buyer, 'All')}</select></label></div>
       <div id="closed-body">${closedBody()}</div>`,
     bind(root) {
@@ -225,7 +224,7 @@ window.NCR = window.NCR || {};
       <label>Defect<select id="${idp}-defect">${options(defects, F.defect, 'All')}</select></label></div></details>`;
   };
   // the bell toggle lives outside the filter box, next to the tabs
-  const changedBtn = (attr, F) => (recentCount() ? `<button class="btn${F.changed ? ' primary' : ''}" type="button" ${attr}="1" title="Show only NCRs that are new or changed in the latest upload">🔔 Changed in latest upload (${recentCount()})</button>` : '');
+  const changedBtn = (attr, F) => (recentCount() ? `<button class="btn${F.changed ? ' primary' : ''}" type="button" ${attr}="1" title="Show only the NCRs that are new, or whose Remarks changed, in the latest uploaded file">🔔 New or changed since last upload (${recentCount()})</button>` : '');
   function bindFilterBar(root, idp, F, refresh) {
     ['year', 'month', 'from', 'to', 'defect'].forEach((k) => root.querySelector(`#${idp}-${k}`).addEventListener('change', (e) => { F[k] = e.target.value; NCR.app.render(); }));
   }
@@ -321,8 +320,8 @@ window.NCR = window.NCR || {};
     const o = (pairs, cur) => pairs.map(([v, l]) => `<option value="${v}"${cur === v ? ' selected' : ''}>${l}</option>`).join('');
     const todo = st.ncrs.filter((n) => inf(n).bucket === 'todo').length, noRem = st.ncrs.filter((n) => inf(n).bucket === 'todo' && inf(n).remarkGroup === 'none').length;
     return { html: `<div class="page-head"><div><h1>To follow up</h1><div class="muted"><b>${todo}</b> to follow up · <b>${noRem}</b> with no remark</div></div></div>
-      <div class="card filters">
-        <label class="grow">Search<input id="f-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(LF.q)}"></label>
+      <div class="filters flat">
+        <label class="grow"><input id="f-q" aria-label="Search" type="search" placeholder="🔍 Search NCR No., Item No. or Batch No." value="${esc(LF.q)}"></label>
         <button class="btn" id="f-clear">Clear</button>
         <div class="full-row">${filterBar('f', LF)}</div>
       </div>
@@ -388,22 +387,21 @@ window.NCR = window.NCR || {};
         <td class="wide">${esc(buyerOf(n))}<div class="sub clip">${esc(n.Defect)}</div></td>
         <td class="remark">${remarkText(n, i)}${(recentOf(n) || []).filter((c) => c.t === 'update' && c.from).map((c) => `<div class="sub" title="${esc(c.from)}">Before: ${esc(c.from.length > 90 ? c.from.slice(0, 90) + '…' : c.from)}</div>`).join('')}</td>
         <td class="nowrap">${n.Last_Followup ? L.fmtDate(n.Last_Followup) : '–'}<div class="sub">${i.count} follow-up${i.count === 1 ? '' : 's'}${changes ? ` · ${changes} buyer update${changes === 1 ? '' : 's'}` : ''}</div></td>
-        <td class="nowrap">${n.Due_Date ? L.fmtDate(n.Due_Date) : '<span class="muted">Not set</span>'}${i.dueDiff !== null ? `<div class="sub">${i.dueDiff < 0 ? -i.dueDiff + 'd late' : i.dueDiff === 0 ? 'today' : 'in ' + i.dueDiff + 'd'}</div>` : ''}</td>
         <td>${at ? `<span class="badge ${at.cls}">${at.label}</span>` : '<span class="sub">Waiting</span>'}</td>
         <td class="right acts">${i.needsReview ? `<button class="btn sm" data-action="reviewed" data-id="${esc(n.NCR_ID)}" title="I read the buyer update">✓ Reviewed</button>` : ''}</td></tr>
-        ${open_ ? `<tr class="sub-row"><td colspan="9"><ul class="mini-tl">${timelineRows(n)}</ul><a href="#/ncr/${esc(n.NCR_ID)}">Full timeline →</a></td></tr>` : ''}`;
+        ${open_ ? `<tr class="sub-row"><td colspan="8"><ul class="mini-tl">${timelineRows(n)}</ul><a href="#/ncr/${esc(n.NCR_ID)}">Full timeline →</a></td></tr>` : ''}`;
     }).join('');
     return `${pillsHtml(per, all.length, WF.buyer, 'data-wbuyer')}${buyerLine(WF.buyer)}${tabsHtml(cnt, WF.tab, 'data-wtab')}
-      <div class="row-between wait-line"><span class="muted">${list.length ? `<b>${attn}</b> of these need your attention${unanswered ? ` (<b>${unanswered}</b> with no reply after ${st.settings.escalationThreshold || 3}+ follow-ups)` : ''}: no reply, buyer updated, or check date reached. The rest are waiting.` : ''}</span>
+      <div class="row-between wait-line"><span class="muted">${list.length && attn ? `<b>${attn}</b> need attention${unanswered ? ` · <b>${unanswered}</b> with no reply after ${st.settings.escalationThreshold || 3}+ follow-ups` : ''}` : ''}</span>
         <span class="inline">${changedBtn('data-wchg', WF)}<button class="btn" data-action="export" data-src="followed"${list.length ? '' : ' disabled'}>Export to Excel</button></span></div>
-      <section class="block">${list.length ? `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead('followed')}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th><th>Latest remark</th><th>Last follow-up</th><th>Next check</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+      <section class="block">${list.length ? `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead('followed')}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th><th>Latest remark</th><th>Follow-ups</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
         : `<div class="empty">${all.length ? 'No NCRs in this tab.' : 'Nothing here yet. Press Follow-up on an NCR in To follow up: it moves here and stays until it is closed.'}</div>`}</section>`;
   }
   function followedPage() {
     if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Followed up</h1></div>' + emptyState() };
     const n = open().filter(isFollowed).length;
-    return { html: `<div class="page-head"><div><h1>Followed up</h1><div class="muted"><b>${n}</b> followed up and not closed yet. They stay here, and weekly imports add buyer updates to each timeline, until the NCR is closed.</div></div></div>
-      <div class="card filters"><label class="grow">Search<input id="w-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(WF.q)}"></label><button class="btn" id="w-clear">Clear</button><div class="full-row">${filterBar('w', WF)}</div></div>
+    return { html: `<div class="page-head"><div><h1>Followed up</h1><div class="muted"><b>${n}</b> followed up and not closed yet. Buyer replies from each new upload are added to their timeline.</div></div></div>
+      <div class="filters flat"><label class="grow"><input id="w-q" aria-label="Search" type="search" placeholder="🔍 Search NCR No., Item No. or Batch No." value="${esc(WF.q)}"></label><button class="btn" id="w-clear">Clear</button><div class="full-row">${filterBar('w', WF)}</div></div>
       <div id="followed-main">${followedBody()}</div>`,
     bind(root) {
       const main = root.querySelector('#followed-main'), refresh = () => { main.innerHTML = followedBody(); };
@@ -456,7 +454,7 @@ window.NCR = window.NCR || {};
   function holdPage() {
     if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Hold &amp; Jira</h1></div>' + emptyState() };
     return { html: `<div class="page-head"><div><h1>Hold &amp; Jira</h1><div class="muted">NCRs whose Remarks say hold / scrap, or Jira. They are not part of the follow-up flow.</div></div></div>
-      <div class="card filters"><label class="grow">Search<input id="h-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(HJ.q)}"></label></div>
+      <div class="card filters"><label class="grow">Search<input id="h-q" type="search" placeholder="🔍 Search NCR No., Item No. or Batch No." value="${esc(HJ.q)}"></label></div>
       <div id="hold-main">${holdBody()}</div>`,
     bind(root) {
       const main = root.querySelector('#hold-main'), refresh = () => { main.innerHTML = holdBody(); };
