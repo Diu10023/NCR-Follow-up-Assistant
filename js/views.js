@@ -197,10 +197,24 @@ window.NCR = window.NCR || {};
   }
 
   // ---------- Open NCRs (one worklist: no remark first, then has remark) ----------
-  const LF0 = { q: '', buyer: '', tab: 'none', show: 'open', status: '', owner: '', waiting: '', disposition: '', due: '', buyerUpdate: '', fu: '', age: '', sort: 'due', dir: 'asc' };
+  const LF0 = { q: '', buyer: '', tab: 'none', show: 'open', status: '', owner: '', waiting: '', disposition: '', due: '', buyerUpdate: '', fu: '', age: '', sort: 'due', dir: 'asc', from: '', to: '', defect: '' };
   const LF = Object.assign({}, LF0);
   // links from Home pass buyerUpdate; map them onto the two priority tabs
   function setFilter(f) { Object.keys(LF).forEach((k) => delete LF[k]); Object.assign(LF, LF0, f); }
+
+  // Created-date range and defect type, shared by To follow up and Followed up
+  const inDates = (n, F) => !((F.from && (n.NCR_Date || '') < F.from) || (F.to && (n.NCR_Date || '') > F.to) || (F.defect && n.Defect !== F.defect));
+  const filterBar = (idp, F) => {
+    const today = L.todayISO(), defects = [...new Set(st.ncrs.map((n) => n.Defect).filter(Boolean))].sort();
+    const chip = (k, label, from, to) => `<button class="chip-btn${F.from === from && F.to === to ? ' on' : ''}" type="button" data-${idp}chip="${k}" data-from="${from}" data-to="${to}">${label}</button>`;
+    return `<div class="datebar"><label>Created from<input type="date" id="${idp}-from" value="${esc(F.from)}"></label><label>to<input type="date" id="${idp}-to" value="${esc(F.to)}"></label>
+      <label>Defect<select id="${idp}-defect">${options(defects, F.defect, 'All')}</select></label>
+      <span class="chips">${chip('7', 'Last 7 days', L.addDays(today, -7), '')}${chip('30', 'Last 30 days', L.addDays(today, -30), '')}${chip('o90', 'Older than 90 days', '', L.addDays(today, -90))}${chip('o365', 'Older than 1 year', '', L.addDays(today, -365))}</span></div>`;
+  };
+  function bindFilterBar(root, idp, F, refresh) {
+    ['from', 'to', 'defect'].forEach((k) => root.querySelector(`#${idp}-${k}`).addEventListener('change', (e) => { F[k] = e.target.value; NCR.app.render(); }));
+    root.querySelectorAll(`[data-${idp}chip]`).forEach((b) => b.addEventListener('click', () => { const on = b.classList.contains('on'); F.from = on ? '' : b.dataset.from; F.to = on ? '' : b.dataset.to; NCR.app.render(); }));
+  }
 
   // every open NCR matching the non-tab filters; `tab` decides which part of it to show
   function baseList(ignoreBuyer) {
@@ -210,6 +224,7 @@ window.NCR = window.NCR || {};
       if (i.bucket !== 'todo' && i.bucket !== 'followed') return false; // closed, Hold for scrap and Jira NCRs live on their own pages
       if (q && !(`${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))) return false;
       if (!ignoreBuyer && LF.buyer && (LF.buyer === '__none' ? n.Buyer : n.Buyer !== LF.buyer)) return false;
+      if (!inDates(n, LF)) return false;
       if (LF.show === 'action' && !i.actionRequired) return false;
       if (LF.show === 'ready' && !i.ready) return false;
       if (LF.status && n.Status !== LF.status) return false;
@@ -295,23 +310,14 @@ window.NCR = window.NCR || {};
       <div class="card filters">
         <label class="grow">Search<input id="f-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(LF.q)}"></label>
         <button class="btn" id="f-clear">Clear</button>
-        <details class="full-row"><summary>More filters &amp; sorting</summary><div class="filters inner">
-          ${sel('f-status', 'Status', options(L.PICKABLE.filter((x) => x !== 'Closed'), LF.status, 'Any'))}
-          ${sel('f-owner', 'Owner', options(S.owners(), LF.owner, 'All'))}
-          ${sel('f-waiting', 'Waiting For', `<option value="">All</option><option value="__none"${LF.waiting === '__none' ? ' selected' : ''}>Not set</option>${options(s.waitingFor, LF.waiting)}`)}
-          ${sel('f-disposition', 'Disposition', options(s.dispositions, LF.disposition, 'All'))}
-          ${sel('f-due', 'Next check / Due', o([['', 'Any'], ['overdue', 'Overdue'], ['today', 'Today'], ['soon', 'Due soon'], ['week', 'Next 7 days'], ['none', 'Not set']], LF.due))}
-          ${sel('f-bu', 'Remark type', o([['', 'Any'], ['progress', 'In progress'], ['hold', 'Hold / scrap'], ['stale', 'Stale']], LF.buyerUpdate))}
-          ${sel('f-sort', 'Sort “All to follow up” by', o([['due', 'Next check'], ['aging', 'Aging'], ['date', 'NCR date']], LF.sort))}
-          <button class="btn" id="f-dir" title="Toggle direction">${LF.dir === 'asc' ? '↑ Asc' : '↓ Desc'}</button></div></details>
+        <div class="full-row">${filterBar('f', LF)}</div>
       </div>
       <div id="open-main">${openMain()}</div>`,
     bind(root) {
       const main = root.querySelector('#open-main');
       const refresh = () => { main.innerHTML = openMain(); };
-      const map = { 'f-q': 'q', 'f-status': 'status', 'f-owner': 'owner', 'f-waiting': 'waiting', 'f-disposition': 'disposition', 'f-due': 'due', 'f-bu': 'buyerUpdate', 'f-sort': 'sort' };
-      Object.keys(map).forEach((id) => root.querySelector('#' + id).addEventListener('input', (e) => { LF[map[id]] = e.target.value; refresh(); }));
-      root.querySelector('#f-dir').addEventListener('click', (e) => { LF.dir = LF.dir === 'asc' ? 'desc' : 'asc'; e.target.textContent = LF.dir === 'asc' ? '↑ Asc' : '↓ Desc'; refresh(); });
+      root.querySelector('#f-q').addEventListener('input', (e) => { LF.q = e.target.value; refresh(); });
+      bindFilterBar(root, 'f', LF, refresh);
       root.querySelector('#f-clear').addEventListener('click', () => { setFilter({}); NCR.app.render(); });
       main.addEventListener('click', (e) => { // pills and tabs live inside the refreshed area
         const b = e.target.closest('[data-buyer].pill'), t = e.target.closest('[data-tab]');
@@ -322,9 +328,9 @@ window.NCR = window.NCR || {};
   }
 
   // ---------- Followed up (stays until the NCR is closed; shows the timeline) ----------
-  const WF = { q: '', buyer: '', tab: 'none' };
+  const WF = { q: '', buyer: '', tab: 'none', from: '', to: '', defect: '' };
   const WF_OPEN = new Set(); // rows whose timeline is expanded
-  function setWaitFilter(f) { Object.assign(WF, { q: '', buyer: '', tab: 'none' }, f); }
+  function setWaitFilter(f) { Object.assign(WF, { q: '', buyer: '', tab: 'none', from: '', to: '', defect: '' }, f); }
   // what, if anything, needs QA's attention on a followed-up NCR
   // Followed up several times and the buyer's remark has not changed since the first follow-up
   function noReplyAfter(n) {
@@ -345,7 +351,7 @@ window.NCR = window.NCR || {};
   }
   function followedList() {
     const q = WF.q.trim().toLowerCase();
-    return st.ncrs.filter((n) => isFollowed(n) && (!q || `${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))
+    return st.ncrs.filter((n) => isFollowed(n) && inDates(n, WF) && (!q || `${n.NCR_No} ${n.Item_No} ${n.Batch_No}`.toLowerCase().includes(q))
       && (!WF.buyer || (WF.buyer === '__none' ? !n.Buyer : n.Buyer === WF.buyer)))
       .sort((a, b) => { const x = attention(a), y = attention(b); return priSort(a, b) || (x ? x.rank : 9) - (y ? y.rank : 9) || (a.Due_Date || '9999').localeCompare(b.Due_Date || '9999') || oldest(a, b); });
   }
@@ -383,10 +389,12 @@ window.NCR = window.NCR || {};
     if (!st.ncrs.length) return { html: '<div class="page-head"><h1>Followed up</h1></div>' + emptyState() };
     const n = open().filter(isFollowed).length;
     return { html: `<div class="page-head"><div><h1>Followed up</h1><div class="muted"><b>${n}</b> followed up and not closed yet. They stay here, and weekly imports add buyer updates to each timeline, until the NCR is closed.</div></div></div>
-      <div class="card filters"><label class="grow">Search<input id="w-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(WF.q)}"></label></div>
+      <div class="card filters"><label class="grow">Search<input id="w-q" type="search" placeholder="NCR No., Item No. or Batch No." value="${esc(WF.q)}"></label><button class="btn" id="w-clear">Clear</button><div class="full-row">${filterBar('w', WF)}</div></div>
       <div id="followed-main">${followedBody()}</div>`,
     bind(root) {
       const main = root.querySelector('#followed-main'), refresh = () => { main.innerHTML = followedBody(); };
+      bindFilterBar(root, 'w', WF, refresh);
+      root.querySelector('#w-clear').addEventListener('click', () => { setWaitFilter({}); NCR.app.render(); });
       root.querySelector('#w-q').addEventListener('input', (e) => { WF.q = e.target.value; refresh(); });
       main.addEventListener('click', (e) => { const b = e.target.closest('[data-wbuyer]'), t = e.target.closest('[data-wtab]'); if (b) { WF.buyer = b.dataset.wbuyer; refresh(); } else if (t) { WF.tab = t.dataset.wtab; refresh(); } });
     } };
