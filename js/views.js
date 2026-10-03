@@ -516,7 +516,7 @@ window.NCR = window.NCR || {};
   // ---------- import ----------
   const imp = { wb: null, name: '', sheet: '', table: null, mapping: {}, opts: { closeMissing: false, date: '' }, done: null };
   function importPage() {
-    const I = NCR.importer;
+    const I = NCR.importer, IB = importsBlock(false);
     let body = '';
     if (imp.done) body += `<div class="alert ok">✅ Import complete: ${imp.done} <button class="btn sm" id="undo-now" type="button">Wrong file? Undo this import</button></div>`;
     if (imp.table) {
@@ -551,9 +551,10 @@ window.NCR = window.NCR || {};
     }
     return { html: `<div class="page-head"><h1>Import from Excel</h1><a class="btn" href="#/imports">📅 Import history (${S.getImports().length})</a></div>
       <section class="card"><h2>1. Upload raw data</h2><p class="hint">Upload the periodic NCR export (.xlsx, .xls or .csv). New NCRs are added; existing ones (matched by NCR No.) keep all QA follow-up data.</p>
-        <label class="drop" id="drop"><input type="file" id="imp-file" accept=".xlsx,.xls,.xlsm,.csv" hidden><span>📁 Click or drop an Excel file here</span></label></section>${body}`,
+        <label class="drop" id="drop"><input type="file" id="imp-file" accept=".xlsx,.xls,.xlsm,.csv" hidden><span>📁 Click or drop an Excel file here</span></label></section>${body}
+      <div class="hist-sep">${IB.html}</div>`,
     bind(root) {
-      const I2 = NCR.importer;
+      const I2 = NCR.importer; IB.bind(root);
       const load = async (file) => {
         try {
           if (typeof XLSX === 'undefined') throw new Error('Excel library not loaded (check internet connection)');
@@ -734,7 +735,7 @@ window.NCR = window.NCR || {};
   const IM = { month: '' };
   const monthName = (ym) => new Date(ym + '-01T00:00:00Z').toLocaleString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   const shiftMonth = (ym, d) => { const [y, m] = ym.split('-').map(Number), t = new Date(Date.UTC(y, m - 1 + d, 1)); return t.getUTCFullYear() + '-' + String(t.getUTCMonth() + 1).padStart(2, '0'); };
-  function importsPage() {
+  function importsBlock(standalone) {
     const logs = S.getImports().map((x) => Object.assign({}, x, { fd: x.fileDate || String(x.at).slice(0, 10) })).sort((a, b) => b.fd.localeCompare(a.fd) || String(b.at).localeCompare(String(a.at)));
     const today = L.todayISO(), byDay = {};
     logs.forEach((x) => { (byDay[x.fd] = byDay[x.fd] || []).push(x); });
@@ -751,10 +752,20 @@ window.NCR = window.NCR || {};
     const weeksWith = new Set(logs.map((x) => monday(x.fd))), skipped = [];
     if (logs.length) for (let w = monday(logs[logs.length - 1].fd); w < monday(today); w = L.addDays(w, 7)) if (!weeksWith.has(w)) skipped.push(w);
     const wk = (w) => `${L.fmtDate(w)} – ${L.fmtDate(L.addDays(w, 6))}`;
+    // weekly timeline: one block per week, filled = uploaded, hatched = no file that week
+    const perWeek = {}; logs.forEach((x) => { const m = monday(x.fd); perWeek[m] = (perWeek[m] || 0) + 1; });
+    let tl = '';
+    if (logs.length) {
+      const thisWk = monday(today), firstWk = monday(logs[logs.length - 1].fd), capWk = L.addDays(thisWk, -7 * 15), startWk = firstWk > capWk ? firstWk : capWk;
+      for (let w = startWk; w <= thisWk; w = L.addDays(w, 7)) {
+        const c = perWeek[w] || 0, parts = L.fmtDate(w).split('-');
+        tl += `<div class="wk ${c ? 'up' : 'gap'}${w === thisWk ? ' now' : ''}" title="Week ${wk(w)}: ${c ? c + ' upload' + (c === 1 ? '' : 's') : 'no file'}"><span class="wd">${parts[0]} ${parts[1]}</span><i>${c ? '✓' : ''}</i><span class="wn">${c ? c + '×' : 'no file'}</span></div>`;
+      }
+    }
     const stackAts = new Set(S.getImportStack());
     const rows = logs.map((x) => `<tr><td class="nowrap"><b>${L.fmtDate(x.fd)}</b>${x.fd !== String(x.at).slice(0, 10) ? `<div class="sub">uploaded ${L.fmtDate(x.at)}</div>` : ''}</td><td>${esc(x.file || 'file')}</td><td>${x.added || 0}</td><td>${x.remarkChanged === undefined ? '–' : x.remarkChanged}</td><td>${x.closed || 0}</td><td>${x.total === undefined ? '–' : x.total}</td><td class="right">${x.changes ? `<a class="btn sm" href="#/changes/${encodeURIComponent(x.at)}">Changes</a> ` : ''}${stackAts.has(x.at) ? `<button class="btn sm danger" data-del="${esc(x.at)}" data-newer="${logs.filter((y) => String(y.at) > String(x.at) && stackAts.has(y.at)).length}">Delete</button>` : '<span class="sub" title="This upload was made before undo was saved for every upload. Use Settings → Clear all NCR data to start over.">no undo data</span>'}</td></tr>`).join('');
-    return { html: `<div class="page-head"><div><h1>Import history</h1><div class="muted">${logs.length} upload${logs.length === 1 ? '' : 's'} · <a href="#/import">Import a new file</a></div></div></div>
-      ${logs.length ? `<div class="charts"><section class="block"><div class="cal-nav"><button class="btn sm" data-im="${shiftMonth(ym, -1)}">‹</button><h2>${monthName(ym)}</h2><button class="btn sm" data-im="${shiftMonth(ym, 1)}">›</button></div>
+    return { html: `${standalone ? `<div class="page-head"><div><h1>Import history</h1><div class="muted">${logs.length} upload${logs.length === 1 ? '' : 's'} · <a href="#/import">Import a new file</a></div></div></div>` : `<div class="page-head"><div><h2 class="sect">Upload history</h2><div class="muted">${logs.length} upload${logs.length === 1 ? '' : 's'} so far. Each week should have one file.</div></div></div>`}
+      ${logs.length ? `<section class="block"><h2>Weekly timeline</h2><div class="wkline">${tl}</div><p class="hint">One block per week (Mon–Sun), oldest on the left. ✓ = a file dated in that week was uploaded; hatched = no file that week; outlined = this week.</p></section><div class="charts"><section class="block"><div class="cal-nav"><button class="btn sm" data-im="${shiftMonth(ym, -1)}">‹</button><h2>${monthName(ym)}</h2><button class="btn sm" data-im="${shiftMonth(ym, 1)}">›</button></div>
           <div class="cal">${cells}</div><p class="hint">● = a file dated that day was imported. Hover for the file name.</p></section>
         <section class="block"><h2>Weeks without an upload</h2>${skipped.length ? `<p class="hint">No file is dated in these weeks (Mon–Sun). Upload them in order if you still have the files.</p><div class="skips">${skipped.slice(-12).reverse().map((w) => `<span class="chip age-attention">${wk(w)}</span>`).join(' ')}</div>${skipped.length > 12 ? `<p class="hint">…and ${skipped.length - 12} older weeks</p>` : ''}` : '<p class="hint">✅ Every week since the first upload has a file.</p>'}</section></div>
         <section class="block"><h2>All uploads</h2><div class="table-wrap"><table class="grid compact"><thead><tr><th>File date</th><th>File</th><th>New NCRs</th><th>Remark changed</th><th>Closed</th><th>Rows in file</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
@@ -767,6 +778,7 @@ window.NCR = window.NCR || {};
       }));
       root.querySelectorAll('[data-im]').forEach((b) => b.addEventListener('click', () => { IM.month = b.dataset.im; NCR.app.render(); })); } };
   }
+  const importsPage = () => importsBlock(true);
 
   // ---------- settings ----------
   function settings() {

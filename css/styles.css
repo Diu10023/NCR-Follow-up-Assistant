@@ -303,3 +303,13 @@ details.datefilter{margin-top:6px}details.datefilter>summary{font-size:15px}
 /* lighter search row on the two work lists */
 .filters.flat{padding:0;margin-bottom:10px;gap:10px 14px;align-items:center}
 .filters.flat .grow{flex:1 1 320px}.filters.flat .grow input{width:100%}
+
+/* weekly upload timeline */
+.wkline{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0}
+.wk{width:68px;padding:10px 4px;border-radius:16px;display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:var(--ins-s);color:var(--mut)}
+.wk .wd{font-size:12px;font-weight:700}.wk i{font-style:normal;font-size:20px;height:24px;font-weight:800}.wk .wn{font-size:11.5px}
+.wk.up{background:var(--acc);color:#fff;box-shadow:var(--ext-s)}
+.wk.gap{background:repeating-linear-gradient(45deg,transparent 0 6px,var(--line-s) 6px 8px)}
+.wk.now{outline:2px solid var(--acc);outline-offset:2px}
+.hist-sep{margin-top:28px}
+h2.sect{font-size:26px;margin:0}
