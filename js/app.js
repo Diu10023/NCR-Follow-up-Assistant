@@ -11,6 +11,11 @@
   }
 
   function render() {
+    if (!st.loaded && st.needCode) {
+      main.innerHTML = `<div class="card" style="max-width:460px;margin:60px auto"><h2>Team access code</h2><p class="hint">Ask the person who set up this tool for the code.</p><form id="code-form" class="form"><label class="full">Access code<input name="code" type="password" autocomplete="off" required autofocus></label><div class="full actions"><button class="btn primary" type="submit">Open</button></div></form>${st.error ? `<p class="bad">${esc(st.error)}</p>` : ''}</div>`;
+      $('#code-form').addEventListener('submit', async (e) => { e.preventDefault(); S.setAccessCode(new FormData(e.target).get('code')); await S.init(); render(); });
+      return;
+    }
     if (!st.loaded) { main.innerHTML = `<div class="empty">${st.error ? esc(st.error) : 'Loading…'}</div>`; return; }
     const { page, arg } = route();
     const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, followed: V.followedPage, hold: V.holdPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, imports: V.importsPage, trends: V.trendsPage, help: V.helpPage, changes: () => V.changesPage(arg),  response: V.responsePage, settings: V.settings };
@@ -32,7 +37,7 @@
     const lg = S.getImports().filter((x) => x.changes).pop();   // unseen upload: show how many NCRs it touched
     $('#chg-badge').textContent = lg && S.getSeen() !== lg.at ? new Set(lg.changes.filter((c) => ['new', 'update', 'cleared', 'reopened'].includes(c.t)).map((c) => c.no)).size || '' : '';
     const el = $('#sync');
-    const si = S.storageInfo();
+    const si = st.mode === 'sheets' ? { pct: 0, kb: 0 } : S.storageInfo();
     el.className = 'sync' + (st.error || si.pct >= 80 ? ' err' : '');
     el.textContent = st.error ? '⚠️ ' + st.error : si.pct >= 80 ? `⚠️ Browser storage is ${si.pct}% full. Save a backup (Settings → Your data) and consider clearing old data.` : st.saving ? 'Saving…' : st.mode === 'sheets' ? '✓ Synced with Google Sheets' : '';
     $('#mode').hidden = st.mode !== 'demo';

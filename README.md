@@ -2,18 +2,15 @@
 
 Internal QA tool for following up open NCRs with Purchasing and Suppliers. QA is the only user; Purchasing needs no login.
 
-Static web app (plain HTML/CSS/JS, no build) + Google Sheets backend via a small Apps Script.
+Plain HTML/CSS/JS web app (no framework). It runs in two modes:
 
-## Run
-Open `index.html` in a browser (or host the folder on any static host / GitHub Pages).
-With no backend configured the app starts empty and keeps data in the browser only; import your Excel file to begin. There is no sample data.
+- **This browser only** (default): open `index.html`; data stays in the browser. Good for trying it out. Use Settings → Backup (Excel) to keep a copy.
+- **Team mode (Google Sheet as the database):** a few teammates open one link, see the same data and every change is saved to a Google Sheet automatically. The app is served by a Google Apps Script web app, so no hosting is needed. Setup (about 10 minutes, no coding): see **`apps-script/SETUP.md`** (Thai).
 
-## Connect Google Sheets (auto load/save, no Sync button)
-1. Create a Google Sheet. **Extensions → Apps Script**, paste `apps-script/Code.gs`.
-2. **Deploy → New deployment → Web app**: Execute as *Me*, access *Anyone* (optionally set `API_KEY` in the script).
-3. Copy the `/exec` URL into the app: **Settings → Apps Script Web App URL → Save & connect**.
-
-Sheets `NCR_Master`, `Followup_History` and `Settings` are created automatically with the specified columns.
+## Team mode files
+- `apps-script/Code.gs`: the script that serves the app and reads/writes the Sheet (tabs `NCR_Master`, `Followup_History`, `Settings`, `_Data`). Optional `ACCESS_CODE` passcode inside.
+- `apps-script/Index.html`: the whole app in one file. **Generated**: run `python3 tools/build_apps_script.py` after changing anything under `js/`, `css/` or `index.html`, then paste the new file into the Apps Script project and deploy a new version.
+- Not yet tested against a real Google account. It was tested against an in-memory simulation of the Apps Script services (load, save, two users, undo, clear, restore, passcode).
 
 ## Uploaded the wrong file?
 **Settings → Your data**: *Undo last import* (removes what it added, restores what it changed) or *Clear all NCR data* (type DELETE). The Import page also shows *Undo this import* right after an import. In Google Sheets mode, paste the latest `apps-script/Code.gs` and redeploy so undo and clear can reach the sheet.

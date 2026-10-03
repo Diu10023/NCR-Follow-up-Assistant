@@ -9,11 +9,8 @@ window.NCR = window.NCR || {};
   const TRACKED = [['Status', 'Status'], ['Disposition', 'Disposition'], ['Next_Action', 'Next Action'],
     ['Owner', 'Owner'], ['Waiting_For', 'Waiting For'], ['Due_Date', 'Due Date']];
 
-  const CFG_KEY = 'ncr.api';
   const DATA_KEY = 'ncr.demo.data';
 
-  function getApiConfig() { try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch (e) { return {}; } }
-  function setApiConfig(c) { localStorage.setItem(CFG_KEY, JSON.stringify(c)); }
 
   // ---------- adapters ----------
   const LocalAdapter = {
@@ -21,6 +18,7 @@ window.NCR = window.NCR || {};
     async load() {
       let d = null;
       try { d = JSON.parse(localStorage.getItem(DATA_KEY)); } catch (e) { /* ignore */ }
+      const rd = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
       if (!d) { d = demoData(); localStorage.setItem(DATA_KEY, JSON.stringify(d)); }
       // remove sample rows seeded by earlier versions
       if (d.ncrs.some((n) => String(n.NCR_ID).startsWith('NCR-DEMO'))) {
@@ -28,6 +26,8 @@ window.NCR = window.NCR || {};
         d.history = d.history.filter((h) => !String(h.NCR_ID).startsWith('NCR-DEMO'));
         localStorage.setItem(DATA_KEY, JSON.stringify(d));
       }
+      const old = rd('ncr.lastImport'), st = rd('ncr.importStack') || [];
+      d.imports = rd('ncr.imports') || []; d.stack = old && !st.some((x) => x.at === old.at) ? st.concat([old]) : st;   // an import saved before the stack existed
       return d;
     },
     async save(p) {
@@ -40,7 +40,14 @@ window.NCR = window.NCR || {};
       d.settings = s;
       localStorage.setItem(DATA_KEY, JSON.stringify(d));
     },
-    async restore(d) { localStorage.setItem(DATA_KEY, JSON.stringify(d)); },
+    async restore(d) { localStorage.setItem(DATA_KEY, JSON.stringify({ ncrs: d.ncrs, history: d.history, settings: d.settings })); },
+    async saveMeta(m) {
+      try {
+        m.imports && m.imports.length ? localStorage.setItem('ncr.imports', JSON.stringify(m.imports)) : localStorage.removeItem('ncr.imports');
+        localStorage.removeItem('ncr.lastImport');
+        m.stack && m.stack.length ? localStorage.setItem('ncr.importStack', JSON.stringify(m.stack)) : localStorage.removeItem('ncr.importStack');
+      } catch (e) { throw new Error('Browser storage is full'); }
+    },
     reset() { localStorage.removeItem(DATA_KEY); },
     async clear() { this.reset(); },
   };
@@ -54,27 +61,28 @@ window.NCR = window.NCR || {};
     if (del.size) { d.ncrs = d.ncrs.filter((n) => !del.has(n.NCR_ID)); d.history = d.history.filter((h) => !del.has(h.NCR_ID)); }
   }
 
-  function SheetsAdapter(cfg) {
-    async function call(method, body) {
-      const url = cfg.url + (method === 'GET' ? (cfg.url.includes('?') ? '&' : '?') + 'action=load&key=' + encodeURIComponent(cfg.key || '') : '');
-      // text/plain avoids a CORS preflight, which Apps Script cannot answer.
-      const res = await fetch(url, method === 'GET' ? {} : { method: 'POST', body: JSON.stringify(Object.assign({ key: cfg.key || '' }, body)) });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
-      return json;
-    }
+  // Team mode: the app is served by an Apps Script web app and talks to the Google Sheet through google.script.run.
+  const hasGas = () => typeof google !== 'undefined' && google.script && google.script.run;
+  let accessCode = '';
+  function GasAdapter() {
+    const run = (fn, arg) => new Promise((res, rej) => {
+      const r = google.script.run.withSuccessHandler(res).withFailureHandler((e) => rej(new Error((e && e.message) || String(e))));
+      (arg === undefined ? r[fn](accessCode) : r[fn](accessCode, JSON.stringify(arg)));
+    });
+    const parse = (t) => (typeof t === 'string' ? JSON.parse(t) : t);
     return {
       name: 'sheets',
-      async load() { return call('GET'); },
-      async save(p) { await call('POST', Object.assign({ action: 'save' }, p)); },
-      async clear() { await call('POST', { action: 'clear' }); },
-      async saveSettings(s) { await call('POST', { action: 'saveSettings', settings: s }); },
+      async load() { return parse(await run('apiLoad')); },
+      async save(p) { await run('apiSave', p); },
+      async clear() { await run('apiClear'); },
+      async saveSettings(s) { await run('apiSaveSettings', s); },
+      async saveMeta(m) { await run('apiSaveMeta', m); },
+      async restore(d) { await run('apiRestore', d); },
     };
   }
 
   // ---------- store ----------
-  const state = { ncrs: [], history: [], settings: L.DEFAULT_SETTINGS, loaded: false, saving: 0, error: null, mode: 'demo', lastLoad: null };
+  const state = { ncrs: [], history: [], imports: [], stack: [], meta: {}, settings: L.DEFAULT_SETTINGS, loaded: false, saving: 0, error: null, mode: 'demo', lastLoad: null };
   const listeners = [];
   let adapter = LocalAdapter;
   let chain = Promise.resolve();
@@ -89,17 +97,17 @@ window.NCR = window.NCR || {};
     });
     state.history = (d.history || []).map((h) => { const r = {}; HIST_FIELDS.forEach((f) => { r[f] = h[f] == null ? '' : h[f]; }); return r; });
     state.settings = Object.assign({}, L.DEFAULT_SETTINGS, d.settings || {});
+    state.imports = Array.isArray(d.imports) ? d.imports : state.imports; state.stack = Array.isArray(d.stack) ? d.stack : state.stack; state.meta = d.meta || state.meta;
     state.loaded = true; state.lastLoad = Date.now();
   }
 
   async function init() {
-    const cfg = getApiConfig();
-    adapter = cfg.url ? SheetsAdapter(cfg) : LocalAdapter;
+    adapter = hasGas() ? GasAdapter() : LocalAdapter;
     state.mode = adapter.name;
     await reload();
   }
   async function reload() {
-    try { normalize(await adapter.load()); state.error = null; } catch (e) { state.error = 'Cannot load data: ' + e.message; }
+    try { normalize(await adapter.load()); state.error = null; state.needCode = false; } catch (e) { state.needCode = /access code/i.test(e.message); state.error = state.needCode ? null : 'Cannot load data: ' + e.message; }
     emit();
   }
   function persist(fn) {
@@ -287,8 +295,8 @@ window.NCR = window.NCR || {};
     if (b.seen) ls.set(SEEN_KEY, b.seen);
     ls.set(BK_KEY, L.nowStamp()); emit();
     return persist(async () => {
-      if (adapter.restore) await adapter.restore(d);
-      else { await adapter.clear(); await adapter.save({ ncrs: state.ncrs, history: state.history }); await adapter.saveSettings(state.settings); }
+      await adapter.restore(d);
+      await adapter.saveMeta({ imports: state.imports, stack: state.stack });
     });
   }
   // rough browser storage use (localStorage is about 5 MB per site)
@@ -298,24 +306,17 @@ window.NCR = window.NCR || {};
   }
 
   // ---- undo a wrong import / clear everything ----
-  const LAST_KEY = 'ncr.lastImport';
   // Every import keeps how to take it back, so uploads can be removed newest-first (a stack).
-  const STACK_KEY = 'ncr.importStack', STACK_MAX = 15;
-  function getStack() {
-    try {
-      const s = JSON.parse(localStorage.getItem(STACK_KEY)) || [], old = JSON.parse(localStorage.getItem(LAST_KEY));
-      return old && !s.some((x) => x.at === old.at) ? s.concat([old]) : s; // an import saved before the stack existed
-    } catch (e) { return []; }
-  }
-  function setStack(v) { try { localStorage.removeItem(LAST_KEY); v && v.length ? localStorage.setItem(STACK_KEY, JSON.stringify(v.slice(-STACK_MAX))) : localStorage.removeItem(STACK_KEY); } catch (e) { /* storage unavailable */ } }
-  function getLastImport() { const s = getStack(); return s[s.length - 1] || null; }
+  const STACK_MAX = 15;
+  const getStack = () => (state.stack || []).slice();
+  const getLastImport = () => getStack()[getStack().length - 1] || null;
+  const getImports = () => (state.imports || []).slice();
+  const saveMeta = () => persist(() => adapter.saveMeta({ imports: state.imports, stack: state.stack }));
+  const setStack = (v) => { state.stack = (v || []).slice(-STACK_MAX); };
+  const setImports = (v) => { state.imports = v || []; };
 
-  // Import log (one entry per upload) for the Import history page. Kept in this browser.
-  const LOG_KEY = 'ncr.imports';
-  function getImports() { try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch (e) { return []; } }
-  function setImports(v) { try { v && v.length ? localStorage.setItem(LOG_KEY, JSON.stringify(v)) : localStorage.removeItem(LOG_KEY); } catch (e) { /* storage unavailable */ } }
-
-  function patchImportLog(at, patch) { setImports(getImports().map((x) => (x.at === at ? Object.assign({}, x, patch) : x))); }
+  // Import log (one entry per upload) for the Imports and What changed pages.
+  function patchImportLog(at, patch) { setImports(getImports().map((x) => (x.at === at ? Object.assign({}, x, patch) : x))); return saveMeta(); }
 
   // Save an import result and remember how to take it back.
 
@@ -326,6 +327,7 @@ window.NCR = window.NCR || {};
     const { changes, ...undoMeta } = meta || {}; // the change list only goes to the log, not the (larger) undo stack
     setStack(getStack().concat([Object.assign({ at, prev, addedIds, historyIds: result.history.map((h) => h.History_ID) }, undoMeta)]));
     setImports(getImports().concat([Object.assign({ at }, undoMeta, changes ? { changes } : {})]));
+    saveMeta();
     return saveMany(result.ncrs, result.history);
   }
   // Remove what the last import added and restore what it changed.
@@ -339,12 +341,12 @@ window.NCR = window.NCR || {};
     state.history = state.history.filter((h) => !added.has(h.NCR_ID) && !dropH.has(h.History_ID));
     commit(restored, [], { deleteIds: rec.addedIds, deleteHistoryIds: rec.historyIds });
     setImports(getImports().filter((x) => x.at !== rec.at));
-    setStack(stack.slice(0, -1)); emit();
+    setStack(stack.slice(0, -1)); saveMeta(); emit();
     return 1;
   }
   function clearAll() {
     state.ncrs = []; state.history = []; setStack([]); setImports([]);
-    persist(() => adapter.clear());
+    persist(() => adapter.clear()); saveMeta();
     emit();
   }
   function resetDemo() { return clearAll(); }
@@ -353,5 +355,5 @@ window.NCR = window.NCR || {};
   function demoData() { return { ncrs: [], history: [], settings: {} }; }
 
   NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
-    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, undoReview, removeNcr, saveMany, applyImport, undoImport, exportBundle, bundleError, restoreBundle, storageInfo, lastBackup: () => ls.get(BK_KEY), getImports, patchImportLog, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, getApiConfig, setApiConfig, resetDemo };
+    saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, undoReview, removeNcr, saveMany, applyImport, undoImport, exportBundle, bundleError, restoreBundle, storageInfo, lastBackup: () => ls.get(BK_KEY), getImports, patchImportLog, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, resetDemo, setAccessCode: (c) => { accessCode = String(c || ''); }, isTeamMode: () => hasGas() };
 })(window.NCR);
