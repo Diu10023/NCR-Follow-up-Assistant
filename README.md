@@ -56,3 +56,6 @@ In **Import history**, every upload has a Delete button. Uploads are removed new
 
 ## What changed notification
 After each upload a 🔔 banner appears on Home, To follow up and Followed up until you open **What changed** (or dismiss it). The page lists, for that upload: buyer remark updates (before → now), new NCRs, cleared remarks, buyer changes and NCRs closed by the file. Every row in Import history has a **Changes** button to reopen it.
+
+## How to use page
+The **How to use** menu explains the weekly routine step by step, what each word means (To follow up, Followed up, No remark, Hold for scrap, Rounds, Carried over…) and what the colours mean. Menu items also show a short tooltip.

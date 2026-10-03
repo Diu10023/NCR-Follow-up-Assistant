@@ -68,7 +68,7 @@ window.NCR = window.NCR || {};
   const byDue = (a, b) => (a.Due_Date || '9999') < (b.Due_Date || '9999') ? -1 : (a.Due_Date || '9999') > (b.Due_Date || '9999') ? 1 : 0;
   const byOldest = (a, b) => String(a.NCR_Date || '9999').localeCompare(String(b.NCR_Date || '9999'));
 
-  const emptyState = () => `<div class="card empty-state"><h2>No NCRs yet</h2><p>All data comes from your Excel export. Upload the file to get started — upload the same export again every week and only new or changed NCRs are applied.</p><a class="btn primary" href="#/import">Import Excel</a></div>`;
+  const emptyState = () => `<div class="card empty-state"><h2>No NCRs yet</h2><p>All data comes from your Excel export. Upload the file to get started — upload the same export again every week and only new or changed NCRs are applied.</p><a class="btn primary" href="#/import">Import Excel</a> <a class="btn" href="#/help">❓ How to use</a></div>`;
 
   // ---------- charts (inline SVG, no library) ----------
   // Palette from the design colours, validated as one ordered set: dark, blue, grey, light blue.
@@ -156,7 +156,7 @@ window.NCR = window.NCR || {};
         <td>${r.closed ? `<a href="#/closed" data-closed="${esc(r.name)}">${r.closed}</a>` : '<span class="muted">0</span>'}</td></tr>
       ${HOME_OPEN.has(r.name) ? `<tr class="sub-row"><td colspan="10"><div class="sub">No remark, still to follow up (${r.none}):</div><div class="nolist">${r.noneIds.length ? r.noneIds.slice().sort(byOldest).slice(0, 60).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(' ') + (r.noneIds.length > 60 ? ' …' : '') : '<span class="muted">none</span>'}</div></td></tr>` : ''}`).join('');
     const big = (v, l, href, attr) => `<a class="big" href="${href}" ${attr || ''}><b>${v}</b><span>${l}</span></a>`;
-    return { html: `<div class="page-head"><h1>Home</h1><span class="inline"><a class="btn" href="#/response">📊 Buyer response</a><span class="muted">${L.fmtDate(L.todayISO())}</span></span></div>
+    return { html: `<div class="page-head"><h1>Home</h1><span class="inline"><a class="btn" href="#/help">❓ How to use</a><a class="btn" href="#/response">📊 Buyer response</a><span class="muted">${L.fmtDate(L.todayISO())}</span></span></div>
       <div class="bigs">${big(tot.total, 'Total', '#/home')}${big(tot.todo, 'To follow up', '#/list', `data-filter='${esc(JSON.stringify({ tab: 'none' }))}'`)}${big(tot.followed, 'Followed up', '#/followed', `data-wfilter='{}'`)}${big(tot.hold, 'Hold for scrap', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'hold' }))}'`)}${big(tot.jira, 'Jira closed', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'jira' }))}'`)}${big(tot.closed, 'Closed', '#/closed', 'data-closed=""')}</div>
       <div class="charts">
         <section class="block"><h2>Overview by buyer</h2><p class="hint">Each bar is all of one buyer's NCRs, split by status: still to follow up (no remark / in progress), followed up, hold for scrap, Jira closed and closed. Hover a segment for the exact count.</p>${buyerChart(rows)}</section>
@@ -660,6 +660,39 @@ window.NCR = window.NCR || {};
         <div class="table-wrap"><table class="grid"><thead><tr><th>Buyer</th><th>Open</th><th title="Follow-ups recorded by QA">QA follow-ups</th><th title="Times the buyer changed the Remarks">Remark updates</th><th title="Weeks (with an upload) in which the buyer updated at least one Remark">Weeks with an update</th><th>Closed this month</th></tr></thead><tbody>${tbody}</tbody></table></div></section>` };
   }
 
+  // ---------- How to use ----------
+  function helpPage() {
+    const row = (t, d) => `<tr><td class="nowrap"><b>${t}</b></td><td>${d}</td></tr>`;
+    const step = (n, t, d) => `<li><span class="stepn">${n}</span><div><b>${t}</b><div class="muted">${d}</div></div></li>`;
+    return { html: `<div class="page-head"><div><h1>How to use</h1><div class="muted">A 5-minute guide. Everything in this app comes from your weekly Excel file, so there is nothing to type in by hand.</div></div></div>
+      <section class="block"><h2>Your weekly routine (e.g. Monday morning)</h2>
+        <ol class="steps2">
+          ${step(1, 'Upload this week’s Excel', '<a href="#/import">Import Excel</a> → choose the file → check the preview → Import. The app compares it with last week’s file.')}
+          ${step(2, 'Read what changed', 'A 🔔 banner appears. <a href="#/changes">What changed</a> lists buyer updates, new NCRs and closed ones. <a href="#/response">Buyer response</a> (on Home) shows who updates every week.')}
+          ${step(3, 'Chase the new ones', '<a href="#/list">To follow up</a>: start with <b>1 · No remark</b> (red). Tick the rows → <b>Follow-up</b> → copy the message to each buyer.')}
+          ${step(4, 'Keep chasing the old ones', '<a href="#/followed">Followed up</a>: red and orange rows have no reply or keep going without finishing. Use <b>Export to Excel</b> to attach a list per buyer to your email.')}
+          ${step(5, 'Nothing to close by hand', 'NCRs close themselves when the next file says Closed = Yes or the remark mentions Jira. You never close or edit an NCR here.')}
+        </ol></section>
+      <section class="block"><h2>What the words mean</h2><div class="table-wrap"><table class="grid">
+        ${row('To follow up', 'NCRs you have not chased yet.')}
+        ${row('Followed up', 'NCRs you chased (pressed Follow-up). They stay here until a later file closes them, and every buyer reply is added to their timeline.')}
+        ${row('No remark', 'The buyer wrote nothing in the Remarks column of the file. QA has to chase.')}
+        ${row('Has remark', 'The buyer wrote something. Read it, then chase if it is not finished.')}
+        ${row('Hold for scrap', 'The remark says hold or scrap, so the NCR is waiting for scrap. It is kept out of the follow-up lists.')}
+        ${row('Jira closed', 'The remark mentions Jira, so the NCR is closed at import. It is listed on the Hold &amp; Jira page, not on Closed.')}
+        ${row('Rounds', 'Follow-ups you made plus remark changes by the buyer. Many rounds and still open means it keeps moving but never finishes.')}
+        ${row('# (work order)', 'The number on each row is the order to work in: No remark first (oldest first), then the ones with the most rounds.')}
+        ${row('Carried over', 'Open NCRs that did not change in the latest file. They are the old ones you keep chasing.')}
+        ${row('File date', 'The day the Excel export was taken. Leave it as today unless you upload late.')}
+      </table></div></section>
+      <section class="block"><h2>What the colours mean</h2><div class="table-wrap"><table class="grid">
+        <tr><td><span class="chip age-escalation">Red</span></td><td>Chase first: no remark, or followed up several times with no reply.</td></tr>
+        <tr><td><span class="chip age-attention">Orange</span></td><td>Has a remark but keeps going for many rounds without finishing.</td></tr>
+        <tr><td><span class="chip" style="background:var(--h3t)">Amber</span></td><td>Has a remark. Check progress.</td></tr>
+        <tr><td><span class="chip new">Blue</span></td><td>New or updated in the latest upload (🆕 / 🔔).</td></tr>
+      </table></div></section>` };
+  }
+
   // ---------- What changed in an upload (notification) ----------
   const latestLog = () => S.getImports().filter((x) => x.changes).pop();
   function changeBanner() {
@@ -770,5 +803,5 @@ window.NCR = window.NCR || {};
     } };
   }
 
-  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, changesPage, changeBanner, responsePage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
+  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, helpPage, changesPage, changeBanner, responsePage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
 })(window.NCR);
