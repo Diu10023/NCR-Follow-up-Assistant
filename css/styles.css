@@ -318,3 +318,8 @@ a.cal-d.up{text-decoration:none}
 .cal-d.up i{font-size:10.5px}
 .upcard{padding:12px 4px;border-bottom:1px solid var(--line-s);display:flex;flex-direction:column;gap:6px}
 .upchips{display:flex;flex-wrap:wrap;gap:6px}
+
+/* tab bar that groups pages under one menu entry */
+.gtabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px}
+.gtab{padding:9px 18px;border-radius:16px;font-weight:700;font-size:15px;color:var(--mut);background:var(--bg);box-shadow:var(--ext-s);text-decoration:none}
+.gtab:hover{color:var(--fg)}.gtab.on{color:var(--acc);box-shadow:var(--ins-s)}

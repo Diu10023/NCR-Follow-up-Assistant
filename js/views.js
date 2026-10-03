@@ -155,7 +155,7 @@ window.NCR = window.NCR || {};
         <td>${r.closed ? `<a href="#/closed" data-closed="${esc(r.name)}">${r.closed}</a>` : '<span class="muted">0</span>'}</td></tr>
       ${HOME_OPEN.has(r.name) ? `<tr class="sub-row"><td colspan="10"><div class="sub">No remark, still to follow up (${r.none}):</div><div class="nolist">${r.noneIds.length ? r.noneIds.slice().sort(byOldest).slice(0, 60).map((n) => `<a href="#/ncr/${esc(n.NCR_ID)}">${esc(n.NCR_No)}</a>`).join(' ') + (r.noneIds.length > 60 ? ' …' : '') : '<span class="muted">none</span>'}</div></td></tr>` : ''}`).join('');
     const big = (v, l, href, attr) => `<a class="big" href="${href}" ${attr || ''}><b>${v}</b><span>${l}</span></a>`;
-    return { html: `<div class="page-head"><h1>Home</h1><span class="inline"><a class="btn" href="#/trends">📈 Trends</a><button class="btn" data-action="export-all" title="One Excel file: every status on its own sheet, plus summary, timeline and uploads">⬇ Export all to Excel</button><a class="btn" href="#/help">❓ How to use</a><a class="btn" href="#/response">📊 Buyer response</a><span class="muted">${L.fmtDate(L.todayISO())}</span></span></div>
+    return { html: `<div class="page-head"><h1>Home</h1><span class="inline"><button class="btn" data-action="export-all" title="One Excel file: every status on its own sheet, plus summary, timeline and uploads">⬇ Export all to Excel</button><a class="btn" href="#/help">❓ How to use</a><span class="muted">${L.fmtDate(L.todayISO())}</span></span></div>
       <div class="bigs">${big(tot.total, 'Total', '#/home')}${big(tot.todo, 'To follow up', '#/list', `data-filter='${esc(JSON.stringify({ tab: 'none' }))}'`)}${big(tot.followed, 'Followed up', '#/followed', `data-wfilter='{}'`)}${big(tot.hold, 'Hold for scrap', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'hold' }))}'`)}${big(tot.jira, 'Jira closed', '#/hold', `data-hjfilter='${esc(JSON.stringify({ tab: 'jira' }))}'`)}${big(tot.closed, 'Closed', '#/closed', 'data-closed=""')}</div>
       <div class="charts">
         <section class="block"><h2>Overview by buyer</h2><p class="hint">Each bar is all of one buyer's NCRs, split by status: still to follow up (no remark / in progress), followed up, hold for scrap, Jira closed and closed. Hover a segment for the exact count.</p>${buyerChart(rows)}</section>
@@ -575,7 +575,7 @@ window.NCR = window.NCR || {};
           <div class="actions"><button class="btn primary" id="imp-go"${missingReq.length || (!p.added.length && !p.updated.length && !p.closeNow.length && !(imp.opts.closeMissing && p.missing.length)) ? ' disabled' : ''}>Import into NCR Master</button>
           <button class="btn" id="imp-cancel">Cancel</button></div></section>`;
     }
-    return { html: `<div class="page-head"><h1>Import from Excel</h1><a class="btn" href="#/imports">📅 Import history (${S.getImports().length})</a></div>
+    return { html: `<div class="page-head"><h1>Import from Excel</h1></div>
       <section class="card"><h2>1. Upload raw data</h2><p class="hint">Upload the periodic NCR export (.xlsx, .xls or .csv). New NCRs are added; existing ones (matched by NCR No.) keep all QA follow-up data.</p>
         <label class="drop" id="drop"><input type="file" id="imp-file" accept=".xlsx,.xls,.xlsm,.csv" hidden><span>📁 Click or drop an Excel file here</span></label></section>${body}
       <div class="hist-sep">${IB.html}</div>`,
@@ -738,6 +738,20 @@ window.NCR = window.NCR || {};
       <section class="block"><h2>Numbers behind the charts</h2><div class="table-wrap"><table class="grid compact"><thead><tr><th>File date</th><th>File</th><th>Open</th><th>No remark</th><th>Over 90 d</th><th>Followed up</th><th>Hold</th><th>Jira closed</th><th>Closed</th><th>New</th><th>Closed by file</th></tr></thead><tbody>${rows}</tbody></table></div></section>` };
   }
 
+  // Tab bars that group related pages under one menu item (fewer menu entries)
+  function groupTabs(page) {
+    const tab = (href, label, on, extra) => `<a class="gtab${on ? ' on' : ''}" href="${href}">${label}${extra || ''}</a>`;
+    if (['import', 'imports', 'changes', 'response', 'trends'].includes(page)) {
+      const lg = latestLog(), unseen = lg && S.getSeen() !== lg.at ? new Set(lg.changes.filter((c) => ['new', 'update', 'cleared'].includes(c.t)).map((c) => c.no)).size : 0;
+      return `<div class="gtabs">${tab('#/import', 'Import', page === 'import' || page === 'imports')}${tab('#/changes', 'What changed', page === 'changes', unseen ? ` <span class="nbadge">${unseen}</span>` : '')}${tab('#/response', 'Buyers', page === 'response')}${tab('#/trends', 'Trends', page === 'trends')}</div>`;
+    }
+    if (['hold', 'closed'].includes(page)) {
+      const n = st.ncrs.filter((x) => inf(x).bucket === 'hold').length + st.ncrs.filter((x) => inf(x).bucket === 'jira').length, c = st.ncrs.filter((x) => inf(x).bucket === 'closed').length;
+      return `<div class="gtabs">${tab('#/hold', 'Hold &amp; Jira', page === 'hold', ` <span class="nbadge">${n}</span>`)}${tab('#/closed', 'Closed', page === 'closed', ` <span class="nbadge">${c}</span>`)}</div>`;
+    }
+    return '';
+  }
+
   // ---------- How to use ----------
   function helpPage() {
     const row = (t, d) => `<tr><td class="nowrap"><b>${t}</b></td><td>${d}</td></tr>`;
@@ -746,7 +760,7 @@ window.NCR = window.NCR || {};
       <section class="block"><h2>Your weekly routine (any day you upload)</h2>
         <ol class="steps2">
           ${step(1, 'Upload this week’s Excel', '<a href="#/import">Import Excel</a> → choose the file → check the preview → Import. The app compares it with last week’s file.')}
-          ${step(2, 'Read what changed', 'A 🔔 banner appears. <a href="#/changes">What changed</a> lists buyer updates, new NCRs and closed ones. <a href="#/response">Buyer response</a> (on Home) shows who updates every week.')}
+          ${step(2, 'Read what changed', 'A 🔔 banner appears. <a href="#/changes">What changed</a> lists buyer updates, new NCRs and closed ones. <a href="#/response">Buyers</a> shows who updates, and <a href="#/trends">Trends</a> shows whether the backlog is shrinking. All of them are under the Uploads menu.')}
           ${step(3, 'Chase the new ones', '<a href="#/list">To follow up</a>: start with <b>1 · No remark</b> (red). Tick the rows → <b>Follow-up</b> → copy the message to each buyer.')}
           ${step(4, 'Keep chasing the old ones', '<a href="#/followed">Followed up</a>: red and orange rows have no reply or keep going without finishing. Use <b>Export to Excel</b> to attach a list per buyer to your email.')}
           ${step(5, 'Nothing to close by hand', 'NCRs close themselves when the next file says Closed = Yes or the remark mentions Jira. You never close or edit an NCR here.')}
@@ -893,5 +907,5 @@ window.NCR = window.NCR || {};
     } };
   }
 
-  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, exportBook, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, trendsPage, trendsSvg, monthBook, snapshotNow, helpPage, changesPage, changeBanner, responsePage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
+  NCR.views = { esc, options, withCurrent, home, closedPage, list, followedPage, exportRows, exportBook, setWaitFilter, holdPage, setHJ, currentIds, CF, detail, importPage, importsPage, groupTabs, trendsPage, trendsSvg, monthBook, snapshotNow, helpPage, changesPage, changeBanner, responsePage, settings, setFilter, inf, SEL, showAll, sectionIds, HOME_OPEN, WF_OPEN, isFollowed, buyerOf, open, NO_BUYER };
 })(window.NCR);
