@@ -19,6 +19,8 @@ var CHUNK = 40000; // a Sheets cell holds at most 50,000 characters
 // ---------- web app ----------
 // The page is split into five HTML files (Index, Styles, Core, Views, App) so each is small enough to paste.
 var PAGE_FILES = ['Index', 'Styles', 'Core', 'Views', 'App'];
+// A complete file ends with its closing tag; a file that was cut off while pasting does not.
+var PAGE_ENDS = { Index: /<\/html>\s*$/, Styles: /<\/style>\s*$/, Core: /<\/script>\s*$/, Views: /<\/script>\s*$/, App: /<\/script>\s*$/ };
 function include(name) { return HtmlService.createHtmlOutputFromFile(name).getContent(); }
 
 function doGet() {
@@ -26,11 +28,11 @@ function doGet() {
   PAGE_FILES.forEach(function (n) {
     var t = null;
     try { t = include(n); } catch (e) { bad.push('<li><b>' + n + '</b>: file not found. Create an HTML file with exactly this name.</li>'); return; }
-    if (t.indexOf('NCR-END-' + n) < 0) bad.push('<li><b>' + n + '</b>: incomplete or an old version (' + Math.round(t.length / 1024) + ' KB). Paste the whole file again.</li>');
+    if (!PAGE_ENDS[n].test(t)) bad.push('<li><b>' + n + '</b>: looks cut off (' + Math.round(t.length / 1024) + ' KB). Paste the whole file again.</li>');
   });
   if (bad.length) {
     return HtmlService.createHtmlOutput('<div style="font-family:Arial,sans-serif;padding:28px;max-width:680px"><h2>Some files are missing or incomplete</h2><ul>' + bad.join('') +
-      '</ul><p>Open each file in this Apps Script project, delete everything, paste the whole content again (download it, open it with Notepad, Ctrl+A, Ctrl+C), and save. The last line of each file is a comment starting with <code>NCR-END</code>. Then Deploy a new version.</p></div>');
+      '</ul><p>Open each file in this Apps Script project, delete everything, paste the whole content again (open the .txt file with Notepad, Ctrl+A, Ctrl+C), and save. Then Deploy a new version.</p></div>');
   }
   return HtmlService.createTemplateFromFile('Index').evaluate()
     .setTitle('NCR Follow-up Control')
