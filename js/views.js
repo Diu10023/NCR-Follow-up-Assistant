@@ -16,7 +16,7 @@ window.NCR = window.NCR || {};
   const SEL = new Set();
   const showAll = {};
   const sectionIds = {};
-  const cbHead = '<th class="cb"><input type="checkbox" class="sel-all" title="Select all in this table"></th>';
+  const cbHead = (key) => `<th class="cb"><input type="checkbox" class="sel-all"${key ? ` data-key="${key}"` : ''} title="Select all ${key ? 'in this list, including rows not shown' : 'in this table'}"></th>`;
   const cbCell = (n) => `<td class="cb"><input type="checkbox" class="sel" data-id="${esc(n.NCR_ID)}"${SEL.has(n.NCR_ID) ? ' checked' : ''}></td>`;
 
   // ---------- small renderers ----------
@@ -62,7 +62,7 @@ window.NCR = window.NCR || {};
         <td class="right nowrap">${i.needsReview ? `<button class="btn sm" data-action="reviewed" data-id="${esc(n.NCR_ID)}" title="I read the buyer update – check again in ${st.settings.defaultCheckDays} days">✓ Reviewed</button>` : ''}</td></tr>`;
     }).join('');
     const more = list.length > limit ? `<div class="more"><button class="link" data-action="showall" data-key="${key}">${showAll[key] ? 'Show fewer' : `Show all ${list.length}`}</button> · <button class="link" data-action="selsection" data-key="${key}">Select all ${list.length}</button></div>` : '';
-    return `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th>${withRemark ? '<th>Buyer remark</th>' : ''}<th>Why</th><th>Next check</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
+    return `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead(key)}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th>${withRemark ? '<th>Buyer remark</th>' : ''}<th>Why</th><th>Next check</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
   }
 
   const byDue = (a, b) => (a.Due_Date || '9999') < (b.Due_Date || '9999') ? -1 : (a.Due_Date || '9999') > (b.Due_Date || '9999') ? 1 : 0;
@@ -395,7 +395,7 @@ window.NCR = window.NCR || {};
     return `${pillsHtml(per, all.length, WF.buyer, 'data-wbuyer')}${buyerLine(WF.buyer)}${tabsHtml(cnt, WF.tab, 'data-wtab')}
       <div class="row-between wait-line"><span class="muted">${list.length ? `<b>${attn}</b> of these need your attention${unanswered ? ` (<b>${unanswered}</b> with no reply after ${st.settings.escalationThreshold || 3}+ follow-ups)` : ''}: no reply, buyer updated, or check date reached. The rest are waiting.` : ''}</span>
         <button class="btn" data-action="export" data-src="followed"${list.length ? '' : ' disabled'}>Export to Excel</button></div>
-      <section class="block">${list.length ? `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th><th>Latest remark</th><th>Last follow-up</th><th>Next check</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+      <section class="block">${list.length ? `<div class="table-wrap"><table class="grid compact"><thead><tr>${cbHead('followed')}<th title="Work order">#</th><th>NCR</th><th>Buyer / Defect</th><th>Latest remark</th><th>Last follow-up</th><th>Next check</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
         : `<div class="empty">${all.length ? 'No NCRs in this tab.' : 'Nothing here yet. Press Follow-up on an NCR in To follow up: it moves here and stays until it is closed.'}</div>`}</section>`;
   }
   function followedPage() {

@@ -220,6 +220,8 @@
     if (cb.classList && cb.classList.contains('sel')) { cb.checked ? V.SEL.add(cb.dataset.id) : V.SEL.delete(cb.dataset.id); updateBulkBar(); }
     else if (cb.classList && cb.classList.contains('sel-all')) {
       cb.closest('table').querySelectorAll('.sel').forEach((x) => { x.checked = cb.checked; cb.checked ? V.SEL.add(x.dataset.id) : V.SEL.delete(x.dataset.id); });
+      // the whole list, also the rows beyond the "Show all" limit
+      (V.sectionIds[cb.dataset.key] || []).forEach((id) => { cb.checked ? V.SEL.add(id) : V.SEL.delete(id); });
       updateBulkBar();
     }
   });
