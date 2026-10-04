@@ -150,11 +150,15 @@ window.NCR = window.NCR || {};
     try { await refreshOnce(); } finally { state.refreshing = false; }
   }
   async function refreshOnce() {
-    if (!adapter.version || state.noVersion) { if (Date.now() - (state.lastLoad || 0) >= 20000) await reload(); return; }
+    if (!adapter.version || state.noVersion) { if (Date.now() - (state.lastLoad || 0) >= 20000) { await reload(); noteCheck(state.error); } return; }
     let v;
-    try { v = (await adapter.version()).v; } catch (e) { if (/Unknown function/i.test(e.message)) state.noVersion = true; return; }
+    try { v = (await adapter.version()).v; } catch (e) { if (/Unknown function/i.test(e.message)) { state.noVersion = true; return; } noteCheck(e.message); return; }
+    noteCheck('');
     if (v !== state.version) await reload();
   }
+  // The auto-refresh shows when it last checked the Sheet (and why a check failed) without redrawing the page.
+  const checkListeners = [];
+  function noteCheck(err) { state.lastCheck = Date.now(); state.checkError = err || ''; checkListeners.forEach((f) => f()); }
   function persist(fn) {
     state.saving++; emit();
     chain = chain.then(fn).then(() => { state.error = null; }).catch((e) => { state.error = 'Save failed: ' + e.message + ' — changes are only on this screen until saved.'; })
@@ -399,6 +403,6 @@ window.NCR = window.NCR || {};
   // Browser-only mode starts empty: all data comes from the uploaded Excel file.
   function demoData() { return { ncrs: [], history: [], settings: {} }; }
 
-  NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, refresh, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
+  NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, refresh, onCheck: (f) => checkListeners.push(f), subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
     saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, undoReview, removeNcr, saveMany, applyImport, undoImport, exportBundle, bundleError, restoreBundle, storageInfo, lastBackup: () => ls.get(BK_KEY), getImports, patchImportLog, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, resetDemo, setAccessCode: (c) => { accessCode = String(c || ''); lsSet('ncr.code', accessCode); }, isTeamMode: () => hasGas() || !!apiUrl(), getApiUrl: apiUrl, setApiUrl: (u) => lsSet('ncr.apiUrl', String(u || '').trim()), forgetCode: () => { accessCode = ''; lsSet('ncr.code', ''); } };
 })(window.NCR);

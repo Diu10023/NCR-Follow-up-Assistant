@@ -45,16 +45,25 @@
     const el = $('#sync');
     const si = st.mode === 'sheets' ? { pct: 0, kb: 0 } : S.storageInfo();
     el.className = 'sync' + (st.error || si.pct >= 80 ? ' err' : '');
-    el.textContent = st.error ? '⚠️ ' + st.error : si.pct >= 80 ? `⚠️ Browser storage is ${si.pct}% full. Save a backup (Settings → Your data) and consider clearing old data.` : st.saving ? 'Saving…' : st.mode === 'sheets' ? '✓ Synced with Google Sheets' : '';
+    el.textContent = st.error ? '⚠️ ' + st.error : si.pct >= 80 ? `⚠️ Browser storage is ${si.pct}% full. Save a backup (Settings → Your data) and consider clearing old data.` : st.saving ? 'Saving…' : st.mode === 'sheets' ? (st.checkError ? '⚠️ Cannot check for updates (' + st.checkError + '). Retrying…' : '✓ Synced with Google Sheets' + (st.lastCheck ? ' · checked ' + new Date(st.lastCheck).toLocaleTimeString() : '')) : '';
     $('#mode').hidden = st.mode !== 'demo';
   }
 
+  S.onCheck(status);
   S.subscribe(() => {
     status();
     const a = document.activeElement;
     const editing = a && main.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
-    if (st.loaded && !modal.open && !editing) { window.__keepScroll = window.scrollY; render(); }
+    if (st.loaded && !modal.open && !editing) { pendingRender = false; window.__keepScroll = window.scrollY; render(); } else if (st.loaded) pendingRender = true;
   });
+  // A change that arrived while someone was typing or a dialog was open is drawn as soon as that is over.
+  let pendingRender = false;
+  function drawPending() {
+    const a = document.activeElement;
+    if (pendingRender && st.loaded && !modal.open && !(a && main.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) { pendingRender = false; window.__keepScroll = window.scrollY; render(); }
+  }
+  document.addEventListener('focusout', () => setTimeout(drawPending, 150));
+  modal.addEventListener('close', () => setTimeout(drawPending, 150));
   // remember where each page was scrolled, so Back returns to the same spot in a long list
   const scrollMem = {}; let scrollKey = location.hash;
   window.addEventListener('scroll', () => { scrollMem[scrollKey] = window.scrollY; }, { passive: true });
@@ -337,10 +346,12 @@
     if (row && !e.target.closest('a,button,input,select')) location.hash = row.dataset.href;
   });
 
-  // Auto-load: check for changes when the tab regains focus and every 5 seconds (Sheets mode only).
-  function autoRefresh() { if (st.mode === 'sheets' && !st.saving && !modal.open) S.refresh(); }
+  // Auto-load: check for changes when the tab regains focus and every 8 seconds (Sheets mode only).
+  function autoRefresh() { drawPending(); if (st.mode === 'sheets' && !st.saving && !modal.open) S.refresh(); }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) autoRefresh(); });
-  setInterval(autoRefresh, 5000);
+  window.addEventListener('focus', autoRefresh);
+  window.addEventListener('online', autoRefresh);
+  setInterval(autoRefresh, 8000);
 
   // one shared tooltip for chart marks (text only, via textContent)
   const tip = document.createElement('div'); tip.id = 'tip'; tip.hidden = true;
