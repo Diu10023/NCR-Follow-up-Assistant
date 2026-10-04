@@ -143,14 +143,14 @@ window.NCR = window.NCR || {};
     emit();
   }
   // Cheap check used by the auto-refresh: ask the Sheet for its change counter and only reload the data when it moved.
-  // An older Apps Script without that counter falls back to a full reload every 20 seconds.
+  // An older Apps Script without that counter falls back to a full reload every 10 seconds.
   async function refresh() {
     if (state.refreshing) return;
     state.refreshing = true;
     try { await refreshOnce(); } finally { state.refreshing = false; }
   }
   async function refreshOnce() {
-    if (!adapter.version || state.noVersion) { if (Date.now() - (state.lastLoad || 0) >= 20000) { await reload(); noteCheck(state.error); } return; }
+    if (!adapter.version || state.noVersion) { if (Date.now() - (state.lastLoad || 0) >= 10000) { await reload(); noteCheck(state.error); } return; }
     let v;
     try { v = (await adapter.version()).v; } catch (e) { if (/Unknown function/i.test(e.message)) { state.noVersion = true; return; } noteCheck(e.message); return; }
     noteCheck('');

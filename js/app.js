@@ -45,7 +45,7 @@
     const el = $('#sync');
     const si = st.mode === 'sheets' ? { pct: 0, kb: 0 } : S.storageInfo();
     el.className = 'sync' + (st.error || si.pct >= 80 ? ' err' : '');
-    el.textContent = st.error ? '⚠️ ' + st.error : si.pct >= 80 ? `⚠️ Browser storage is ${si.pct}% full. Save a backup (Settings → Your data) and consider clearing old data.` : st.saving ? 'Saving…' : st.mode === 'sheets' ? (st.checkError ? '⚠️ Cannot check for updates (' + st.checkError + '). Retrying…' : '✓ Synced with Google Sheets' + (st.lastCheck ? ' · checked ' + new Date(st.lastCheck).toLocaleTimeString() : '')) : '';
+    el.textContent = st.error ? '⚠️ ' + st.error : si.pct >= 80 ? `⚠️ Browser storage is ${si.pct}% full. Save a backup (Settings → Your data) and consider clearing old data.` : st.saving ? 'Saving…' : st.mode === 'sheets' ? (st.checkError ? '⚠️ Cannot check for updates (' + st.checkError + '). Retrying…' : '✓ Synced with Google Sheets' + (st.lastCheck ? ' · checked ' + new Date(st.lastCheck).toLocaleTimeString() : '') + (st.noVersion ? ' · slower updates: the Apps Script code is an old version' : '')) : '';
     $('#mode').hidden = st.mode !== 'demo';
   }
 
