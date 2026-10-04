@@ -71,7 +71,8 @@ var API = { apiLoad: apiLoad, apiSave: apiSave, apiSaveSettings: apiSaveSettings
 function api_(code, write, fn) {
   if (ACCESS_CODE && code !== ACCESS_CODE) throw new Error('Wrong or missing access code');
   var lock = null;
-  if (write) { lock = LockService.getScriptLock(); lock.waitLock(25000); }
+  // Reads wait for writes too: a write clears cells before filling them, so an unlocked read could see empty data.
+  lock = LockService.getScriptLock(); lock.waitLock(25000);
   try { return JSON.stringify(fn()); } finally { if (lock) lock.releaseLock(); }
 }
 
