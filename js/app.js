@@ -47,9 +47,16 @@
     el.className = 'sync' + (st.error || si.pct >= 80 ? ' err' : '');
     el.textContent = st.error ? '⚠️ ' + st.error : si.pct >= 80 ? `⚠️ Browser storage is ${si.pct}% full. Save a backup (Settings → Your data) and consider clearing old data.` : st.saving ? 'Saving…' : st.mode === 'sheets' ? (st.checkError ? '⚠️ Cannot check for updates (' + st.checkError + '). Retrying…' : '✓ Synced with Google Sheets' + (st.lastCheck ? ' · checked ' + new Date(st.lastCheck).toLocaleTimeString() : '') + (st.noVersion ? ' · slower updates: the Apps Script code is an old version' : '')) : '';
     $('#mode').hidden = st.mode !== 'demo';
+    $('#refresh-btn').hidden = st.mode !== 'sheets';
   }
 
   S.onCheck(status);
+  $('#refresh-btn').addEventListener('click', async (e) => {
+    const b = e.currentTarget; b.disabled = true; b.textContent = '↻ Refreshing…';
+    await S.reload();
+    b.disabled = false; b.textContent = '↻ Refresh';
+    toast(st.error ? st.error : 'Updated from the Google Sheet', !!st.error);
+  });
   S.subscribe(() => {
     status();
     const a = document.activeElement;
