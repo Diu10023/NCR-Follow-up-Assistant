@@ -71,8 +71,13 @@ window.NCR = window.NCR || {};
   function FetchAdapter(url) {
     const call = async (fn, arg) => {
       let res;
-      try { res = await fetch(url, { method: 'POST', body: JSON.stringify({ fn, code: accessCode, arg: arg === undefined ? null : arg }) }); } // text/plain: no CORS preflight
-      catch (e) { throw new Error('Cannot reach the Google Sheet. Check the API URL, and that the Apps Script access is set to "Anyone". (' + (e && e.message || e) + ')'); }
+      const body = JSON.stringify({ fn, code: accessCode, arg: arg === undefined ? null : arg });
+      // Loading is safe to repeat, so retry it when the network call fails. Writes are never repeated (they could be saved twice).
+      for (let i = 0; ; i++) {
+        try { res = await fetch(url, { method: 'POST', body }); break; } // text/plain: no CORS preflight
+        catch (e) { if (fn !== 'apiLoad' || i >= 2) { res = e; break; } await new Promise((r) => setTimeout(r, 1500 * (i + 1))); }
+      }
+      if (res instanceof Error || (res && !('ok' in res))) { const e = res; throw new Error('Cannot reach the Google Sheet. Check the API URL, and that the Apps Script access is set to "Anyone". (' + (e && e.message || e) + ')'); }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       let j; try { j = await res.json(); } catch (e) { throw new Error('The API URL did not answer with data. Is it the /exec link of a Web app deployed for "Anyone"?'); }
       if (j.error) throw new Error(j.error);

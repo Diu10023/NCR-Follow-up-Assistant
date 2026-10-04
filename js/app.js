@@ -16,7 +16,12 @@
       $('#code-form').addEventListener('submit', async (e) => { e.preventDefault(); S.setAccessCode(new FormData(e.target).get('code')); await S.init(); render(); });
       return;
     }
-    if (!st.loaded) { main.innerHTML = `<div class="empty">${st.error ? esc(st.error) : 'Loading…'}</div>`; return; }
+    if (!st.loaded) {
+      main.innerHTML = `<div class="empty">${st.error ? esc(st.error) : 'Loading…'}${st.error ? '<p><button class="btn primary" id="retry-load" type="button">Try again</button></p>' : ''}</div>`;
+      const rb = $('#retry-load');
+      if (rb) rb.addEventListener('click', async () => { rb.disabled = true; rb.textContent = 'Loading…'; await S.init(); render(); });
+      return;
+    }
     const { page, arg } = route();
     const views = { home: V.home, overview: V.home, dashboard: V.home, closed: V.closedPage, followed: V.followedPage, hold: V.holdPage, today: V.list, list: V.list, ncr: () => V.detail(arg), import: V.importPage, imports: V.importsPage, trends: V.trendsPage, help: V.helpPage, changes: () => V.changesPage(arg),  response: V.responsePage, settings: V.settings };
     current = (views[page] || V.home)();
