@@ -337,10 +337,10 @@
     if (row && !e.target.closest('a,button,input,select')) location.hash = row.dataset.href;
   });
 
-  // Auto-load: refresh when the tab regains focus and every 20 seconds (Sheets mode only).
-  function autoRefresh() { if (st.mode === 'sheets' && !st.saving && !modal.open) S.reload(); }
+  // Auto-load: check for changes when the tab regains focus and every 5 seconds (Sheets mode only).
+  function autoRefresh() { if (st.mode === 'sheets' && !st.saving && !modal.open) S.refresh(); }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) autoRefresh(); });
-  setInterval(autoRefresh, 20000);
+  setInterval(autoRefresh, 5000);
 
   // one shared tooltip for chart marks (text only, via textContent)
   const tip = document.createElement('div'); tip.id = 'tip'; tip.hidden = true;

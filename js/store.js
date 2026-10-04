@@ -74,7 +74,7 @@ window.NCR = window.NCR || {};
       const body = JSON.stringify({ fn, code: accessCode, arg: arg === undefined ? null : arg });
       // Loading is safe to repeat, so retry it when the network call fails. Writes are never repeated (they could be saved twice).
       for (let i = 0; ; i++) {
-        try { res = await fetch(url, { method: 'POST', body }); break; } // text/plain: no CORS preflight
+        try { res = await fetch(url, { method: 'POST', body, cache: 'no-store' }); break; } // text/plain: no CORS preflight
         catch (e) { if (fn !== 'apiLoad' || i >= 2) { res = e; break; } await new Promise((r) => setTimeout(r, 1500 * (i + 1))); }
       }
       if (res instanceof Error || (res && !('ok' in res))) { const e = res; throw new Error('Cannot reach the Google Sheet. Check the API URL, and that the Apps Script access is set to "Anyone". (' + (e && e.message || e) + ')'); }
@@ -86,6 +86,7 @@ window.NCR = window.NCR || {};
     return {
       name: 'sheets',
       load: () => call('apiLoad'),
+      version: () => call('apiVersion'),
       save: (p) => call('apiSave', p),
       clear: () => call('apiClear'),
       saveSettings: (s) => call('apiSaveSettings', s),
@@ -102,6 +103,7 @@ window.NCR = window.NCR || {};
     return {
       name: 'sheets',
       async load() { return parse(await run('apiLoad')); },
+      async version() { return parse(await run('apiVersion')); },
       async save(p) { await run('apiSave', p); },
       async clear() { await run('apiClear'); },
       async saveSettings(s) { await run('apiSaveSettings', s); },
@@ -127,7 +129,7 @@ window.NCR = window.NCR || {};
     state.history = (d.history || []).map((h) => { const r = {}; HIST_FIELDS.forEach((f) => { r[f] = h[f] == null ? '' : h[f]; }); return r; });
     state.settings = Object.assign({}, L.DEFAULT_SETTINGS, d.settings || {});
     state.imports = Array.isArray(d.imports) ? d.imports : state.imports; state.stack = Array.isArray(d.stack) ? d.stack : state.stack; state.meta = d.meta || state.meta;
-    state.loaded = true; state.lastLoad = Date.now();
+    state.version = d.version || ''; state.loaded = true; state.lastLoad = Date.now();
   }
 
   async function init() {
@@ -139,6 +141,19 @@ window.NCR = window.NCR || {};
   async function reload() {
     try { normalize(await adapter.load()); state.error = null; state.needCode = false; if (adapter.name === 'sheets') lsSet('ncr.code', accessCode); } catch (e) { state.needCode = /access code/i.test(e.message); state.error = state.needCode ? null : 'Cannot load data: ' + e.message; }
     emit();
+  }
+  // Cheap check used by the auto-refresh: ask the Sheet for its change counter and only reload the data when it moved.
+  // An older Apps Script without that counter falls back to a full reload every 20 seconds.
+  async function refresh() {
+    if (state.refreshing) return;
+    state.refreshing = true;
+    try { await refreshOnce(); } finally { state.refreshing = false; }
+  }
+  async function refreshOnce() {
+    if (!adapter.version || state.noVersion) { if (Date.now() - (state.lastLoad || 0) >= 20000) await reload(); return; }
+    let v;
+    try { v = (await adapter.version()).v; } catch (e) { if (/Unknown function/i.test(e.message)) state.noVersion = true; return; }
+    if (v !== state.version) await reload();
   }
   function persist(fn) {
     state.saving++; emit();
@@ -384,6 +399,6 @@ window.NCR = window.NCR || {};
   // Browser-only mode starts empty: all data comes from the uploaded Excel file.
   function demoData() { return { ncrs: [], history: [], settings: {} }; }
 
-  NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
+  NCR.store = { state, NCR_FIELDS, HIST_FIELDS, init, reload, refresh, subscribe: (f) => listeners.push(f), getNcr, historyFor, owners, buyers,
     saveNcr, addHistory, recordFollowups, bulkSet, markReviewed, undoReview, removeNcr, saveMany, applyImport, undoImport, exportBundle, bundleError, restoreBundle, storageInfo, lastBackup: () => ls.get(BK_KEY), getImports, patchImportLog, getSeen: () => { try { return localStorage.getItem('ncr.seenChanges') || ''; } catch (e) { return ''; } }, setSeen: (v) => { try { localStorage.setItem('ncr.seenChanges', v); } catch (e) { /* storage unavailable */ } }, getImportStack: () => getStack().map((x) => x.at), getLastImport, clearAll, saveSettings, resetDemo, setAccessCode: (c) => { accessCode = String(c || ''); lsSet('ncr.code', accessCode); }, isTeamMode: () => hasGas() || !!apiUrl(), getApiUrl: apiUrl, setApiUrl: (u) => lsSet('ncr.apiUrl', String(u || '').trim()), forgetCode: () => { accessCode = ''; lsSet('ncr.code', ''); } };
 })(window.NCR);

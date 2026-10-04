@@ -59,22 +59,28 @@ function doPost(e) {
 }
 
 // ---------- API called from the page (google.script.run) ----------
-function apiLoad(code) { return api_(code, false, function () { return load_(); }); }
-function apiSave(code, json) { return api_(code, true, function () { save_(JSON.parse(json)); return { ok: true }; }); }
-function apiSaveSettings(code, json) { return api_(code, true, function () { saveSettings_(JSON.parse(json)); return { ok: true }; }); }
-function apiSaveMeta(code, json) { return api_(code, true, function () { var m = JSON.parse(json); kvSet_('imports', JSON.stringify(m.imports || [])); kvSet_('stack', JSON.stringify(m.stack || [])); return { ok: true }; }); }
-function apiClear(code) { return api_(code, true, function () { clear_(); return { ok: true }; }); }
-function apiRestore(code, json) { return api_(code, true, function () { restore_(JSON.parse(json)); return { ok: true }; }); }
+function apiLoad(code) { return api_(code, true, function () { return load_(); }); }
+// Tiny call the website makes every few seconds: it only reloads the data when this value changed.
+function apiVersion(code) { return api_(code, false, function () { return { v: ver_() }; }); }
+function apiSave(code, json) { return api_(code, true, function () { save_(JSON.parse(json)); bump_(); return { ok: true }; }); }
+function apiSaveSettings(code, json) { return api_(code, true, function () { saveSettings_(JSON.parse(json)); bump_(); return { ok: true }; }); }
+function apiSaveMeta(code, json) { return api_(code, true, function () { var m = JSON.parse(json); kvSet_('imports', JSON.stringify(m.imports || [])); kvSet_('stack', JSON.stringify(m.stack || [])); bump_(); return { ok: true }; }); }
+function apiClear(code) { return api_(code, true, function () { clear_(); bump_(); return { ok: true }; }); }
+function apiRestore(code, json) { return api_(code, true, function () { restore_(JSON.parse(json)); bump_(); return { ok: true }; }); }
 
-var API = { apiLoad: apiLoad, apiSave: apiSave, apiSaveSettings: apiSaveSettings, apiSaveMeta: apiSaveMeta, apiClear: apiClear, apiRestore: apiRestore };
+var API = { apiLoad: apiLoad, apiVersion: apiVersion, apiSave: apiSave, apiSaveSettings: apiSaveSettings, apiSaveMeta: apiSaveMeta, apiClear: apiClear, apiRestore: apiRestore };
 
-function api_(code, write, fn) {
+function api_(code, lockIt, fn) {
   if (ACCESS_CODE && code !== ACCESS_CODE) throw new Error('Wrong or missing access code');
   var lock = null;
-  // Reads wait for writes too: a write clears cells before filling them, so an unlocked read could see empty data.
-  lock = LockService.getScriptLock(); lock.waitLock(25000);
+  // Reads of the data wait for writes too: a write clears cells before filling them, so an unlocked read could see empty data.
+  if (lockIt) { lock = LockService.getScriptLock(); lock.waitLock(25000); }
   try { return JSON.stringify(fn()); } finally { if (lock) lock.releaseLock(); }
 }
+
+// Change counter: every write sets a new value, so the website can see cheaply that something changed.
+function ver_() { return PropertiesService.getScriptProperties().getProperty('ncr_v') || '0'; }
+function bump_() { PropertiesService.getScriptProperties().setProperty('ncr_v', String(new Date().getTime()) + Math.random().toString(36).slice(2, 6)); }
 
 // ---------- Sheet helpers ----------
 // Cells are kept as plain text so dates stay "yyyy-MM-dd" and nothing gets auto-converted.
@@ -153,6 +159,7 @@ function load_() {
     settings: settings,
     imports: kvJson_('imports'),
     stack: kvJson_('stack'),
+    version: ver_(),
     meta: { sheetUrl: SpreadsheetApp.getActiveSpreadsheet().getUrl(), user: user }
   };
 }
