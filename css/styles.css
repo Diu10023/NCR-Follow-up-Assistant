@@ -51,14 +51,15 @@ h1,h2,h3,.brand,.big b,#tip .tv{font-family:var(--display);color:var(--fg);lette
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 
 /* ---------- header ---------- */
-.topbar{display:flex;align-items:center;gap:14px 24px;flex-wrap:wrap;padding:14px 28px;position:sticky;top:0;z-index:20;
+.topbar{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:14px 24px;padding:14px 28px;position:sticky;top:0;z-index:20;
   background:var(--hdr-bg);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:var(--hdr-sh)}
-.brand{display:flex;align-items:center;gap:12px;font-size:22px;font-weight:800;line-height:1}
+.brand{display:flex;align-items:center;gap:12px;white-space:nowrap;font-size:22px;font-weight:800;line-height:1}
 .logo{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:var(--r-base);background:var(--bg);box-shadow:var(--ins-d);animation:float 3s ease-in-out infinite}
 .logo path{stroke:var(--acc)}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 .chip.demo{font-size:12px;background:var(--bg);box-shadow:var(--ins-s);color:var(--mut)}
-nav{display:flex;gap:8px;flex:1;flex-wrap:wrap}
+nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.topbar .theme-btn{justify-self:end}
+@media(max-width:1600px){.topbar{display:flex;flex-wrap:wrap}nav{flex:1}}
 nav a{color:var(--fg);font-weight:600;padding:8px 15px;border-radius:var(--r-base);background:var(--bg);box-shadow:var(--ext-s);transition:all var(--ease);text-decoration:none;white-space:nowrap}
 nav a:hover{transform:translateY(-1px);box-shadow:var(--ext);text-decoration:none}
 nav a.active{color:var(--acc);box-shadow:var(--ins-s);transform:none}
