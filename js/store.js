@@ -72,7 +72,7 @@ window.NCR = window.NCR || {};
     const call = async (fn, arg) => {
       let res;
       try { res = await fetch(url, { method: 'POST', body: JSON.stringify({ fn, code: accessCode, arg: arg === undefined ? null : arg }) }); } // text/plain: no CORS preflight
-      catch (e) { throw new Error('Cannot reach the Google Sheet. Check the API URL, and that the Apps Script access is set to "Anyone".'); }
+      catch (e) { throw new Error('Cannot reach the Google Sheet. Check the API URL, and that the Apps Script access is set to "Anyone". (' + (e && e.message || e) + ')'); }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       let j; try { j = await res.json(); } catch (e) { throw new Error('The API URL did not answer with data. Is it the /exec link of a Web app deployed for "Anyone"?'); }
       if (j.error) throw new Error(j.error);
