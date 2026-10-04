@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><title>NCR Follow-up Control: app flow</title>
+<!doctype html><html lang="th"><head><meta charset="utf-8"><title>NCR Follow-up Control: ภาพรวมการทำงาน</title>
 <style>
 body{margin:0;background:#fff;color:#3D4852;font-family:Loma,"DejaVu Sans",Arial,sans-serif}
 figure{margin:0;padding:26px 30px 22px}
@@ -11,7 +11,7 @@ text{font-family:Loma,"DejaVu Sans",Arial,sans-serif;fill:#3D4852;stroke:none}
 </style></head><body><figure>
 <h1>NCR Follow-up Control: ภาพรวมการทำงาน</h1>
 <p class="sub">ส่วนบน: ระบบเชื่อมกันอย่างไร · ส่วนล่าง: สิ่งที่ QA ทำในแต่ละสัปดาห์</p>
-<svg viewBox="0 0 1440 860">
+<svg viewBox="0 0 1440 900">
 <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3D4852"/></marker></defs>
 <g fill="none" stroke="#3D4852" stroke-width="1.8">
 <text class="h" x="30" y="30">1) ระบบเชื่อมกันอย่างไร</text>
@@ -22,7 +22,7 @@ text{font-family:Loma,"DejaVu Sans",Arial,sans-serif;fill:#3D4852;stroke:none}
 <line x1="300" y1="105" x2="398" y2="105" marker-end="url(#a)"/>
 <rect class="box" x="400" y="50" width="270" height="110" rx="14" stroke="#007AC8" stroke-width="2.4"/>
 <text class="t" x="535" y="84" text-anchor="middle">เว็บแอป (Vercel)</text>
-<text class="s" x="535" y="106" text-anchor="middle">หน้าจอทั้งหมด + ประมวลผลไฟล์ Excel</text>
+<text class="s" x="535" y="106" text-anchor="middle">หน้าจอทั้งหมด + อ่านไฟล์ Excel</text>
 <text class="s" x="535" y="124" text-anchor="middle">ไม่เก็บข้อมูลเอง</text>
 <line x1="670" y1="105" x2="768" y2="105" marker-end="url(#a)"/>
 <text class="l" x="719" y="94" text-anchor="middle">อ่าน/เขียน</text>
@@ -37,9 +37,11 @@ text{font-family:Loma,"DejaVu Sans",Arial,sans-serif;fill:#3D4852;stroke:none}
 <text class="s" x="1275" y="118" text-anchor="middle">Settings · _Data (ประวัติอัพโหลด)</text>
 <text class="s" x="1275" y="140" text-anchor="middle">ห้ามแก้ด้วยมือ</text>
 <rect class="box" x="400" y="190" width="270" height="52" rx="12" stroke-dasharray="6 5"/>
-<text class="s" x="535" y="213" text-anchor="middle">GitHub: เก็บโค้ด → Vercel deploy อัตโนมัติ</text>
-<text class="s" x="535" y="231" text-anchor="middle">ทุกครั้งที่ push</text>
+<text class="s" x="535" y="213" text-anchor="middle">GitHub: เก็บโค้ด → Vercel deploy</text>
+<text class="s" x="535" y="231" text-anchor="middle">อัตโนมัติทุกครั้งที่ push</text>
 <line x1="535" y1="190" x2="535" y2="162" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<rect class="box" x="770" y="190" width="640" height="52" rx="12" stroke-dasharray="6 5"/>
+<text class="s" x="1090" y="221" text-anchor="middle">คนอื่นเห็นการเปลี่ยนแปลงใน ~8 วินาที (เช็กอัตโนมัติ) หรือทันทีด้วยปุ่ม Refresh</text>
 
 <text class="h" x="30" y="300">2) สิ่งที่ QA ทำในแต่ละสัปดาห์</text>
 <rect class="box" x="30" y="325" width="230" height="86" rx="14"/>
@@ -83,12 +85,11 @@ text{font-family:Loma,"DejaVu Sans",Arial,sans-serif;fill:#3D4852;stroke:none}
 <rect class="box" x="1120" y="540" width="260" height="110" rx="14" stroke-dasharray="6 5"/>
 <text class="t" x="1250" y="575" text-anchor="middle">NCR หายจากไฟล์</text>
 <text class="s" x="1250" y="597" text-anchor="middle">แจ้งเป็น missing</text>
-<text class="s" x="1250" y="615" text-anchor="middle">ปิดซ้ำแล้วเปิดใหม่ → กลับมา</text>
+<text class="s" x="1250" y="615" text-anchor="middle">ปิดแล้วเปิดใหม่ → กลับมา</text>
 <line x1="370" y1="595" x2="398" y2="595" marker-end="url(#a)"/>
-<text class="l" x="385" y="583" text-anchor="middle"></text>
 <path d="M485 650 L485 720 L1105 720 L1105 413" stroke-dasharray="6 5" marker-end="url(#a)"/>
 <text class="l" x="795" y="710" text-anchor="middle">สัปดาห์ถัดไป: Buyer เขียน Remarks → อัพไฟล์ใหม่ → วนกลับไปที่ What changed</text>
-<rect class="box" x="30" y="760" width="1380" height="60" rx="12" stroke-dasharray="6 5"/>
-<text class="s" x="720" y="784" text-anchor="middle">เมนูเสริม: Buyers (ดูต่อ Buyer + export Excel) · Trends (กราฟ) · Settings (สำรอง/กู้คืน, Undo, ล้างข้อมูล)</text>
-<text class="s" x="720" y="804" text-anchor="middle">ไม่มีการแก้ข้อมูลด้วยมือในแอป: ทุกอย่างมาจากไฟล์ Excel + ปุ่ม Follow-up</text>
+<rect class="box" x="30" y="770" width="1380" height="60" rx="12" stroke-dasharray="6 5"/>
+<text class="s" x="720" y="794" text-anchor="middle">เมนูเสริม: Buyers (ดูต่อ Buyer + export Excel) · Trends (กราฟ) · Settings (สำรอง/กู้คืน, Undo, ล้างข้อมูล)</text>
+<text class="s" x="720" y="814" text-anchor="middle">ไม่มีการแก้ข้อมูลด้วยมือในแอป: ทุกอย่างมาจากไฟล์ Excel + ปุ่ม Follow-up</text>
 </g></svg></figure></body></html>

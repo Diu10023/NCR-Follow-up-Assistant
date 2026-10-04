@@ -1,0 +1,95 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>NCR Follow-up Control: process flow</title>
+<style>
+body{margin:0;background:#fff;color:#3D4852;font-family:Loma,"DejaVu Sans",Arial,sans-serif}
+figure{margin:0;padding:26px 30px 22px}
+h1{font-size:22px;margin:0 0 4px}.sub{font-size:14px;color:#6B7280;margin:0 0 10px}
+svg{display:block;width:100%;height:auto}
+text{font-family:Loma,"DejaVu Sans",Arial,sans-serif;fill:#3D4852;stroke:none}
+.t{font-size:15px;font-weight:700}.s{font-size:12.5px;fill:#5b6572}.h{font-size:15px;font-weight:700;fill:#007AC8}
+.l{font-size:12.5px;font-weight:700;paint-order:stroke;stroke:#fff;stroke-width:5px}
+.box{fill:#fff;stroke:#3D4852;stroke-width:1.6}
+</style></head><body><figure>
+<h1>NCR Follow-up Control: process flow</h1>
+<p class="sub">Top: how the parts connect · Bottom: what QA does every week</p>
+<svg viewBox="0 0 1440 900">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3D4852"/></marker></defs>
+<g fill="none" stroke="#3D4852" stroke-width="1.8">
+<text class="h" x="30" y="30">1) How the system connects</text>
+<rect class="box" x="30" y="50" width="270" height="110" rx="14"/>
+<text class="t" x="165" y="84" text-anchor="middle">Team (QA + others)</text>
+<text class="s" x="165" y="106" text-anchor="middle">Open the same web link</text>
+<text class="s" x="165" y="124" text-anchor="middle">Type the team code once</text>
+<line x1="300" y1="105" x2="398" y2="105" marker-end="url(#a)"/>
+<rect class="box" x="400" y="50" width="270" height="110" rx="14" stroke="#007AC8" stroke-width="2.4"/>
+<text class="t" x="535" y="84" text-anchor="middle">Web app (Vercel)</text>
+<text class="s" x="535" y="106" text-anchor="middle">All screens + reads the Excel file</text>
+<text class="s" x="535" y="124" text-anchor="middle">Stores no data itself</text>
+<line x1="670" y1="105" x2="768" y2="105" marker-end="url(#a)"/>
+<text class="l" x="719" y="94" text-anchor="middle">read / write</text>
+<rect class="box" x="770" y="50" width="270" height="110" rx="14"/>
+<text class="t" x="905" y="84" text-anchor="middle">Apps Script (API)</text>
+<text class="s" x="905" y="106" text-anchor="middle">Checks the team code, reads/writes</text>
+<text class="s" x="905" y="124" text-anchor="middle">the Sheet. Link /exec in config.js</text>
+<line x1="1040" y1="105" x2="1138" y2="105" marker-end="url(#a)"/>
+<rect class="box" x="1140" y="50" width="270" height="110" rx="14"/>
+<text class="t" x="1275" y="78" text-anchor="middle">Google Sheet (database)</text>
+<text class="s" x="1275" y="100" text-anchor="middle">NCR_Master · Followup_History</text>
+<text class="s" x="1275" y="118" text-anchor="middle">Settings · _Data (upload log)</text>
+<text class="s" x="1275" y="140" text-anchor="middle">Do not edit by hand</text>
+<rect class="box" x="400" y="190" width="270" height="52" rx="12" stroke-dasharray="6 5"/>
+<text class="s" x="535" y="213" text-anchor="middle">GitHub: code → Vercel deploys</text>
+<text class="s" x="535" y="231" text-anchor="middle">automatically on every push</text>
+<line x1="535" y1="190" x2="535" y2="162" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<rect class="box" x="770" y="190" width="640" height="52" rx="12" stroke-dasharray="6 5"/>
+<text class="s" x="1090" y="221" text-anchor="middle">Others see changes in about 8 s (auto-check) or at once with the Refresh button</text>
+
+<text class="h" x="30" y="300">2) What QA does every week</text>
+<rect class="box" x="30" y="325" width="230" height="86" rx="14"/>
+<text class="t" x="145" y="358" text-anchor="middle">Weekly Excel export</text>
+<text class="s" x="145" y="380" text-anchor="middle">NCR, Closed, Remarks, Buyer</text>
+<line x1="260" y1="368" x2="338" y2="368" marker-end="url(#a)"/>
+<rect class="box" x="340" y="325" width="230" height="86" rx="14" stroke="#007AC8" stroke-width="2.4"/>
+<text class="t" x="455" y="358" text-anchor="middle">Uploads → Import</text>
+<text class="s" x="455" y="380" text-anchor="middle">Pick the file date, check the preview</text>
+<line x1="570" y1="368" x2="648" y2="368" marker-end="url(#a)"/>
+<rect class="box" x="650" y="325" width="230" height="86" rx="14"/>
+<text class="t" x="765" y="358" text-anchor="middle">Sorted automatically</text>
+<text class="s" x="765" y="380" text-anchor="middle">Matched to old NCRs by NCR No.</text>
+<line x1="880" y1="368" x2="958" y2="368" marker-end="url(#a)"/>
+<rect class="box" x="960" y="325" width="230" height="86" rx="14"/>
+<text class="t" x="1075" y="358" text-anchor="middle">What changed</text>
+<text class="s" x="1075" y="380" text-anchor="middle">What buyers wrote. Press Reviewed</text>
+<line x1="765" y1="411" x2="765" y2="470"/>
+<polyline points="230,540 230,470 1210,470 1210,540"/>
+<line x1="485" y1="470" x2="485" y2="538" marker-end="url(#a)"/>
+<line x1="765" y1="470" x2="765" y2="538" marker-end="url(#a)"/>
+<line x1="990" y1="470" x2="990" y2="538" marker-end="url(#a)"/>
+<line x1="230" y1="510" x2="230" y2="538" marker-end="url(#a)"/>
+<line x1="1210" y1="510" x2="1210" y2="538" marker-end="url(#a)"/>
+<rect class="box" x="90" y="540" width="280" height="110" rx="14" stroke="#C0392B" stroke-width="2.4"/>
+<text class="t" x="230" y="570" text-anchor="middle">To follow up</text>
+<text class="s" x="230" y="592" text-anchor="middle">Red: No remark (chase first)</text>
+<text class="s" x="230" y="610" text-anchor="middle">Orange: Has remark (buyer replied)</text>
+<text class="s" x="230" y="632" text-anchor="middle">Press Follow-up</text>
+<rect class="box" x="400" y="540" width="170" height="110" rx="14"/>
+<text class="t" x="485" y="575" text-anchor="middle">Followed up</text>
+<text class="s" x="485" y="597" text-anchor="middle">Stays here until the</text>
+<text class="s" x="485" y="615" text-anchor="middle">file closes it</text>
+<rect class="box" x="670" y="540" width="190" height="110" rx="14"/>
+<text class="t" x="765" y="575" text-anchor="middle">Closed</text>
+<text class="s" x="765" y="597" text-anchor="middle">The file says it is closed</text>
+<rect class="box" x="890" y="540" width="200" height="110" rx="14"/>
+<text class="t" x="990" y="575" text-anchor="middle">Hold &amp; Jira</text>
+<text class="s" x="990" y="597" text-anchor="middle">Hold for scrap</text>
+<text class="s" x="990" y="615" text-anchor="middle">Closed because of Jira</text>
+<rect class="box" x="1120" y="540" width="260" height="110" rx="14" stroke-dasharray="6 5"/>
+<text class="t" x="1250" y="575" text-anchor="middle">NCR missing from file</text>
+<text class="s" x="1250" y="597" text-anchor="middle">Shown as missing</text>
+<text class="s" x="1250" y="615" text-anchor="middle">Closed then reopened → comes back</text>
+<line x1="370" y1="595" x2="398" y2="595" marker-end="url(#a)"/>
+<path d="M485 650 L485 720 L1105 720 L1105 413" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<text class="l" x="795" y="710" text-anchor="middle">Next week: buyer writes Remarks → upload the new file → back to What changed</text>
+<rect class="box" x="30" y="770" width="1380" height="60" rx="12" stroke-dasharray="6 5"/>
+<text class="s" x="720" y="794" text-anchor="middle">Extra menus: Buyers (per buyer + Excel export) · Trends (charts) · Settings (backup/restore, Undo, clear data)</text>
+<text class="s" x="720" y="814" text-anchor="middle">No manual editing in the app: everything comes from the Excel file + the Follow-up button</text>
+</g></svg></figure></body></html>
